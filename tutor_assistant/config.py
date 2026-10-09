@@ -82,6 +82,7 @@ class Settings:
     allowed_domains: tuple[str, ...] = ()  # домены школы и разрешённые сайты
     allowed_phones: tuple[str, ...] = ()  # телефоны поддержки школы (только цифры)
     split_window_seconds: int = 180  # окно склейки номера, разбитого на сообщения
+    relay_media: bool = True  # анонимный мост: пересылать фото/файлы/голосовые (их содержимое не проверяется)
 
     # Интеграции
     telegram_token: str = ""
@@ -110,6 +111,7 @@ class Settings:
             allowed_domains=tuple(x.lower() for x in _env_list("TUTOR_ALLOWED_DOMAINS")),
             allowed_phones=tuple("".join(c for c in x if c.isdigit()) for x in _env_list("TUTOR_ALLOWED_PHONES")),
             split_window_seconds=_env_int("TUTOR_SPLIT_WINDOW_SECONDS", cls.split_window_seconds),
+            relay_media=_env_bool("TUTOR_RELAY_MEDIA", cls.relay_media),
             telegram_token=_env("TELEGRAM_BOT_TOKEN"),
             admin_chat_id=_env("TUTOR_ADMIN_CHAT_ID"),
             admin_user_ids=_env_list("TUTOR_ADMIN_USER_IDS"),

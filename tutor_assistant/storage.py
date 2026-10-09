@@ -94,6 +94,39 @@ CREATE TABLE IF NOT EXISTS incidents (
 );
 CREATE INDEX IF NOT EXISTS idx_incidents_lesson ON incidents(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_incidents_user ON incidents(user_id, created_at);
+
+-- Анонимный мост: преподаватель и ученик общаются только через бота
+CREATE TABLE IF NOT EXISTS pairs (
+    id TEXT PRIMARY KEY,
+    tutor_alias TEXT NOT NULL,
+    student_alias TEXT NOT NULL,
+    tutor_user_id TEXT,
+    student_user_id TEXT,
+    tutor_code TEXT NOT NULL UNIQUE,
+    student_code TEXT NOT NULL UNIQUE,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_pairs_tutor ON pairs(tutor_user_id);
+CREATE INDEX IF NOT EXISTS idx_pairs_student ON pairs(student_user_id);
+
+CREATE TABLE IF NOT EXISTS relay_current (
+    user_id TEXT PRIMARY KEY,
+    pair_id TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS relay_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pair_id TEXT NOT NULL,
+    src_chat TEXT NOT NULL,
+    src_msg INTEGER NOT NULL,
+    dst_chat TEXT NOT NULL,
+    dst_msg INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_relay_dst ON relay_messages(dst_chat, dst_msg);
+CREATE INDEX IF NOT EXISTS idx_relay_src ON relay_messages(src_chat, src_msg);
 """
 
 
@@ -309,3 +342,56 @@ class Storage:
             params.append(user_id)
         row = self._one(f"SELECT COUNT(*) AS n FROM incidents WHERE {' AND '.join(cond)}", params)
         return int(row["n"]) if row else 0
+
+    # -- анонимный мост -------------------------------------------------------------
+    def create_pair(self, pair_id: str, tutor_alias: str, student_alias: str, tutor_code: str, student_code: str,
+                    created_by: str | None) -> dict[str, Any]:
+        self._exec("INSERT INTO pairs(id, tutor_alias, student_alias, tutor_code, student_code, created_by, created_at)"
+                   " VALUES (?,?,?,?,?,?,?)",
+                   (pair_id, tutor_alias, student_alias, tutor_code, student_code, created_by, utcnow()))
+        return self.get_pair(pair_id)  # type: ignore[return-value]
+
+    def get_pair(self, pair_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM pairs WHERE id=?", (pair_id,))
+
+    def pair_by_code(self, code: str) -> tuple[dict[str, Any], str] | None:
+        row = self._one("SELECT * FROM pairs WHERE tutor_code=?", (code,))
+        if row:
+            return row, "tutor"
+        row = self._one("SELECT * FROM pairs WHERE student_code=?", (code,))
+        return (row, "student") if row else None
+
+    def bind_pair_user(self, pair_id: str, role: str, user_id: str) -> None:
+        column = "tutor_user_id" if role == "tutor" else "student_user_id"
+        self._exec(f"UPDATE pairs SET {column}=? WHERE id=?", (user_id, pair_id))
+
+    def deactivate_pair(self, pair_id: str) -> bool:
+        return bool(self._exec("UPDATE pairs SET active=0 WHERE id=? AND active=1", (pair_id,)).rowcount)
+
+    def pairs_for_user(self, user_id: str) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM pairs WHERE active=1 AND (tutor_user_id=? OR student_user_id=?)"
+                         " ORDER BY created_at, rowid", (user_id, user_id))
+
+    def list_pairs(self, include_inactive: bool = False, limit: int = 100) -> list[dict[str, Any]]:
+        where = "" if include_inactive else "WHERE active=1"
+        return self._all(f"SELECT * FROM pairs {where} ORDER BY created_at DESC, rowid DESC LIMIT ?", (int(limit),))
+
+    def set_current_pair(self, user_id: str, pair_id: str) -> None:
+        self._exec("INSERT INTO relay_current(user_id, pair_id) VALUES (?,?)"
+                   " ON CONFLICT(user_id) DO UPDATE SET pair_id=excluded.pair_id", (user_id, pair_id))
+
+    def current_pair_id(self, user_id: str) -> str | None:
+        row = self._one("SELECT pair_id FROM relay_current WHERE user_id=?", (user_id,))
+        return row["pair_id"] if row else None
+
+    def add_relay_message(self, pair_id: str, src_chat: str, src_msg: int, dst_chat: str, dst_msg: int) -> None:
+        self._exec("INSERT INTO relay_messages(pair_id, src_chat, src_msg, dst_chat, dst_msg, created_at)"
+                   " VALUES (?,?,?,?,?,?)", (pair_id, src_chat, int(src_msg), dst_chat, int(dst_msg), utcnow()))
+
+    def relay_by_dst(self, dst_chat: str, dst_msg: int) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM relay_messages WHERE dst_chat=? AND dst_msg=? ORDER BY id DESC LIMIT 1",
+                         (dst_chat, int(dst_msg)))
+
+    def relay_by_src(self, src_chat: str, src_msg: int) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM relay_messages WHERE src_chat=? AND src_msg=? ORDER BY id",
+                         (src_chat, int(src_msg)))
