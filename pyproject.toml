@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tutor-assistant"
+version = "1.0.0"
+description = "AI-ассистент онлайн-школы: контроль обмена контактами, конспект урока, новые слова, тест и домашнее задание"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.7",
+    "anthropic>=1.12",
+    "python-telegram-bot>=22.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+tutor-assistant = "tutor_assistant.cli:main"
+
+[tool.setuptools]
+packages = ["tutor_assistant"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "I"]
+ignore = ["E501"]  # длинные регулярные выражения и текст промпта
