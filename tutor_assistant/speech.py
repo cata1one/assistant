@@ -85,7 +85,7 @@ class WhisperTranscriber:
         self.last_error: str | None = None
         self._model = None
         self._lock = threading.Lock()
-        self._load_failed_at = 0.0
+        self._load_failed_at: float | None = None
 
     @property
     def available(self) -> bool:
@@ -95,7 +95,7 @@ class WhisperTranscriber:
         if self._model is None:
             from faster_whisper import WhisperModel
 
-            if time.monotonic() - self._load_failed_at < LOAD_RETRY_SECONDS:
+            if self._load_failed_at is not None and time.monotonic() - self._load_failed_at < LOAD_RETRY_SECONDS:
                 raise RuntimeError(self.last_error or "модель распознавания речи недоступна")
             log.info("Загрузка модели распознавания речи %s (%s/%s)…", self.model_name, self.device, self.compute_type)
             try:
