@@ -1027,7 +1027,10 @@ class TutorBot:
     def build(self) -> Application:
         if not self.settings.telegram_token:
             raise SystemExit("Не задан TELEGRAM_BOT_TOKEN (см. .env.example)")
-        app = Application.builder().token(self.settings.telegram_token).post_init(self._post_init).build()
+        builder = Application.builder().token(self.settings.telegram_token).post_init(self._post_init)
+        if self.settings.telegram_proxy:  # если api.telegram.org недоступен напрямую
+            builder = builder.proxy(self.settings.telegram_proxy).get_updates_proxy(self.settings.telegram_proxy)
+        app = builder.build()
         app.add_handler(CommandHandler("start", self.cmd_start))
         app.add_handler(CommandHandler("help", self.cmd_help))
         app.add_handler(CommandHandler("new_pair", self.cmd_new_pair))
@@ -1074,9 +1077,18 @@ def run_bot(settings: Settings, with_site: bool = False, host: str | None = None
         server = make_server(bot.assistant, host, port)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         log.info("Сайт и HTTP API: http://%s:%s", host, port)
-    log.info("Бот запущен")
+    log.info("Бот подключается к Telegram…")
     try:
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
+        app.run_polling(allowed_updates=Update.ALL_TYPES, bootstrap_retries=3)
+    except (TelegramError, OSError) as exc:
+        log.error("Нет связи с серверами Telegram (%s). Проверьте интернет и TELEGRAM_BOT_TOKEN. "
+                  "Если api.telegram.org недоступен, задайте прокси в TELEGRAM_PROXY (см. .env.example).", exc)
+        if server:
+            log.warning("Бот не запущен, но сайт продолжает работать: http://%s:%s (остановить — Ctrl+C)", host, port)
+            try:
+                threading.Event().wait()
+            except KeyboardInterrupt:
+                pass
     finally:
         if server:
             server.shutdown()

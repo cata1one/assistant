@@ -99,6 +99,7 @@ class Settings:
 
     # Интеграции
     telegram_token: str = ""
+    telegram_proxy: str = ""  # прокси для связи с Telegram: http://host:port или socks5://user:pass@host:port
     admin_chat_id: str = ""  # куда слать уведомления о нарушениях
     admin_user_ids: tuple[str, ...] = ()
     api_token: str = ""  # Bearer-токен HTTP API (пусто — без авторизации, только для локальной разработки)
@@ -144,6 +145,7 @@ class Settings:
             recording_gap_seconds=_env_int("TUTOR_RECORDING_GAP_SECONDS", cls.recording_gap_seconds),
             alert_webhook_url=_env("TUTOR_ALERT_WEBHOOK_URL", cls.alert_webhook_url),
             telegram_token=_env("TELEGRAM_BOT_TOKEN"),
+            telegram_proxy=_env("TELEGRAM_PROXY"),
             admin_chat_id=_env("TUTOR_ADMIN_CHAT_ID"),
             admin_user_ids=_env_list("TUTOR_ADMIN_USER_IDS"),
             api_token=_env("TUTOR_API_TOKEN"),
