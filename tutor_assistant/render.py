@@ -6,7 +6,7 @@ import html
 from collections.abc import Iterable
 
 from .homework import LANGUAGE_NAMES
-from .models import HomeworkTask, LessonReport, TestQuestion, VocabItem
+from .models import HOMEWORK_STATUS_RU, HomeworkTask, LessonReport, TestQuestion, VocabItem
 from .quiz import LETTERS
 
 
@@ -100,15 +100,68 @@ def render_stats(r: LessonReport) -> str:
     return "📊 " + "; ".join(parts)
 
 
+def render_review(r: LessonReport) -> str:
+    if not r.review_items:
+        return ""
+    return "🔁 Что повторить к следующему уроку:\n" + "\n".join(f"• {x}" for x in r.review_items)
+
+
+def render_student_report(r: LessonReport) -> str:
+    """Конспект для ученика: материал урока, что повторить, тест (без ответов) и ДЗ."""
+    blocks = [render_summary(r), render_review(r), render_words(r.vocabulary, "Новые слова урока")]
+    if r.extra_words:
+        blocks.append(render_words(r.extra_words, "Также звучали на уроке"))
+    blocks += [render_test(r.test, with_answers=False) + "\n\nОтветы — в файле конспекта (раздел «Ответы»).",
+               render_homework(r.homework_teacher, r.homework_generated)]
+    return "\n\n".join(b for b in blocks if b)
+
+
+def render_parent_report(r: LessonReport) -> str:
+    """Отчёт для родителей: успехи, на что обратить внимание, замечания, ДЗ, как помочь дома."""
+    p = r.parent
+    who = f" — {p.student_name}" if p.student_name else ""
+    lines = [f"👨‍👩‍👧 Отчёт об уроке {r.date}{who}"]
+    if r.topic:
+        lines.append(f"Тема: {r.topic}")
+    if p.summary:
+        lines += ["", p.summary]
+    if p.activity:
+        lines += ["", f"Активность на уроке: {p.activity}"]
+    if p.achievements:
+        lines += ["", "✅ Успехи:"] + [f"• {x}" for x in p.achievements]
+    if p.attention:
+        lines += ["", "⚠️ На что обратить внимание:"] + [f"• {x}" for x in p.attention]
+    if p.teacher_remarks:
+        lines += ["", "💬 Замечания преподавателя:"] + [f"• {x}" for x in p.teacher_remarks]
+    lines += ["", f"📝 Домашнее задание к этому уроку: {HOMEWORK_STATUS_RU.get(p.homework_status, p.homework_status)}"]
+    if r.homework_teacher:
+        lines.append("Задано к следующему уроку:")
+        lines += [f"{i}. {t.text}" for i, t in enumerate(r.homework_teacher, 1)]
+    if r.progress and r.progress.lessons_total > 1:
+        pr = r.progress
+        lines += ["", f"📈 Прогресс: уроков — {pr.lessons_total}, слов в словаре — {pr.words_total}"
+                      f" (+{pr.words_this_lesson} за урок)"]
+    if p.recommendations:
+        lines += ["", "💡 Как помочь дома:"] + [f"• {x}" for x in p.recommendations]
+    return "\n".join(lines)
+
+
 def render_report(r: LessonReport, with_answers: bool = True) -> str:
-    blocks = [render_summary(r), render_words(r.vocabulary, "Новые слова урока")]
+    """Полный отчёт для преподавателя: всё, что получили ученик и родители, плюс ответы и статистика."""
+    blocks = [render_summary(r), render_review(r), render_words(r.vocabulary, "Новые слова урока")]
     if r.extra_words:
         blocks.append(render_words(r.extra_words, "Также звучали на уроке"))
     blocks += [render_test(r.test, with_answers=with_answers), render_homework(r.homework_teacher, r.homework_generated),
-               render_stats(r)]
+               render_stats(r), "— — —\n" + render_parent_report(r)]
     if r.notes:
         blocks.append("ℹ️ " + "\nℹ️ ".join(r.notes))
-    return "\n\n".join(blocks)
+    return "\n\n".join(b for b in blocks if b)
+
+
+def render_parent_markdown(r: LessonReport) -> str:
+    text = render_parent_report(r)
+    head, _, rest = text.partition("\n")
+    return f"# {head}\n{rest}\n"
 
 
 def render_report_markdown(r: LessonReport) -> str:
@@ -133,6 +186,8 @@ def render_report_markdown(r: LessonReport) -> str:
             for i, v in enumerate(r.vocabulary, 1))
     if r.extra_words:
         md.append("## Также звучали на уроке\n" + ", ".join(v.word for v in r.extra_words))
+    if r.review_items:
+        md.append("## Что повторить к следующему уроку\n" + "\n".join(f"- {x}" for x in r.review_items))
     if r.corrections:
         md.append("## Работа над ошибками\n" + "\n".join(
             f"- ~~{c.wrong}~~ → **{c.correct}**" + (f" — {c.note}" if c.note else "") if c.wrong != "—"

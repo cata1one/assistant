@@ -95,6 +95,39 @@ class LessonStats(BaseModel):
     violations: int = 0
 
 
+class Progress(BaseModel):
+    """Динамика по сравнению с прошлыми уроками того же ученика."""
+
+    lessons_total: int = 1
+    words_total: int = 0  # слов в словаре ученика после урока
+    words_this_lesson: int = 0
+    corrections_now: int = 0
+    corrections_prev: int | None = None
+    talk_share_now: float = 0.0
+    talk_share_prev: float | None = None
+
+
+class ParentReport(BaseModel):
+    """Отчёт для родителей: успехи, на что обратить внимание, замечания преподавателя."""
+
+    student_name: str | None = None
+    summary: str = ""
+    achievements: list[str] = Field(default_factory=list)  # успехи
+    attention: list[str] = Field(default_factory=list)  # на что обратить внимание
+    teacher_remarks: list[str] = Field(default_factory=list)  # замечания преподавателя
+    homework_status: str = "unknown"  # done | partial | not_done | unknown — как выполнено прошлое ДЗ
+    recommendations: list[str] = Field(default_factory=list)  # как помочь дома
+    activity: str | None = None  # активность на уроке
+
+
+HOMEWORK_STATUS_RU = {
+    "done": "выполнено",
+    "partial": "выполнено частично",
+    "not_done": "не выполнено",
+    "unknown": "на уроке не обсуждалось",
+}
+
+
 class LessonReport(BaseModel):
     lesson_id: str | None = None
     title: str | None = None
@@ -111,6 +144,9 @@ class LessonReport(BaseModel):
     homework_teacher: list[HomeworkTask] = Field(default_factory=list)
     homework_generated: list[HomeworkTask] = Field(default_factory=list)
     stats: LessonStats = Field(default_factory=LessonStats)
+    review_items: list[str] = Field(default_factory=list)  # что повторить к следующему уроку
+    parent: ParentReport = Field(default_factory=ParentReport)
+    progress: Progress | None = None
     generated_by: str = "offline"  # offline | claude
     notes: list[str] = Field(default_factory=list)
 

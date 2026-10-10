@@ -28,6 +28,21 @@ _QUESTION_RE = re.compile(r"(?:какое|какая|что|а)\s+(?:у\s+нас
                           re.IGNORECASE)
 
 
+_ASSIGN_RE = re.compile(
+    r"(?<![\w])(?:(?:выучи|сделай|напиши|прочитай|прочти|выполни|повтори|подготовь|перескажи|переведи|послушай"
+    r"|посмотри|ответь|составь|запиши|реши|найди|заполни|придумай|расскажи)(?:те)?"
+    r"|выучить|сделать|написать|прочитать|выполнить|повторить|подготовить|пересказать|перевести|послушать"
+    r"|посмотреть|ответить|составить|записать|решить|заполнить|придумать|рассказать"
+    r"|learn|do|write|read|prepare|translate|watch|listen|finish|complete|revise|practi[cs]e)(?![\w])",
+    re.IGNORECASE,
+)
+_CHECK_RE = re.compile(
+    r"(?<![\w])(?:провер\w*|не\s+(?:сделал\w*|выполнил\w*|сделан\w*|выполнен\w*)|сделал\w*|выполнил\w*|как\s+(?:там|у\s+тебя|у\s+вас)"
+    r"|did\s+you|have\s+you\s+done|check)(?![\w])",
+    re.IGNORECASE,
+)
+
+
 def _split_tasks(text: str) -> list[str]:
     text = text.strip().strip(":—–- ")
     if not text:
@@ -64,6 +79,10 @@ def extract_from_message(text: str) -> tuple[list[str], bool]:
     sentence = text[start:end].strip()
     if len(sentence.split()) < 3:
         return [], True
+    # В устной речи «домашнее задание» звучит и при проверке старого: «проверим домашнее задание»,
+    # «ты не сделал дз». Заданием считаем только фразу с поручением.
+    if _CHECK_RE.search(sentence) or not _ASSIGN_RE.search(sentence):
+        return [], False
     return _split_tasks(sentence), False
 
 

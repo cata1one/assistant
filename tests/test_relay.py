@@ -253,7 +253,10 @@ def test_relay_lesson_flow(bot):
     run(bot.cmd_lesson_end(pm(TUTOR_ID, "/lesson_end"), end))
     for uid in (TUTOR_ID, STUDENT_ID):
         assert any("Конспект урока" in t for t in sent_texts(end, uid))
-    assert end.bot.send_document.await_count == 2
+    assert end.bot.send_document.await_count == 1  # файл конспекта — ученику
+    assert end.bot.send_document.call_args.args[0] == STUDENT_ID
+    tutor_text = "\n".join(sent_texts(end, TUTOR_ID))
+    assert "Полный отчёт для преподавателя" in tutor_text and "Родители ученика не подключены" in tutor_text
 
 
 def test_not_connected_user_gets_regular_private_mode(bot):

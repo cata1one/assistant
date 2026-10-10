@@ -72,6 +72,10 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         )
     if args.json:
         print(json.dumps({"report": report.model_dump(), "violations": violations}, ensure_ascii=False, indent=2))
+    elif args.audience == "student":
+        print(render.render_student_report(report))
+    elif args.audience == "parent":
+        print(render.render_parent_report(report))
     else:
         print(render.render_report(report))
         if violations:
@@ -82,6 +86,9 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     if args.md:
         Path(args.md).write_text(render.render_report_markdown(report), encoding="utf-8")
         print(f"\nКонспект сохранён: {args.md}", file=sys.stderr)
+    if args.parent_md:
+        Path(args.parent_md).write_text(render.render_parent_markdown(report), encoding="utf-8")
+        print(f"Отчёт для родителей сохранён: {args.parent_md}", file=sys.stderr)
     return 0
 
 
@@ -150,6 +157,8 @@ def cmd_chat(args: argparse.Namespace) -> int:
                                               for w in out.new_words))
         if out.new_homework:
             print("   📝 Записал ДЗ: " + "; ".join(h.text for h in out.new_homework))
+        if out.parent_note and not m.blocked:
+            print("   📝 Заметка для родителей сохранена (ученик её не видит)")
         answer = assistant.handle_text_query(body.strip(), chat_id=f"cli:{args.chat}")
         if answer:
             print(answer)
@@ -265,7 +274,10 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--tutor", action="append", help="имя преподавателя в расшифровке (можно несколько)")
     a.add_argument("--student-name", action="append", help="имя ученика в расшифровке (можно несколько)")
     a.add_argument("--json", action="store_true", help="вывод в JSON")
-    a.add_argument("--md", help="сохранить конспект в Markdown")
+    a.add_argument("--md", help="сохранить конспект ученика в Markdown")
+    a.add_argument("--parent-md", help="сохранить отчёт для родителей в Markdown")
+    a.add_argument("--for", dest="audience", choices=["tutor", "student", "parent"], default="tutor",
+                   help="чей вариант показать: преподавателя (полный), ученика или родителей")
     a.add_argument("--save", action="store_true", help="сохранить урок, слова и нарушения в базу")
     a.add_argument("--no-llm", action="store_true", help="не использовать Claude")
     a.set_defaults(func=cmd_analyze)

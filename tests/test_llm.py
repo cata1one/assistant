@@ -36,6 +36,10 @@ def llm_report(**over):
         test=[LLMQuestion(kind="choice", question="cat — это…", options=["кошка", "собака"], answer="кошка",
                           explanation=None)],
         homework_teacher=["Выучить слова"], homework_generated=["Напишите 3 предложения про кошек"],
+        review_items=["Артикль a перед согласной"], parent_summary="Миша выучил названия животных.",
+        parent_achievements=["Уверенно называет животных"], parent_attention=["Путает a и an"],
+        parent_teacher_remarks=["Молодец на уроке"], homework_status="unknown",
+        parent_recommendations=["Повторяйте слова 5 минут в день"],
     )
     data.update(over)
     return LLMLessonReport(**data)

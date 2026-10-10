@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import re
 import time
 from typing import Any
 
@@ -28,6 +29,7 @@ from .commands import HELP_TEXT, detect_command
 from .config import Settings
 from .contact_guard import ModerationResult, Severity
 from .models import Role
+from .parent_report import parent_note
 from .relay import TUTOR, Pair, RelayError, RelayService
 from .service import AudioOutcome, MessageOutcome, TutorAssistant
 from .summary import plural
@@ -129,9 +131,9 @@ class TutorBot:
     async def cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text(HELP_TEXT + "\nКоманды: /lesson_start [тема], /lesson_end, /words, "
                                                   "/words_today, /dictionary, /homework, /test, /answers, /summary, "
-                                                  "/report, /check <текст>, /chats, /recording\n"
+                                                  "/report, /check <текст>, /chats, /recording, /note <текст>\n"
                                                   "Администраторам: /new_pair Преподаватель | Ученик, /pairs, "
-                                                  "/unpair <id>, /incidents")
+                                                  "/unpair <id>, /parent_link, /incidents")
 
     async def cmd_lesson_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         chat, user, msg = update.effective_chat, update.effective_user, update.effective_message
@@ -184,13 +186,131 @@ class TutorBot:
             log.exception("Ошибка при завершении урока %s", lesson["id"])
             await msg.reply_text("Не удалось подготовить отчёт. Урок сохранён — попробуйте /lesson_end ещё раз.")
             return
-        await self._send_long(context, chat.id, render.render_report(report, with_answers=False))
-        md = render.render_report_markdown(report).encode("utf-8")
+        await self._deliver_reports(context, report, chat_key=str(chat.id), student_targets=[chat.id],
+                                    tutor_target=int(lesson["tutor_id"]) if str(lesson.get("tutor_id") or "").lstrip("-").isdigit()
+                                    else None)
+
+    async def _deliver_reports(self, context: ContextTypes.DEFAULT_TYPE, report: Any, chat_key: str,
+                               student_targets: list[int], tutor_target: int | None) -> None:
+        """Ученику — конспект, преподавателю — полный отчёт с ответами, родителям — отчёт об успехах."""
+        md = io.BytesIO(render.render_report_markdown(report).encode("utf-8"))
+        for target in student_targets:
+            try:
+                await self._send_long(context, target, render.render_student_report(report))
+                md.seek(0)
+                await context.bot.send_document(target, document=md, filename=f"konspekt_{report.date}.md",
+                                                caption="Конспект урока (ответы к тесту — в конце файла)")
+            except TelegramError as exc:
+                log.warning("Не удалось отправить конспект в %s: %s", target, exc)
+        parents = self.assistant.storage.parents_for(chat_key)
+        delivered = 0
+        for parent in parents:
+            try:
+                await self._send_long(context, int(parent), render.render_parent_report(report))
+                delivered += 1
+            except (TelegramError, ValueError) as exc:
+                log.warning("Не удалось отправить отчёт родителю %s: %s", parent, exc)
+        if tutor_target is not None:
+            status = (f"📨 Отчёт отправлен родителям: {delivered}." if parents else
+                      "ℹ️ Родители ученика не подключены — ссылку для них выдаёт администратор школы (/parent_link).")
+            try:
+                await self._send_long(context, tutor_target, "📋 Полный отчёт для преподавателя\n\n"
+                                      + render.render_report(report, with_answers=True) + "\n\n" + status)
+            except TelegramError as exc:
+                log.warning("Не удалось отправить отчёт преподавателю: %s", exc)
+
+    async def cmd_note(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """/note текст — замечание преподавателя для родителей (ученик его не видит)."""
+        msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
+        text = " ".join(context.args or []).strip()
+        if chat.type == ChatType.PRIVATE:
+            current = self.relay.current(str(user.id))
+            if not current or current[1] != TUTOR:
+                await msg.reply_text("Заметки для родителей пишет преподаватель во время урока.")
+                return
+            chat_key = current[0].chat_id
+        else:
+            chat_key = str(chat.id)
+            try:
+                await msg.delete()  # ученик в группе не должен видеть заметку
+            except TelegramError:
+                pass
+        lesson = self.assistant.storage.active_lesson(chat_key)
+        reply = msg.reply_text if chat.type == ChatType.PRIVATE else (
+            lambda t: context.bot.send_message(user.id, t))
+        if not lesson or (str(user.id) != str(lesson.get("tutor_id")) and not self._is_school_admin(update)):
+            await self._safe(reply, "Заметки для родителей добавляет преподаватель во время урока (после /lesson_start).")
+            return
+        if not text:
+            await self._safe(reply, "Использование: /note Миша стал увереннее говорить, но нужно повторить времена")
+            return
+        ok, result = self.assistant.add_note(lesson["id"], text, str(user.id), self._name(update))
+        await self._safe(reply, "📝 Заметка для родителей сохранена — она войдёт в отчёт после урока." if ok else
+                         f"🚫 Заметка не сохранена: {result.summary}. Личные контакты передавать нельзя.")
+
+    @staticmethod
+    async def _safe(send: Any, text: str) -> None:
         try:
-            await context.bot.send_document(chat.id, document=io.BytesIO(md), filename=f"konspekt_{report.date}.md",
-                                            caption="Конспект урока (с ответами к тесту)")
+            await send(text)
         except TelegramError as exc:
-            log.warning("Не удалось отправить файл конспекта: %s", exc)
+            log.warning("Не удалось отправить сообщение: %s", exc)
+
+    async def cmd_parent_link(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Ссылка для родителей: /parent_link <id пары> в личке или /parent_link в чате урока (только администратор)."""
+        msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
+        is_admin = self._is_school_admin(update) or (chat.type != ChatType.PRIVATE and await self._is_admin(update, context))
+        if not is_admin:
+            await msg.reply_text("Ссылки для родителей выдаёт администратор школы.")
+            return
+        if chat.type == ChatType.PRIVATE:
+            pair = self.relay.get(context.args[0]) if context.args else None
+            if not pair:
+                await msg.reply_text("Использование: /parent_link <id пары> (список пар: /pairs)")
+                return
+            chat_key, student = pair.chat_id, pair.student_alias
+        else:
+            chat_key, student = str(chat.id), None
+        code = self.assistant.create_parent_invite(chat_key, student, created_by=str(user.id))
+        text = ("Ссылка для родителей" + (f" ученика «{student}»" if student else "") + " (до 2 человек):\n"
+                + self._link(context, f"p_{code}") + "\nРодители будут получать отчёт после каждого урока. "
+                "Писать преподавателю через неё нельзя.")
+        try:
+            await context.bot.send_message(user.id, text, disable_web_page_preview=True)
+            if chat.type != ChatType.PRIVATE:
+                await msg.reply_text("Ссылка для родителей отправлена администратору в личные сообщения.")
+        except TelegramError:
+            await msg.reply_text("Не могу написать вам в личку — откройте диалог с ботом (/start) и повторите.")
+
+    @staticmethod
+    def _link(context: ContextTypes.DEFAULT_TYPE, payload: str) -> str:
+        username = context.bot.username
+        return f"https://t.me/{username}?start={payload}" if username else f"/start {payload}"
+
+    async def _parent_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE, code: str) -> None:
+        msg, user = update.effective_message, update.effective_user
+        invite = self.assistant.subscribe_parent(code, str(user.id))
+        if not invite:
+            await msg.reply_text("❌ Ссылка недействительна или уже использована. Обратитесь к администратору школы.")
+            return
+        who = f" ученика «{invite['student_name']}»" if invite.get("student_name") else ""
+        await msg.reply_text(f"✅ Готово! Вы будете получать отчёт после каждого урока{who}: успехи, на что обратить "
+                             "внимание, замечания преподавателя и домашнее задание.\nПоследний отчёт: напишите «отчёт».")
+        await self._notify_admin_text(context, f"👨‍👩‍👧 Подключился родитель{who} (id {user.id}, {self._name(update)})")
+
+    async def _parent_message(self, update: Update) -> None:
+        msg, user = update.effective_message, update.effective_user
+        text = (msg.text or "").strip().lower()
+        if re.search(r"отч[её]т|успех|прогресс|как\s+дела|report", text):
+            reports = self.assistant.parent_report_for(str(user.id))
+            if not reports:
+                await msg.reply_text("Отчётов пока нет — он придёт после ближайшего урока.")
+                return
+            for _, report in reports:
+                for part in render.split_message(render.render_parent_report(report)):
+                    await msg.reply_text(part)
+            return
+        await msg.reply_text("Здесь приходят отчёты об уроках. Последний отчёт — напишите «отчёт». "
+                             "С вопросами обращайтесь в поддержку школы.")
 
     async def _answer(self, update: Update, command: str) -> None:
         chat, user = update.effective_chat, update.effective_user
@@ -366,6 +486,14 @@ class TutorBot:
         if result.action == "warn":
             await msg.reply_text(result.warning or "")
             await self._notify_admin(context, update, result, incident_id, role)
+        if outcome and outcome.parent_note is not None:
+            try:
+                await msg.delete()
+            except TelegramError:
+                pass
+            await self._safe(lambda t: context.bot.send_message(user.id, t),
+                             "📝 Заметка для родителей сохранена. В групповом чате удобнее писать /note текст.")
+            return
 
         if outcome and (outcome.new_words or outcome.new_homework):
             parts = []
@@ -500,6 +628,9 @@ class TutorBot:
             else:
                 await self.cmd_help(update, context)
             return
+        if context.args[0].startswith("p_"):
+            await self._parent_start(update, context, context.args[0][2:])
+            return
         try:
             pair, role = self.relay.bind(context.args[0], str(user.id))
         except RelayError as exc:
@@ -530,12 +661,14 @@ class TutorBot:
         tutor_alias, _, student_alias = raw.partition("|")
         pair = self.relay.create_pair(tutor_alias, student_alias, created_by=str(update.effective_user.id))
         t_payload, s_payload = self.relay.invite_payloads(pair)
-        username = context.bot.username
-        link = (lambda p: f"https://t.me/{username}?start={p}") if username else (lambda p: f"/start {p}")
+        parent_code = self.assistant.create_parent_invite(pair.chat_id, pair.student_alias,
+                                                          created_by=str(update.effective_user.id))
+        link = lambda p: self._link(context, p)  # noqa: E731
         await msg.reply_text(
             f"✅ Пара {pair.id} создана: «{pair.tutor_alias}» ↔ «{pair.student_alias}».\n\n"
             f"Ссылка для преподавателя:\n{link(t_payload)}\n\nСсылка для ученика:\n{link(s_payload)}\n\n"
-            "Каждая ссылка срабатывает для одного человека. Отправьте их участникам по каналам школы. "
+            f"Ссылка для родителей (отчёты после уроков, до 2 человек):\n{link('p_' + parent_code)}\n\n"
+            "Ссылки преподавателя и ученика срабатывают для одного человека. Отправьте их участникам по каналам школы. "
             "Отключить пару: /unpair " + pair.id,
             disable_web_page_preview=True)
 
@@ -643,18 +776,9 @@ class TutorBot:
             log.exception("Ошибка при завершении урока %s", lesson["id"])
             await msg.reply_text("Не удалось подготовить отчёт. Урок сохранён — попробуйте /lesson_end ещё раз.")
             return
-        text = render.render_report(report, with_answers=False)
-        md = render.render_report_markdown(report).encode("utf-8")
-        for target in (pair.tutor_user_id, pair.student_user_id):
-            if not target:
-                continue
-            try:
-                await self._send_long(context, int(target), text)
-                await context.bot.send_document(int(target), document=io.BytesIO(md),
-                                                filename=f"konspekt_{report.date}.md",
-                                                caption="Конспект урока (с ответами к тесту)")
-            except TelegramError as exc:
-                log.warning("Не удалось отправить отчёт пользователю %s: %s", target, exc)
+        await self._deliver_reports(context, report, chat_key=pair.chat_id,
+                                    student_targets=[int(pair.student_user_id)] if pair.student_user_id else [],
+                                    tutor_target=int(pair.tutor_user_id) if pair.tutor_user_id else None)
 
     @staticmethod
     def _hidden_parts(msg: Any) -> tuple[list[str], list[str]]:
@@ -685,6 +809,9 @@ class TutorBot:
             elif self.relay.pairs_for(uid):
                 await msg.reply_text("У вас несколько собеседников — выберите, кому писать: /chats")
                 return
+        if target is None and self.assistant.storage.parent_chats(uid):
+            await self._parent_message(update)
+            return
         if target is None:
             recording = self._speech_attachment(msg) or (
                 msg.document if msg.document and (msg.document.mime_type or "").startswith(("audio/", "video/")) else None)
@@ -707,6 +834,11 @@ class TutorBot:
             return
         if msg.text and detect_command(msg.text):
             await self._answer(update, detect_command(msg.text) or "help")
+            return
+        if role == TUTOR and msg.text and parent_note(msg.text) is not None \
+                and not self.assistant.storage.active_lesson(pair.chat_id):
+            await msg.reply_text("Заметки для родителей сохраняются во время урока (после /lesson_start). "
+                                 "Ученику сообщение не отправлено.")
             return
 
         speech = self._speech_attachment(msg)
@@ -768,6 +900,9 @@ class TutorBot:
             return
         if result is not None and result.action == "warn":
             await msg.reply_text(result.warning or "")
+        if outcome is not None and outcome.parent_note is not None:
+            await msg.reply_text("📝 Заметка для родителей сохранена — ученику она не отправлена.")
+            return
 
         other = pair.other_user(role)
         if not other:
@@ -839,6 +974,8 @@ class TutorBot:
         app.add_handler(CommandHandler("check", self.cmd_check))
         app.add_handler(CommandHandler("incidents", self.cmd_incidents))
         app.add_handler(CommandHandler("recording", self.cmd_recording))
+        app.add_handler(CommandHandler("note", self.cmd_note))
+        app.add_handler(CommandHandler("parent_link", self.cmd_parent_link))
         speech = filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO | filters.VIDEO
         group = filters.ChatType.GROUPS & (filters.TEXT | filters.CAPTION | speech) & ~filters.COMMAND
         app.add_handler(MessageHandler(group, self.on_group_message))

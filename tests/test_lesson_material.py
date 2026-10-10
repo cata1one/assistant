@@ -217,3 +217,24 @@ def test_parse_transcript_infers_roles():
 def test_parse_transcript_with_names_mapping():
     utt = parse_transcript("Anna: Hi\nMike: Hello", tutor_names=["Anna"], student_names=["Mike"])
     assert [u.role for u in utt] == [Role.TUTOR, Role.STUDENT]
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("speech", [
+    "Сначала проверим домашнее задание.",
+    "Ты не сделал домашнее задание, это плохо.",
+    "Как там домашнее задание, получилось?",
+    "Домашку сделал отлично, молодец.",
+])
+def test_homework_check_in_speech_is_not_new_homework(speech):
+    assert extract_from_message(speech)[0] == []
+
+
+@pytest.mark.parametrize("speech, task", [
+    ("На дом выучите слова и сделайте упражнение пять.", "На дом выучите слова и сделайте упражнение пять."),
+    ("К следующему уроку прочитать текст на странице двадцать.", "К следующему уроку прочитать текст на странице двадцать."),
+])
+def test_homework_assignment_in_speech(speech, task):
+    assert extract_from_message(speech)[0] == [task]

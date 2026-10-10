@@ -106,6 +106,23 @@ CREATE TABLE IF NOT EXISTS recordings (
     gap_alerted_at TEXT
 );
 
+-- Родители: получают отчёты об уроках чата/пары (по ссылке-приглашению от школы)
+CREATE TABLE IF NOT EXISTS parent_invites (
+    code TEXT PRIMARY KEY,
+    chat_id TEXT NOT NULL,
+    student_name TEXT,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    uses INTEGER NOT NULL DEFAULT 0,
+    max_uses INTEGER NOT NULL DEFAULT 2
+);
+CREATE TABLE IF NOT EXISTS parent_subscriptions (
+    chat_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (chat_id, user_id)
+);
+
 -- Анонимный мост: преподаватель и ученик общаются только через бота
 CREATE TABLE IF NOT EXISTS pairs (
     id TEXT PRIMARY KEY,
@@ -433,6 +450,65 @@ class Storage:
                          " AND (gap_alerted_at IS NULL OR gap_alerted_at < ?)", (_iso(at), lesson_id, reference))
         return cur.rowcount == 1
 
+
+    # -- история уроков ученика -------------------------------------------------------
+    def previous_finished_lesson(self, lesson: dict[str, Any]) -> dict[str, Any] | None:
+        """Прошлый завершённый урок того же ученика (или того же чата, если ученик неизвестен)."""
+        if lesson.get("student_id"):
+            cond, val = "student_id=?", lesson["student_id"]
+        elif lesson.get("chat_id"):
+            cond, val = "chat_id=?", lesson["chat_id"]
+        else:
+            return None
+        return self._one(f"SELECT * FROM lessons WHERE {cond} AND status='finished' AND id<>?"
+                         " ORDER BY started_at DESC, rowid DESC LIMIT 1", (val, lesson["id"]))
+
+    def finished_lessons_count(self, lesson: dict[str, Any]) -> int:
+        if lesson.get("student_id"):
+            cond, val = "student_id=?", lesson["student_id"]
+        elif lesson.get("chat_id"):
+            cond, val = "chat_id=?", lesson["chat_id"]
+        else:
+            return 0
+        row = self._one(f"SELECT COUNT(*) AS n FROM lessons WHERE {cond} AND status='finished' AND id<>?",
+                        (val, lesson["id"]))
+        return int(row["n"]) if row else 0
+
+    # -- родители ---------------------------------------------------------------------
+    def create_parent_invite(self, code: str, chat_id: str, student_name: str | None, created_by: str | None,
+                             max_uses: int = 2) -> None:
+        self._exec("INSERT INTO parent_invites(code, chat_id, student_name, created_by, created_at, max_uses)"
+                   " VALUES (?,?,?,?,?,?)", (code, chat_id, student_name, created_by, utcnow(), max_uses))
+
+    def use_parent_invite(self, code: str, user_id: str) -> dict[str, Any] | None:
+        """Подписать родителя по коду. None — код неизвестен или исчерпан."""
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM parent_invites WHERE code=?", (code,)).fetchone()
+            if not row:
+                return None
+            invite = dict(row)
+            already = self._conn.execute("SELECT 1 FROM parent_subscriptions WHERE chat_id=? AND user_id=?",
+                                         (invite["chat_id"], user_id)).fetchone()
+            if not already:
+                if invite["uses"] >= invite["max_uses"]:
+                    return None
+                self._conn.execute("UPDATE parent_invites SET uses=uses+1 WHERE code=?", (code,))
+                self._conn.execute("INSERT INTO parent_subscriptions(chat_id, user_id, created_at) VALUES (?,?,?)",
+                                   (invite["chat_id"], user_id, utcnow()))
+                self._conn.commit()
+            return invite
+
+    def parents_for(self, chat_id: str) -> list[str]:
+        return [r["user_id"] for r in self._all("SELECT user_id FROM parent_subscriptions WHERE chat_id=? ORDER BY rowid",
+                                                (chat_id,))]
+
+    def parent_chats(self, user_id: str) -> list[str]:
+        return [r["chat_id"] for r in self._all("SELECT chat_id FROM parent_subscriptions WHERE user_id=? ORDER BY rowid",
+                                                (user_id,))]
+
+    def remove_parent(self, chat_id: str, user_id: str) -> bool:
+        return bool(self._exec("DELETE FROM parent_subscriptions WHERE chat_id=? AND user_id=?",
+                               (chat_id, user_id)).rowcount)
 
 def _iso(at: datetime | None) -> str:
     return (at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(timespec="seconds")

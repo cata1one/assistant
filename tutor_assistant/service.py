@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import threading
 import urllib.request
 from collections.abc import Callable, Hashable
@@ -18,6 +19,7 @@ from .contact_guard import REDACTED_MESSAGE, ContactGuard, ConversationGuard, Mo
 from .homework import HomeworkCollector
 from .llm import LLMClient
 from .models import HomeworkTask, LessonReport, Role, Utterance, VocabItem
+from .parent_report import parent_note
 from .report import build_report
 from .speech import AudioInput, Transcriber, Transcription, audio_duration, make_transcriber, segments_to_transcript
 from .storage import Storage
@@ -74,10 +76,12 @@ class MessageOutcome:
     incident_id: int | None = None
     new_words: list[VocabItem] = field(default_factory=list)
     new_homework: list[HomeworkTask] = field(default_factory=list)
+    parent_note: str | None = None  # реплика была заметкой для родителей (ученику не показывается)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "lesson_id": self.lesson_id,
+            "parent_note": self.parent_note,
             "moderation": self.moderation.to_dict(),
             "stored_text": self.stored_text,
             "incident_id": self.incident_id,
@@ -125,10 +129,15 @@ class TutorAssistant:
         return incident_id
 
     def _post_webhook(self, payload: dict[str, Any]) -> None:
+        self._send_webhook({"type": "incident", "incident": payload})
+
+    def _send_webhook(self, body: dict[str, Any]) -> None:
+        if not self.settings.alert_webhook_url:
+            return
+
         def send() -> None:
             req = urllib.request.Request(self.settings.alert_webhook_url, method="POST",
-                                         data=json.dumps({"type": "incident", "incident": payload},
-                                                         ensure_ascii=False).encode("utf-8"),
+                                         data=json.dumps(body, ensure_ascii=False, default=str).encode("utf-8"),
                                          headers={"Content-Type": "application/json"})
             try:
                 with urllib.request.urlopen(req, timeout=10):
@@ -232,7 +241,10 @@ class TutorAssistant:
                 result.original_text = text
                 result.redacted_text = REDACTED_MESSAGE
         stored = result.redacted_text if result.blocked else text
-        self.storage.add_message(lesson_id, None if speaker_id is None else str(speaker_id), speaker_name, role_, stored)
+        note = parent_note(text) if role_ in (Role.TUTOR, Role.UNKNOWN) else None
+        if note is None:  # заметка для родителей — не часть урока и не попадает в конспект ученика
+            self.storage.add_message(lesson_id, None if speaker_id is None else str(speaker_id), speaker_name, role_,
+                                     stored)
 
         incident_id = None
         if result.is_violation:
@@ -242,6 +254,11 @@ class TutorAssistant:
                 summary=result.summary, original_text=text, redacted_text=result.redacted_text,
                 findings=[f.to_dict() for f in result.findings],
             )
+
+        if note is not None:
+            if not result.blocked:
+                self.storage.add_lesson_item(lesson_id, "note", {"text": note, "author": speaker_name})
+            return MessageOutcome(lesson_id, result, stored, incident_id, parent_note=note)
 
         new_words: list[VocabItem] = []
         new_hw: list[HomeworkTask] = []
@@ -262,17 +279,65 @@ class TutorAssistant:
         utterances = self.storage.lesson_utterances(lesson_id)
         owner = self.owner_for(lesson)
         known = self.storage.known_words(owner, exclude_lesson=lesson_id)
+        prev_lesson = self.storage.previous_finished_lesson(lesson)
         report = build_report(
             utterances, self.settings, llm=self.llm if use_llm else None, known_words=known, title=lesson.get("title"),
             lesson_id=lesson_id, violations=self.storage.incident_count(lesson_id=lesson_id),
             announced=self.storage.lesson_words_live(lesson_id), assigned=self.storage.lesson_homework_live(lesson_id),
+            notes=self.lesson_notes(lesson_id),
+            previous=self.storage.get_report(prev_lesson["id"]) if prev_lesson else None,
+            lessons_before=self.storage.finished_lessons_count(lesson), student_name=lesson.get("student_name"),
         )
         self.storage.add_words(owner, lesson_id, report.vocabulary)
         self.storage.save_report(lesson_id, report)
         self.storage.finish_lesson(lesson_id)
         with self._lock:
             self._live.pop(lesson_id, None)
+        self._send_webhook({
+            "type": "lesson_finished", "lesson_id": lesson_id, "chat_id": lesson.get("chat_id"),
+            "student_id": lesson.get("student_id"), "student_report": render.render_student_report(report),
+            "student_report_markdown": render.render_report_markdown(report),
+            "parent_report": render.render_parent_report(report), "report": report.model_dump(),
+        })
         return report
+
+    # -- заметки преподавателя и родители ---------------------------------------
+    def add_note(self, lesson_id: str, text: str, author_id: str | None = None,
+                 author_name: str | None = None) -> tuple[bool, ModerationResult]:
+        """Заметка преподавателя для родителей. С контактами не сохраняется: их нельзя передать и родителям."""
+        lesson = self.lesson(lesson_id)
+        result = self.guard.check(text)
+        if result.is_violation:
+            self._incident(lesson_id=lesson_id, chat_id=lesson.get("chat_id"), user_id=author_id, user_name=author_name,
+                           role=Role.TUTOR, severity=result.severity.name.lower(), action=result.action,
+                           summary=result.summary + " (в заметке для родителей)", original_text=text,
+                           redacted_text=result.redacted_text, findings=[f.to_dict() for f in result.findings])
+        if result.blocked or not text.strip():
+            return False, result
+        self.storage.add_lesson_item(lesson_id, "note", {"text": text.strip(), "author": author_name})
+        return True, result
+
+    def lesson_notes(self, lesson_id: str) -> list[str]:
+        return [n["text"] for n in self.storage.lesson_items(lesson_id, "note")]
+
+    def create_parent_invite(self, chat_id: str, student_name: str | None = None, created_by: str | None = None,
+                             max_uses: int = 2) -> str:
+        code = secrets.token_urlsafe(12)
+        self.storage.create_parent_invite(code, chat_id, student_name, created_by, max_uses)
+        return code
+
+    def subscribe_parent(self, code: str, user_id: str) -> dict[str, Any] | None:
+        return self.storage.use_parent_invite(code, user_id)
+
+    def parent_report_for(self, user_id: str) -> list[tuple[str, LessonReport]]:
+        """Последние отчёты по всем ученикам, на которых подписан родитель."""
+        out = []
+        for chat_id in self.storage.parent_chats(user_id):
+            last = self.storage.last_lesson(chat_id=chat_id)
+            report = self.storage.get_report(last["id"]) if last else None
+            if report:
+                out.append((chat_id, report))
+        return out
 
     # -- речь и запись урока -------------------------------------------------
     @property

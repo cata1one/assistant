@@ -63,6 +63,13 @@ class LLMLessonReport(BaseModel):
     test: list[LLMQuestion]
     homework_teacher: list[str]
     homework_generated: list[str]
+    review_items: list[str]
+    parent_summary: str
+    parent_achievements: list[str]
+    parent_attention: list[str]
+    parent_teacher_remarks: list[str]
+    homework_status: Literal["done", "partial", "not_done", "unknown"]
+    parent_recommendations: list[str]
 
 
 SYSTEM_PROMPT = """Ты — методист онлайн-школы иностранных языков и помощник репетитора. По расшифровке урока ты готовишь для ученика материалы после занятия: конспект, словарь новых слов, правила, работу над ошибками, тест для самопроверки и домашнее задание.
@@ -73,6 +80,7 @@ SYSTEM_PROMPT = """Ты — методист онлайн-школы иност�
 - В <announced_words> — слова, которые преподаватель явно продиктовал как новые. Все они обязательно должны быть в vocabulary.
 - В <assigned_homework> — домашнее задание, которое озвучил преподаватель (найдено автоматически, может быть неполным). Уточни его по расшифровке.
 - В <known_words> — слова, которые ученик уже изучал раньше; не включай их в vocabulary, если преподаватель не объявил их новыми.
+- В <teacher_notes> — заметки преподавателя для родителей (ученик их не видел). В <progress> — сравнение с прошлыми уроками.
 
 Требования к результату:
 - Объяснения, конспект, переводы и формулировки заданий — на языке ученика ({native}). Примеры и слова — на изучаемом языке ({target}).
@@ -85,6 +93,16 @@ SYSTEM_PROMPT = """Ты — методист онлайн-школы иност�
 - test: 8–12 вопросов только по материалу урока, разные типы (choice — с 3–4 вариантами в options; gap — предложение с пропуском «_____»; true_false — options ["Верно", "Неверно"]; open — options пустой). В answer — правильный ответ, в explanation — короткое пояснение.
 - homework_teacher: только то, что задал преподаватель, близко к его формулировке; пустой список, если он ничего не задавал. Ничего не выдумывай.
 - homework_generated: 3–6 конкретных заданий для закрепления материала урока. Если преподаватель уже задал ДЗ, сделай эти задания дополнительными и не дублируй его.
+- review_items: 3–8 конкретных пунктов «что повторить к следующему уроку»: правила, в которых ученик ошибался, трудные слова, темы, над которыми работать.
+
+Отчёт для родителей (поля parent_* и homework_status). Родитель не был на уроке, ему важно понять прогресс и чем помочь:
+- parent_summary: 2–4 предложения простым языком: что проходили и как ученик справился. Без грамматических терминов без пояснения.
+- parent_achievements: конкретные успехи (что получилось, что ученик уже умеет, похвала преподавателя, улучшения по сравнению с прошлым уроком из <progress>).
+- parent_attention: на что обратить внимание — повторяющиеся ошибки, пробелы, невыполненное ДЗ, низкая активность. Тактично и конкретно, без оценок личности.
+- parent_teacher_remarks: замечания и пожелания, которые преподаватель высказал на уроке, и все заметки из <teacher_notes> (их передай близко к тексту).
+- homework_status: выполнено ли домашнее задание к ЭТОМУ уроку (по словам преподавателя): done, partial, not_done; unknown — если не обсуждали. Новое ДЗ, выданное в конце урока, сюда не относится.
+- parent_recommendations: 2–4 практичных совета, как родитель может помочь дома (5–10 минут в день, без знания языка).
+- Не пиши в отчёт для родителей ничего о внутренних правилах школы и о нарушениях; не цитируй личные данные.
 - Если в расшифровке мало учебного материала, верни то, что есть, без выдумок."""
 
 
@@ -121,6 +139,9 @@ class LLMClient:
         assigned_homework: list[str],
         known_words: list[str],
         title: str | None = None,
+        teacher_notes: list[str] | None = None,
+        progress: str | None = None,
+        student_name: str | None = None,
     ) -> LLMLessonReport | None:
         if not self._client:
             return None
@@ -129,11 +150,14 @@ class LLMClient:
         user = (
             f"Изучаемый язык: {_language_name(s.target_language)}. Язык ученика: {_language_name(s.native_language)}.\n"
             + (f"Название урока: {title}\n" if title else "")
+            + (f"Имя ученика: {student_name}\n" if student_name else "")
+            + "<teacher_notes>\n" + ("\n".join(teacher_notes or []) or "—") + "\n</teacher_notes>\n"
+            + "<progress>\n" + (progress or "первый урок ученика в системе") + "\n</progress>\n"
             + "<announced_words>\n" + ("\n".join(announced_words) or "—") + "\n</announced_words>\n"
             + "<assigned_homework>\n" + ("\n".join(assigned_homework) or "—") + "\n</assigned_homework>\n"
             + "<known_words>\n" + (", ".join(known_words[:500]) or "—") + "\n</known_words>\n"
             + "<transcript>\n" + transcript + "\n</transcript>\n\n"
-            "Подготовь материалы после урока по требованиям."
+            "Подготовь материалы после урока по требованиям: для ученика и отчёт для родителей."
         )
         kwargs = dict(
             model=s.llm_model,

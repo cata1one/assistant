@@ -8,7 +8,8 @@
     GET  /v1/lessons/{id}
     POST /v1/lessons/{id}/messages         {"speaker_id", "speaker_name", "role", "text"}
     POST /v1/lessons/{id}/finish           {"use_llm": true}
-    GET  /v1/lessons/{id}/report           ?format=json|text|markdown
+    GET  /v1/lessons/{id}/report           ?format=json|text|markdown|student|parent|parent_markdown
+    POST /v1/lessons/{id}/notes            {"text", "author_id", "author_name"} — заметка преподавателя для родителей
     POST /v1/analyze                       {"transcript", "title", "student_id", "use_llm", "save"}
     GET  /v1/students/{id}/words           ?date=today|YYYY-MM-DD
     GET  /v1/incidents                     ?lesson_id=&user_id=&limit=
@@ -80,6 +81,7 @@ class Api:
         ("POST", re.compile(r"^/v1/lessons/(?P<id>[\w-]+)/messages$"), "add_message"),
         ("POST", re.compile(r"^/v1/lessons/(?P<id>[\w-]+)/finish$"), "finish"),
         ("GET", re.compile(r"^/v1/lessons/(?P<id>[\w-]+)/report$"), "report"),
+        ("POST", re.compile(r"^/v1/lessons/(?P<id>[\w-]+)/notes$"), "add_note"),
         ("POST", re.compile(r"^/v1/analyze$"), "analyze"),
         ("GET", re.compile(r"^/v1/students/(?P<id>[\w:.@-]+)/words$"), "words"),
         ("GET", re.compile(r"^/v1/incidents$"), "incidents"),
@@ -195,7 +197,26 @@ class Api:
             return HTTPStatus.OK, {"text": render.render_report(report)}
         if fmt == "markdown":
             return HTTPStatus.OK, {"markdown": render.render_report_markdown(report)}
+        if fmt == "student":
+            return HTTPStatus.OK, {"text": render.render_student_report(report),
+                                   "markdown": render.render_report_markdown(report)}
+        if fmt == "parent":
+            return HTTPStatus.OK, {"text": render.render_parent_report(report), "parent": report.parent.model_dump(),
+                                   "progress": report.progress.model_dump() if report.progress else None}
+        if fmt == "parent_markdown":
+            return HTTPStatus.OK, {"markdown": render.render_parent_markdown(report)}
+        if fmt != "json":
+            raise ApiError(HTTPStatus.BAD_REQUEST, "format: json, text, markdown, student, parent или parent_markdown")
         return HTTPStatus.OK, report.model_dump()
+
+    def add_note(self, id: str, body: dict[str, Any], **_: Any) -> tuple[HTTPStatus, Any]:
+        lesson = self.assistant.lesson(id)
+        if lesson["status"] != "active":
+            raise ApiError(HTTPStatus.CONFLICT, "урок уже завершён")
+        ok, result = self.assistant.add_note(id, _require_text(body, "text", 5000), _opt_str(body, "author_id"),
+                                             _opt_str(body, "author_name"))
+        status = HTTPStatus.CREATED if ok else HTTPStatus.UNPROCESSABLE_ENTITY
+        return status, {"saved": ok, "moderation": result.to_dict(), "notes": self.assistant.lesson_notes(id)}
 
     def analyze(self, body: dict[str, Any], **_: Any) -> tuple[HTTPStatus, Any]:
         report, violations = self.assistant.analyze_transcript(
