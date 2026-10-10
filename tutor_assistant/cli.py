@@ -252,6 +252,13 @@ def cmd_bot(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from .telegram_bot import run_bot
+
+    run_bot(Settings.from_env(), with_site=True, host=args.host, port=args.port)
+    return 0
+
+
 def cmd_api(args: argparse.Namespace) -> int:
     from .api import run_api
 
@@ -325,10 +332,15 @@ def build_parser() -> argparse.ArgumentParser:
     b = sub.add_parser("bot", help="запустить Telegram-бота")
     b.set_defaults(func=cmd_bot)
 
-    s = sub.add_parser("api", help="запустить HTTP API для платформы школы")
+    s = sub.add_parser("api", help="запустить сайт школы и HTTP API для платформы")
     s.add_argument("--host")
     s.add_argument("--port", type=int)
     s.set_defaults(func=cmd_api)
+
+    sv = sub.add_parser("serve", help="всё в одном процессе: Telegram-бот, сайт школы и HTTP API")
+    sv.add_argument("--host")
+    sv.add_argument("--port", type=int)
+    sv.set_defaults(func=cmd_serve)
     return p
 
 

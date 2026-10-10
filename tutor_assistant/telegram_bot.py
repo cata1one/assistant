@@ -21,6 +21,7 @@ import asyncio
 import io
 import logging
 import re
+import threading
 import time
 from typing import Any
 
@@ -30,6 +31,7 @@ from .config import Settings
 from .contact_guard import ModerationResult, Severity
 from .models import Role
 from .parent_report import parent_note
+from .portal import Portal, PortalError
 from .relay import TUTOR, Pair, RelayError, RelayService
 from .service import AudioOutcome, MessageOutcome, TutorAssistant
 from .summary import plural
@@ -80,6 +82,7 @@ class TutorBot:
         self.assistant = assistant or TutorAssistant(settings)
         self._warned_no_rights: set[int] = set()
         self.relay = RelayService(self.assistant.storage)
+        self.portal = Portal(self.assistant)
 
     # -- утилиты -------------------------------------------------------------
     @staticmethod
@@ -131,9 +134,10 @@ class TutorBot:
     async def cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text(HELP_TEXT + "\nКоманды: /lesson_start [тема], /lesson_end, /words, "
                                                   "/words_today, /dictionary, /homework, /test, /answers, /summary, "
-                                                  "/report, /check <текст>, /chats, /recording, /note <текст>\n"
+                                                  "/report, /check <текст>, /chats, /recording, /note <текст>, /cabinet — личный кабинет на сайте, "
+                                                  "/classroom — класс ProgressMe\n"
                                                   "Администраторам: /new_pair Преподаватель | Ученик, /pairs, "
-                                                  "/unpair <id>, /parent_link, /incidents")
+                                                  "/unpair <id>, /parent_link, /incidents, /classroom <id пары> <ссылка>")
 
     async def cmd_lesson_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         chat, user, msg = update.effective_chat, update.effective_user, update.effective_message
@@ -151,7 +155,7 @@ class TutorBot:
                 "Я записываю новые слова («Новые слова сегодня: …») и домашнее задание («ДЗ: …»).\n"
                 "Напоминаю: обмен личными контактами и общение вне платформы запрещены.\n\n"
                 + self._recording_notice(lesson["id"]))
-        await msg.reply_text(text)
+        await msg.reply_text(text, reply_markup=self._classroom_markup(str(chat.id)))
         await self._check_rights(context, chat.id)
         log.info("Урок %s начат в чате %s", lesson["id"], chat.id)
 
@@ -280,6 +284,73 @@ class TutorBot:
                 await msg.reply_text("Ссылка для родителей отправлена администратору в личные сообщения.")
         except TelegramError:
             await msg.reply_text("Не могу написать вам в личку — откройте диалог с ботом (/start) и повторите.")
+
+    # -- сайт школы: личный кабинет и класс ProgressMe ---------------------------------
+    def _classroom_markup(self, chat_key: str) -> InlineKeyboardMarkup | None:
+        url = self.assistant.storage.get_classroom(chat_key)
+        if not url:
+            return None
+        return InlineKeyboardMarkup([[InlineKeyboardButton("🎥 Войти в класс ProgressMe", url=url)]])
+
+    async def cmd_cabinet(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        msg, user = update.effective_message, update.effective_user
+        if update.effective_chat.type != ChatType.PRIVATE:
+            await msg.reply_text("Ссылку в личный кабинет я пришлю только в личном чате: напишите мне /cabinet.")
+            return
+        uid = str(user.id)
+        admin = self._is_school_admin(update)
+        if not admin and not self.relay.pairs_for(uid) and not self.assistant.storage.parent_chats(uid):
+            await msg.reply_text("Личный кабинет откроется после подключения к школе: откройте ссылку-приглашение "
+                                 "от администратора.")
+            return
+        if not self.settings.site_url:
+            await msg.reply_text("Сайт школы ещё не подключён (администратору: задайте TUTOR_SITE_URL).")
+            return
+        token = self.portal.issue_token(uid, admin=admin)
+        link = self.portal.cabinet_link(token)
+        markup = (InlineKeyboardMarkup([[InlineKeyboardButton("Открыть личный кабинет", url=link)]])
+                  if link and link.startswith("https://") else None)
+        await msg.reply_text(f"🔑 Ваш личный кабинет: конспекты, словарь, тесты и доска.\n{link}\n\n"
+                             f"Ссылка действует {self.settings.access_token_days} дн. Никому её не пересылайте — "
+                             "по ней открывается ваш кабинет. Выйти на всех устройствах — кнопка «Выйти» в кабинете.",
+                             reply_markup=markup, disable_web_page_preview=True)
+
+    async def cmd_classroom(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Ссылка на класс ProgressMe. Задаёт администратор школы: /classroom <id пары> <ссылка|->."""
+        msg, chat = update.effective_message, update.effective_chat
+        args = context.args or []
+        admin = self._is_school_admin(update)
+        if chat.type != ChatType.PRIVATE:
+            chat_key = str(chat.id)
+            url = args[0] if args else None
+        elif len(args) >= 1 and admin:
+            pair = self.relay.get(args[0])
+            if not pair:
+                await msg.reply_text("Пара не найдена. Список пар: /pairs")
+                return
+            chat_key, url = pair.chat_id, (args[1] if len(args) > 1 else None)
+        else:
+            current = self.relay.current(str(update.effective_user.id))
+            if not current:
+                await msg.reply_text("Вы пока не подключены к собеседнику.")
+                return
+            chat_key, url = current[0].chat_id, None
+        if url is None:
+            link = self.assistant.storage.get_classroom(chat_key)
+            await msg.reply_text(f"🎥 Класс ProgressMe: {link}" if link else
+                                 "Ссылка на класс ProgressMe ещё не добавлена школой.",
+                                 reply_markup=self._classroom_markup(chat_key), disable_web_page_preview=True)
+            return
+        if not admin:
+            await msg.reply_text("Ссылку на класс задаёт администратор школы.")
+            return
+        try:
+            self.portal.set_classroom(chat_key, None if url == "-" else url, str(update.effective_user.id))
+        except PortalError as exc:
+            await msg.reply_text(f"❌ {exc.message}")
+            return
+        await msg.reply_text("✅ Ссылка на класс сохранена." if url != "-" else "Ссылка на класс удалена.",
+                             reply_markup=self._classroom_markup(chat_key))
 
     @staticmethod
     def _link(context: ContextTypes.DEFAULT_TYPE, payload: str) -> str:
@@ -749,11 +820,12 @@ class TutorBot:
         text = (f"▶️ Урок начат{f': {title}' if title else ''}. Я записываю новые слова и домашнее задание.\n"
                 "Напоминаю: обмен личными контактами и общение вне платформы запрещены.\n\n"
                 + self._recording_notice(lesson["id"]))
-        await msg.reply_text(text)
+        markup = self._classroom_markup(pair.chat_id)
+        await msg.reply_text(text, reply_markup=markup)
         if pair.student_user_id:
             await context.bot.send_message(int(pair.student_user_id), f"▶️ «{pair.tutor_alias}» начал урок"
                                                                        f"{f': {title}' if title else ''}.\n\n"
-                                                                       + RECORDING_NOTICE)
+                                                                       + RECORDING_NOTICE, reply_markup=markup)
 
     async def _relay_lesson_end(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg, uid = update.effective_message, str(update.effective_user.id)
@@ -976,6 +1048,8 @@ class TutorBot:
         app.add_handler(CommandHandler("recording", self.cmd_recording))
         app.add_handler(CommandHandler("note", self.cmd_note))
         app.add_handler(CommandHandler("parent_link", self.cmd_parent_link))
+        app.add_handler(CommandHandler("cabinet", self.cmd_cabinet))
+        app.add_handler(CommandHandler("classroom", self.cmd_classroom))
         speech = filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO | filters.VIDEO
         group = filters.ChatType.GROUPS & (filters.TEXT | filters.CAPTION | speech) & ~filters.COMMAND
         app.add_handler(MessageHandler(group, self.on_group_message))
@@ -986,9 +1060,24 @@ class TutorBot:
         return app
 
 
-def run_bot(settings: Settings) -> None:
+def run_bot(settings: Settings, with_site: bool = False, host: str | None = None, port: int | None = None) -> None:
+    """Запустить бота. С ``with_site`` в том же процессе работают сайт школы и HTTP API."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    app = TutorBot(settings).build()
+    bot = TutorBot(settings)
+    app = bot.build()
+    server = None
+    if with_site:
+        from .api import make_server
+
+        host, port = host or settings.api_host, port or settings.api_port
+        server = make_server(bot.assistant, host, port)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        log.info("Сайт и HTTP API: http://%s:%s", host, port)
     log.info("Бот запущен")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    finally:
+        if server:
+            server.shutdown()
+            server.server_close()

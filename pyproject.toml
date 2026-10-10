@@ -25,6 +25,9 @@ tutor-assistant = "tutor_assistant.cli:main"
 [tool.setuptools]
 packages = ["tutor_assistant"]
 
+[tool.setuptools.package-data]
+tutor_assistant = ["web/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

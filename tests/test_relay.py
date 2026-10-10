@@ -271,3 +271,60 @@ def test_student_waits_for_tutor(bot):
     up = pm(STUDENT_ID, "Здравствуйте")
     run(bot.on_private_message(up, Ctx()))
     assert "ещё не подключился" in up.effective_message.reply_text.call_args[0][0]
+
+
+# -- сайт школы: личный кабинет и класс ProgressMe ------------------------------------------------
+
+
+def test_cabinet_link_from_bot(bot):
+    import dataclasses
+
+    from tutor_assistant.portal import Portal
+
+    connect(bot)
+    stranger = pm(555, "/cabinet")
+    run(bot.cmd_cabinet(stranger, Ctx()))
+    assert "ссылку-приглашение" in stranger.effective_message.reply_text.call_args[0][0]
+    no_site = pm(STUDENT_ID, "/cabinet")
+    run(bot.cmd_cabinet(no_site, Ctx()))
+    assert "TUTOR_SITE_URL" in no_site.effective_message.reply_text.call_args[0][0]
+
+    bot.settings = dataclasses.replace(bot.settings, site_url="https://school.example")
+    bot.assistant.settings = bot.settings
+    bot.portal = Portal(bot.assistant)
+    up = pm(STUDENT_ID, "/cabinet")
+    run(bot.cmd_cabinet(up, Ctx()))
+    text = up.effective_message.reply_text.call_args[0][0]
+    token = text.split("#/cabinet?t=", 1)[1].split()[0]
+    viewer = bot.portal.viewer(token)
+    assert viewer.user_id == str(STUDENT_ID) and not viewer.admin
+    assert up.effective_message.reply_text.call_args.kwargs["reply_markup"] is not None
+    admin = pm(ADMIN_ID, "/cabinet")
+    run(bot.cmd_cabinet(admin, Ctx()))
+    admin_token = admin.effective_message.reply_text.call_args[0][0].split("#/cabinet?t=", 1)[1].split()[0]
+    assert bot.portal.viewer(admin_token).admin
+
+
+def test_classroom_link(bot):
+    pair = connect(bot)
+    bad = pm(ADMIN_ID, "/classroom")
+    run(bot.cmd_classroom(bad, Ctx([pair.id, "https://wa.me/79991234567"])))
+    assert "❌" in bad.effective_message.reply_text.call_args[0][0]
+    tutor_try = pm(TUTOR_ID, "/classroom")
+    run(bot.cmd_classroom(tutor_try, Ctx([pair.id, "https://edu.progressme.ru/room/me"])))
+    assert bot.assistant.storage.get_classroom(pair.chat_id) is None  # преподаватель ссылку не задаёт
+    ok = pm(ADMIN_ID, "/classroom")
+    run(bot.cmd_classroom(ok, Ctx([pair.id, "https://edu.progressme.ru/room/42"])))
+    assert bot.assistant.storage.get_classroom(pair.chat_id) == "https://edu.progressme.ru/room/42"
+
+    show = pm(STUDENT_ID, "/classroom")
+    run(bot.cmd_classroom(show, Ctx()))
+    assert "room/42" in show.effective_message.reply_text.call_args[0][0]
+
+    ctx = Ctx(["Еда"])
+    start = pm(TUTOR_ID, "/lesson_start")
+    run(bot.cmd_lesson_start(start, ctx))
+    tutor_markup = start.effective_message.reply_text.call_args.kwargs["reply_markup"]
+    assert tutor_markup.inline_keyboard[0][0].url == "https://edu.progressme.ru/room/42"
+    student_call = [c for c in ctx.bot.send_message.call_args_list if c.args[0] == STUDENT_ID][-1]
+    assert student_call.kwargs["reply_markup"].inline_keyboard[0][0].url.endswith("room/42")

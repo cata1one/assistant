@@ -34,7 +34,9 @@ from urllib.parse import parse_qs, urlparse
 
 from . import render
 from .config import Settings
+from .portal import Portal
 from .service import LessonNotFound, TutorAssistant
+from .website import MAX_SITE_BODY, Website
 
 log = logging.getLogger(__name__)
 
@@ -259,9 +261,33 @@ def _redact_transcript(transcript: str, violations: list[dict[str, Any]]) -> str
     return "\n".join(lines)
 
 
-def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
+def make_handler(api: Api, website: Website | None = None) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "TutorAssistant/1.0"
+
+        def _client_ip(self) -> str:
+            forwarded = self.headers.get("X-Forwarded-For")
+            if forwarded and api.assistant.settings.trust_proxy:
+                return forwarded.split(",")[0].strip()
+            return self.client_address[0]
+
+        def _site(self, method: str, path: str, query: str) -> None:
+            raw = b""
+            if method == "POST":
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > MAX_SITE_BODY:
+                    self._send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "слишком большой запрос"})
+                    return
+                raw = self.rfile.read(length) if length else b""
+            q = {k: v[-1] for k, v in parse_qs(query).items()}
+            resp = website.handle(method, path, q, raw, self.headers, self._client_ip())
+            self.send_response(resp.status)
+            self.send_header("Content-Type", resp.content_type)
+            self.send_header("Content-Length", str(len(resp.body)))
+            for k, v in resp.headers.items():
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(resp.body)
 
         def _send(self, status: HTTPStatus, payload: Any) -> None:
             data = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
@@ -274,6 +300,9 @@ def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
         def _handle(self, method: str) -> None:
             try:
                 parsed = urlparse(self.path)
+                if website is not None and Website.handles(parsed.path):
+                    self._site(method, parsed.path, parsed.query)
+                    return
                 body: dict[str, Any] = {}
                 audio: bytes | None = None
                 if method == "POST":
@@ -314,18 +343,22 @@ def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
+def make_server(assistant: TutorAssistant, host: str, port: int) -> ThreadingHTTPServer:
+    """HTTP-сервер: сайт школы, личный кабинет и API платформы."""
+    if not assistant.settings.api_token:
+        log.warning("TUTOR_API_TOKEN не задан — API доступен без авторизации. Задайте токен перед запуском в сети.")
+    return ThreadingHTTPServer((host, port), make_handler(Api(assistant), Website(Portal(assistant))))
+
+
 def run_api(settings: Settings, host: str = "127.0.0.1", port: int = 8080) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    if not settings.api_token:
-        log.warning("TUTOR_API_TOKEN не задан — API доступен без авторизации. Задайте токен перед запуском в сети.")
     assistant = TutorAssistant(settings)
     if not assistant.speech_available:
         log.warning("Распознавание речи недоступно: %s", assistant.transcriber.last_error)
-    api = Api(assistant)
-    server = ThreadingHTTPServer((host, port), make_handler(api))
+    server = make_server(assistant, host, port)
     stop = threading.Event()
     threading.Thread(target=recording_watchdog, args=(assistant, stop), daemon=True).start()
-    log.info("HTTP API запущен: http://%s:%s", host, port)
+    log.info("Сайт и HTTP API запущены: http://%s:%s", host, port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

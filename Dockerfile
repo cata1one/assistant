@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY tutor_assistant ./tutor_assistant
 VOLUME ["/data"]
 
-# По умолчанию — Telegram-бот. Для API: docker run ... tutor-assistant api --host 0.0.0.0
+# По умолчанию — всё вместе: Telegram-бот, сайт школы и HTTP API на порту 8080.
+# Только бот: docker run ... bot; только сайт и API: docker run ... api --host 0.0.0.0
+EXPOSE 8080
 ENTRYPOINT ["python", "-m", "tutor_assistant"]
-CMD ["bot"]
+CMD ["serve", "--host", "0.0.0.0"]

@@ -155,6 +155,54 @@ CREATE TABLE IF NOT EXISTS relay_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_relay_dst ON relay_messages(dst_chat, dst_msg);
 CREATE INDEX IF NOT EXISTS idx_relay_src ON relay_messages(src_chat, src_msg);
+
+-- Сайт школы: заявки, доступ в личный кабинет, ссылки на класс ProgressMe, доска
+CREATE TABLE IF NOT EXISTS applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    contact TEXT NOT NULL,
+    course_id TEXT,
+    level TEXT,
+    goal TEXT,
+    comment TEXT,
+    status TEXT NOT NULL DEFAULT 'new',
+    ip TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS access_tokens (
+    token_hash TEXT PRIMARY KEY,
+    role TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS classrooms (
+    chat_id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    updated_by TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS boards (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_boards_chat ON boards(chat_id);
+
+CREATE TABLE IF NOT EXISTS board_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    author_role TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    data TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_board_items ON board_items(board_id, id);
 """
 
 
@@ -509,6 +557,89 @@ class Storage:
     def remove_parent(self, chat_id: str, user_id: str) -> bool:
         return bool(self._exec("DELETE FROM parent_subscriptions WHERE chat_id=? AND user_id=?",
                                (chat_id, user_id)).rowcount)
+
+    # -- сайт: заявки ---------------------------------------------------------------
+    def add_application(self, *, name: str, contact: str, course_id: str | None, level: str | None, goal: str | None,
+                        comment: str | None, ip: str | None) -> int:
+        cur = self._exec("INSERT INTO applications(name, contact, course_id, level, goal, comment, ip, created_at)"
+                         " VALUES (?,?,?,?,?,?,?,?)", (name, contact, course_id, level, goal, comment, ip, utcnow()))
+        return int(cur.lastrowid)
+
+    def applications(self, status: str | None = None, limit: int = 200) -> list[dict[str, Any]]:
+        if status:
+            return self._all("SELECT * FROM applications WHERE status=? ORDER BY id DESC LIMIT ?", (status, limit))
+        return self._all("SELECT * FROM applications ORDER BY id DESC LIMIT ?", (limit,))
+
+    def set_application_status(self, app_id: int, status: str) -> bool:
+        return bool(self._exec("UPDATE applications SET status=? WHERE id=?", (status, app_id)).rowcount)
+
+    def applications_since(self, ip: str, since: datetime) -> int:
+        row = self._one("SELECT COUNT(*) AS n FROM applications WHERE ip=? AND created_at>=?", (ip, _iso(since)))
+        return int(row["n"]) if row else 0
+
+    # -- сайт: доступ в личный кабинет --------------------------------------------------
+    def add_access_token(self, token_hash: str, role: str, user_id: str, expires_at: datetime) -> None:
+        self._exec("INSERT INTO access_tokens(token_hash, role, user_id, created_at, expires_at) VALUES (?,?,?,?,?)",
+                   (token_hash, role, user_id, utcnow(), _iso(expires_at)))
+
+    def get_access_token(self, token_hash: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM access_tokens WHERE token_hash=? AND expires_at>?", (token_hash, utcnow()))
+
+    def revoke_access_tokens(self, user_id: str) -> int:
+        return self._exec("DELETE FROM access_tokens WHERE user_id=?", (user_id,)).rowcount
+
+    def purge_access_tokens(self) -> None:
+        self._exec("DELETE FROM access_tokens WHERE expires_at<=?", (utcnow(),))
+
+    # -- сайт: класс на платформе уроков --------------------------------------------------
+    def set_classroom(self, chat_id: str, url: str | None, updated_by: str | None) -> None:
+        if url is None:
+            self._exec("DELETE FROM classrooms WHERE chat_id=?", (chat_id,))
+            return
+        self._exec("INSERT INTO classrooms(chat_id, url, updated_by, updated_at) VALUES (?,?,?,?) "
+                   "ON CONFLICT(chat_id) DO UPDATE SET url=excluded.url, updated_by=excluded.updated_by, "
+                   "updated_at=excluded.updated_at", (chat_id, url, updated_by, utcnow()))
+
+    def get_classroom(self, chat_id: str) -> str | None:
+        row = self._one("SELECT url FROM classrooms WHERE chat_id=?", (chat_id,))
+        return row["url"] if row else None
+
+    # -- сайт: доска ----------------------------------------------------------------------
+    def create_board(self, board_id: str, chat_id: str, title: str, created_by: str | None) -> dict[str, Any]:
+        self._exec("INSERT INTO boards(id, chat_id, title, created_by, created_at) VALUES (?,?,?,?,?)",
+                   (board_id, chat_id, title, created_by, utcnow()))
+        return self.get_board(board_id)  # type: ignore[return-value]
+
+    def get_board(self, board_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM boards WHERE id=?", (board_id,))
+
+    def boards_for(self, chat_id: str) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM boards WHERE chat_id=? ORDER BY created_at, id", (chat_id,))
+
+    def add_board_item(self, board_id: str, author_role: str, kind: str, data: dict[str, Any]) -> int:
+        cur = self._exec("INSERT INTO board_items(board_id, author_role, kind, data, created_at) VALUES (?,?,?,?,?)",
+                         (board_id, author_role, kind, json.dumps(data, ensure_ascii=False), utcnow()))
+        return int(cur.lastrowid)
+
+    def board_items(self, board_id: str, since: int = 0, limit: int = 2000) -> list[dict[str, Any]]:
+        rows = self._all("SELECT id, author_role, kind, data FROM board_items WHERE board_id=? AND id>? "
+                         "ORDER BY id LIMIT ?", (board_id, since, limit))
+        for r in rows:
+            r["data"] = json.loads(r["data"])
+        return rows
+
+    def board_item_count(self, board_id: str) -> int:
+        row = self._one("SELECT COUNT(*) AS n FROM board_items WHERE board_id=?", (board_id,))
+        return int(row["n"]) if row else 0
+
+    def lessons_for_chats(self, chat_ids: Iterable[str], limit: int = 100) -> list[dict[str, Any]]:
+        ids = list(chat_ids)
+        if not ids:
+            return []
+        marks = ",".join("?" * len(ids))
+        return self._all(f"SELECT * FROM lessons WHERE chat_id IN ({marks}) ORDER BY started_at DESC LIMIT ?",
+                         (*ids, limit))
+
 
 def _iso(at: datetime | None) -> str:
     return (at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(timespec="seconds")

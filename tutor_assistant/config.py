@@ -105,6 +105,14 @@ class Settings:
     api_host: str = "127.0.0.1"
     api_port: int = 8080
 
+    # Сайт школы (раздаётся тем же сервером, что и API)
+    school_name: str = "Онлайн-школа языков"
+    site_url: str = ""  # публичный адрес сайта, например https://myschool.ru — для ссылок в личный кабинет
+    bot_username: str = ""  # имя Telegram-бота школы без @ — кнопки «Написать в Telegram» на сайте
+    classroom_domains: tuple[str, ...] = ("progressme.ru",)  # где проходят уроки: ссылки на класс только отсюда
+    access_token_days: int = 30  # срок действия ссылки в личный кабинет
+    trust_proxy: bool = False  # сайт за nginx: брать IP посетителя из X-Forwarded-For (для защиты от спама)
+
     @classmethod
     def from_env(cls, dotenv: str | None = ".env") -> Settings:
         if dotenv:
@@ -141,6 +149,12 @@ class Settings:
             api_token=_env("TUTOR_API_TOKEN"),
             api_host=_env("TUTOR_API_HOST", cls.api_host),
             api_port=_env_int("TUTOR_API_PORT", cls.api_port),
+            school_name=_env("TUTOR_SCHOOL_NAME", cls.school_name),
+            site_url=_env("TUTOR_SITE_URL").rstrip("/"),
+            bot_username=_env("TUTOR_BOT_USERNAME").lstrip("@"),
+            classroom_domains=tuple(x.lower() for x in _env_list("TUTOR_CLASSROOM_DOMAINS")) or cls.classroom_domains,
+            access_token_days=_env_int("TUTOR_ACCESS_TOKEN_DAYS", cls.access_token_days),
+            trust_proxy=_env_bool("TUTOR_TRUST_PROXY", cls.trust_proxy),
         )
 
     @property
