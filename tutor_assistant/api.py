@@ -12,6 +12,8 @@
     POST /v1/analyze                       {"transcript", "title", "student_id", "use_llm", "save"}
     GET  /v1/students/{id}/words           ?date=today|YYYY-MM-DD
     GET  /v1/incidents                     ?lesson_id=&user_id=&limit=
+    POST /v1/lessons/{id}/audio            тело — аудио (wav/ogg/webm/mp3/m4a), ?speaker_id=&speaker_name=&role=
+    POST /v1/analyze/audio                 тело — запись урока целиком, ?title=&student_id=&use_llm=&save=
 
 Авторизация: заголовок ``Authorization: Bearer <TUTOR_API_TOKEN>``.
 """
@@ -22,6 +24,7 @@ import hmac
 import json
 import logging
 import re
+import threading
 from datetime import date, datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,6 +38,8 @@ from .service import LessonNotFound, TutorAssistant
 log = logging.getLogger(__name__)
 
 MAX_BODY = 5 * 1024 * 1024
+MAX_AUDIO_BODY = 300 * 1024 * 1024  # запись урока целиком
+AUDIO_PATH_RE = re.compile(r"^/v1/(?:lessons/[\w-]+/audio|analyze/audio)$")
 
 
 class ApiError(Exception):
@@ -78,6 +83,8 @@ class Api:
         ("POST", re.compile(r"^/v1/analyze$"), "analyze"),
         ("GET", re.compile(r"^/v1/students/(?P<id>[\w:.@-]+)/words$"), "words"),
         ("GET", re.compile(r"^/v1/incidents$"), "incidents"),
+        ("POST", re.compile(r"^/v1/lessons/(?P<id>[\w-]+)/audio$"), "lesson_audio"),
+        ("POST", re.compile(r"^/v1/analyze/audio$"), "analyze_audio"),
     ]
 
     def __init__(self, assistant: TutorAssistant):
@@ -92,7 +99,7 @@ class Api:
         return hmac.compare_digest(header[7:].strip(), self.token)
 
     def dispatch(self, method: str, path: str, query: dict[str, list[str]], body: dict[str, Any],
-                 auth: str | None) -> tuple[HTTPStatus, Any]:
+                 auth: str | None, raw: bytes | None = None) -> tuple[HTTPStatus, Any]:
         if path != "/health" and not self.authorized(auth):
             raise ApiError(HTTPStatus.UNAUTHORIZED, "нужен заголовок Authorization: Bearer <токен>")
         allowed_methods = []
@@ -103,14 +110,15 @@ class Api:
             allowed_methods.append(m)
             if m == method:
                 q = {k: v[-1] for k, v in query.items()}
-                return getattr(self, name)(body=body, query=q, **match.groupdict())
+                return getattr(self, name)(body=body, query=q, raw=raw, **match.groupdict())
         if allowed_methods:
             raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "метод не поддерживается")
         raise ApiError(HTTPStatus.NOT_FOUND, "не найдено")
 
     # -- обработчики ----------------------------------------------------------
     def health(self, **_: Any) -> tuple[HTTPStatus, Any]:
-        return HTTPStatus.OK, {"status": "ok", "llm": self.assistant.llm.available}
+        return HTTPStatus.OK, {"status": "ok", "llm": self.assistant.llm.available,
+                               "speech": self.assistant.speech_available}
 
     def moderate(self, body: dict[str, Any], **_: Any) -> tuple[HTTPStatus, Any]:
         return HTTPStatus.OK, self.assistant.moderate(_require_text(body, "text", 100_000)).to_dict()
@@ -119,11 +127,43 @@ class Api:
         lesson = self.assistant.start_lesson(
             chat_id=_opt_str(body, "chat_id"), tutor_id=_opt_str(body, "tutor_id"), tutor_name=_opt_str(body, "tutor_name"),
             student_id=_opt_str(body, "student_id"), student_name=_opt_str(body, "student_name"),
-            title=_opt_str(body, "title"))
-        return HTTPStatus.CREATED, lesson
+            title=_opt_str(body, "title"),
+            require_recording=bool(body["require_recording"]) if "require_recording" in body else None)
+        return HTTPStatus.CREATED, self._with_recording(lesson)
+
+    def _with_recording(self, lesson: dict[str, Any]) -> dict[str, Any]:
+        return {**lesson, "recording": {**self.assistant.recording_status(lesson["id"]),
+                                        "upload_url": f"/v1/lessons/{lesson['id']}/audio",
+                                        "speech_available": self.assistant.speech_available}}
 
     def get_lesson(self, id: str, **_: Any) -> tuple[HTTPStatus, Any]:
-        return HTTPStatus.OK, self.assistant.lesson(id)
+        return HTTPStatus.OK, self._with_recording(self.assistant.lesson(id))
+
+    def lesson_audio(self, id: str, query: dict[str, str], raw: bytes | None, **_: Any) -> tuple[HTTPStatus, Any]:
+        lesson = self.assistant.lesson(id)
+        if lesson["status"] != "active":
+            raise ApiError(HTTPStatus.CONFLICT, "урок уже завершён")
+        if not raw:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "тело запроса должно содержать аудио")
+        out = self.assistant.process_audio(id, query.get("speaker_id"), query.get("speaker_name"), raw,
+                                           role=query.get("role"), recording=True)
+        # Фрагмент принят и учтён в записи, даже если речь проверить не удалось (это видно по "checked": false).
+        return HTTPStatus.OK, {**out.to_dict(), "recording": self.assistant.recording_status(id)}
+
+    def analyze_audio(self, query: dict[str, str], raw: bytes | None, **_: Any) -> tuple[HTTPStatus, Any]:
+        if not raw:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "тело запроса должно содержать аудиозапись урока")
+        if not self.assistant.speech_available:
+            raise ApiError(HTTPStatus.SERVICE_UNAVAILABLE, "распознавание речи не установлено на сервере")
+        flag = lambda k, d: query.get(k, d).lower() in {"1", "true", "yes"}  # noqa: E731
+        try:
+            report, violations, transcript = self.assistant.analyze_audio(
+                raw, title=query.get("title"), student_id=query.get("student_id"), use_llm=flag("use_llm", "true"),
+                persist=flag("save", "false"))
+        except RuntimeError as exc:
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from None
+        return HTTPStatus.OK, {"report": report.model_dump(), "violations": violations,
+                               "transcript": _redact_transcript(transcript, violations)}
 
     def add_message(self, id: str, body: dict[str, Any], **_: Any) -> tuple[HTTPStatus, Any]:
         lesson = self.assistant.lesson(id)
@@ -187,6 +227,17 @@ class Api:
         return HTTPStatus.OK, {"count": len(rows), "incidents": rows}
 
 
+def _redact_transcript(transcript: str, violations: list[dict[str, Any]]) -> str:
+    """Расшифровка для ответа API — без фрагментов с контактами."""
+    lines = transcript.split("\n")
+    for v in violations:
+        for idx in [v["index"], *v.get("related_indexes", [])]:
+            if 0 <= idx < len(lines) and v.get("action") == "block":
+                prefix = lines[idx].split(": ", 1)[0]
+                lines[idx] = f"{prefix}: {v['redacted_text'] if idx == v['index'] else '[скрыто]'}"
+    return "\n".join(lines)
+
+
 def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "TutorAssistant/1.0"
@@ -203,12 +254,16 @@ def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
             try:
                 parsed = urlparse(self.path)
                 body: dict[str, Any] = {}
+                audio: bytes | None = None
                 if method == "POST":
                     length = int(self.headers.get("Content-Length") or 0)
-                    if length > MAX_BODY:
+                    is_audio = bool(AUDIO_PATH_RE.match(parsed.path.rstrip("/")))
+                    if length > (MAX_AUDIO_BODY if is_audio else MAX_BODY):
                         raise ApiError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "слишком большой запрос")
                     raw = self.rfile.read(length) if length else b""
-                    if raw:
+                    if is_audio:
+                        audio = raw
+                    elif raw:
                         try:
                             body = json.loads(raw.decode("utf-8"))
                         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -216,7 +271,7 @@ def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
                         if not isinstance(body, dict):
                             raise ApiError(HTTPStatus.BAD_REQUEST, "тело запроса должно быть JSON-объектом")
                 status, payload = api.dispatch(method, parsed.path.rstrip("/") or "/", parse_qs(parsed.query), body,
-                                               self.headers.get("Authorization"))
+                                               self.headers.get("Authorization"), raw=audio)
                 self._send(status, payload)
             except ApiError as exc:
                 self._send(exc.status, {"error": exc.message})
@@ -242,12 +297,28 @@ def run_api(settings: Settings, host: str = "127.0.0.1", port: int = 8080) -> No
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if not settings.api_token:
         log.warning("TUTOR_API_TOKEN не задан — API доступен без авторизации. Задайте токен перед запуском в сети.")
-    api = Api(TutorAssistant(settings))
+    assistant = TutorAssistant(settings)
+    if not assistant.speech_available:
+        log.warning("Распознавание речи недоступно: %s", assistant.transcriber.last_error)
+    api = Api(assistant)
     server = ThreadingHTTPServer((host, port), make_handler(api))
+    stop = threading.Event()
+    threading.Thread(target=recording_watchdog, args=(assistant, stop), daemon=True).start()
     log.info("HTTP API запущен: http://%s:%s", host, port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        stop.set()
         server.server_close()
+
+
+def recording_watchdog(assistant: TutorAssistant, stop: threading.Event, interval: float = 15.0) -> None:
+    """Фоновая проверка: на идущих уроках запись должна идти без долгих перерывов."""
+    while not stop.wait(interval):
+        try:
+            for gap in assistant.check_recording_gaps():
+                log.warning("Урок %s: %s", gap["lesson_id"], gap["summary"])
+        except Exception:
+            log.exception("Ошибка проверки записи уроков")

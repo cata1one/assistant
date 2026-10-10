@@ -82,7 +82,20 @@ class Settings:
     allowed_domains: tuple[str, ...] = ()  # домены школы и разрешённые сайты
     allowed_phones: tuple[str, ...] = ()  # телефоны поддержки школы (только цифры)
     split_window_seconds: int = 180  # окно склейки номера, разбитого на сообщения
-    relay_media: bool = True  # анонимный мост: пересылать фото/файлы/голосовые (их содержимое не проверяется)
+    relay_media: bool = True  # анонимный мост: пересылать фото/файлы (их содержимое не проверяется)
+
+    # Распознавание речи (голосовые, запись урока). mode: auto — если установлен faster-whisper; on; off.
+    stt_mode: str = "auto"
+    stt_model: str = "small"  # tiny | base | small | medium | large-v3 — чем больше, тем точнее и медленнее
+    stt_language: str = ""  # пусто — определять автоматически (урок обычно смешанный: ru + изучаемый язык)
+    stt_device: str = "cpu"  # cpu | cuda
+    stt_compute_type: str = "int8"
+    stt_model_dir: str = ""  # папка с моделями (для серверов без доступа в интернет)
+    relay_unchecked_audio: bool = False  # пересылать голосовые, если распознавание недоступно
+    # Запись урока
+    require_recording: bool = False  # урок без записи → нарушение «запись не включена»
+    recording_gap_seconds: int = 90  # перерыв в записи дольше этого → уведомление администратору
+    alert_webhook_url: str = ""  # POST JSON о каждом нарушении (для платформы школы)
 
     # Интеграции
     telegram_token: str = ""
@@ -112,6 +125,16 @@ class Settings:
             allowed_phones=tuple("".join(c for c in x if c.isdigit()) for x in _env_list("TUTOR_ALLOWED_PHONES")),
             split_window_seconds=_env_int("TUTOR_SPLIT_WINDOW_SECONDS", cls.split_window_seconds),
             relay_media=_env_bool("TUTOR_RELAY_MEDIA", cls.relay_media),
+            stt_mode=_env("TUTOR_STT", cls.stt_mode).lower(),
+            stt_model=_env("TUTOR_STT_MODEL", cls.stt_model),
+            stt_language=_env("TUTOR_STT_LANGUAGE", cls.stt_language).lower(),
+            stt_device=_env("TUTOR_STT_DEVICE", cls.stt_device),
+            stt_compute_type=_env("TUTOR_STT_COMPUTE_TYPE", cls.stt_compute_type),
+            stt_model_dir=_env("TUTOR_STT_MODEL_DIR", cls.stt_model_dir),
+            relay_unchecked_audio=_env_bool("TUTOR_RELAY_UNCHECKED_AUDIO", cls.relay_unchecked_audio),
+            require_recording=_env_bool("TUTOR_REQUIRE_RECORDING", cls.require_recording),
+            recording_gap_seconds=_env_int("TUTOR_RECORDING_GAP_SECONDS", cls.recording_gap_seconds),
+            alert_webhook_url=_env("TUTOR_ALERT_WEBHOOK_URL", cls.alert_webhook_url),
             telegram_token=_env("TELEGRAM_BOT_TOKEN"),
             admin_chat_id=_env("TUTOR_ADMIN_CHAT_ID"),
             admin_user_ids=_env_list("TUTOR_ADMIN_USER_IDS"),

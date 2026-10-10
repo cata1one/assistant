@@ -102,7 +102,7 @@ def pm(user_id, text=None, message_id=1, name="Иван Иванов", reply_to=
         date=datetime(2026, 1, 1, tzinfo=timezone.utc), reply_text=AsyncMock(),
         reply_to_message=types.SimpleNamespace(message_id=reply_to) if reply_to else None,
         entities=media.pop("entities", ()), caption_entities=(), document=None, photo=(), video=None, audio=None,
-        voice=None, animation=None, sticker=None, contact=None, location=None, venue=None, poll=None, dice=None,
+        voice=None, video_note=None, animation=None, sticker=None, contact=None, location=None, venue=None, poll=None, dice=None,
         game=None, story=None,
     )
     for k, v in media.items():

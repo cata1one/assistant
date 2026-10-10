@@ -28,6 +28,14 @@ def read_text_file(path: str) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+AUDIO_EXTENSIONS = {".mp3", ".m4a", ".ogg", ".oga", ".opus", ".wav", ".webm", ".mp4", ".mkv", ".mov", ".flac", ".aac",
+                    ".wma", ".amr", ".3gp"}
+
+
+def is_audio_file(path: str) -> bool:
+    return Path(path).suffix.lower() in AUDIO_EXTENSIONS
+
+
 def _assistant(args: argparse.Namespace) -> TutorAssistant:
     settings = Settings.from_env()
     if getattr(args, "no_llm", False):
@@ -39,11 +47,29 @@ def _assistant(args: argparse.Namespace) -> TutorAssistant:
 
 def cmd_analyze(args: argparse.Namespace) -> int:
     assistant = _assistant(args)
-    text = read_text_file(args.file)
-    report, violations = assistant.analyze_transcript(
-        text, title=args.title, student_id=args.student, use_llm=not args.no_llm, persist=args.save,
-        tutor_names=tuple(args.tutor or ()), student_names=tuple(args.student_name or ()),
-    )
+    if args.file != "-" and is_audio_file(args.file):
+        if not Path(args.file).is_file():
+            raise FileNotFoundError(2, "нет файла", args.file)
+        if not assistant.speech_available:
+            print(f"Распознавание речи недоступно: {assistant.transcriber.last_error}", file=sys.stderr)
+            return 3
+        print("⏳ Расшифровываю запись урока…", file=sys.stderr)
+        try:
+            report, violations, transcript = assistant.analyze_audio(
+                args.file, title=args.title or Path(args.file).stem, student_id=args.student,
+                use_llm=not args.no_llm, persist=args.save)
+        except RuntimeError as exc:
+            print(f"Не удалось обработать запись: {exc}", file=sys.stderr)
+            return 3
+        if args.transcript_out:
+            Path(args.transcript_out).write_text(transcript, encoding="utf-8")
+            print(f"Расшифровка сохранена: {args.transcript_out}", file=sys.stderr)
+    else:
+        text = read_text_file(args.file)
+        report, violations = assistant.analyze_transcript(
+            text, title=args.title, student_id=args.student, use_llm=not args.no_llm, persist=args.save,
+            tutor_names=tuple(args.tutor or ()), student_names=tuple(args.student_name or ()),
+        )
     if args.json:
         print(json.dumps({"report": report.model_dump(), "violations": violations}, ensure_ascii=False, indent=2))
     else:
@@ -129,6 +155,65 @@ def cmd_chat(args: argparse.Namespace) -> int:
             print(answer)
 
 
+def cmd_transcribe(args: argparse.Namespace) -> int:
+    from .speech import segments_to_transcript
+
+    assistant = _assistant(args)
+    if not Path(args.file).is_file():
+        raise FileNotFoundError(2, "нет файла", args.file)
+    transcription, error = assistant.transcribe(args.file)
+    if transcription is None:
+        print(f"Не удалось расшифровать: {error}", file=sys.stderr)
+        return 3
+    text = segments_to_transcript(transcription.segments)
+    result = assistant.moderate(transcription.text)
+    print(text)
+    if result.is_violation:
+        print(f"\n🚨 В записи: {result.summary}", file=sys.stderr)
+    return 1 if result.blocked else 0
+
+
+def cmd_record(args: argparse.Namespace) -> int:
+    import signal
+    import threading
+
+    from . import recorder
+
+    if args.list_devices:
+        print(recorder.list_devices())
+        return 0
+    if not args.lesson:
+        print("Укажите урок: --lesson ID (его показывает бот при /lesson_start или API при создании урока)",
+              file=sys.stderr)
+        return 2
+    speaker = recorder.Speaker(args.speaker_id, args.name, args.role)
+    if args.api:
+        upload = recorder.ApiUploader(args.api, args.lesson, speaker, token=args.token or Settings.from_env().api_token)
+    else:
+        assistant = _assistant(args)
+        assistant.lesson(args.lesson)  # урок должен существовать
+        if not assistant.speech_available:
+            print(f"⚠️ Распознавание речи недоступно ({assistant.transcriber.last_error}) — "
+                  "запись идёт, но речь не проверяется.", file=sys.stderr)
+        upload = recorder.LocalUploader(assistant, args.lesson, speaker)
+
+    stop = threading.Event()
+    if args.file:
+        chunks = recorder.iter_file_chunks(args.file, args.chunk)
+    else:
+        device = int(args.device) if args.device and args.device.isdigit() else args.device
+        chunks = recorder.iter_microphone_chunks(args.chunk, stop, device=device)
+        signal.signal(signal.SIGINT, lambda *_: stop.set())
+        print("🔴 Запись занятия включена. Остановить — Ctrl+C (после окончания урока).", file=sys.stderr)
+    try:
+        violations = recorder.run_recording(chunks, upload)
+    except RuntimeError as exc:
+        print(f"Ошибка записи: {exc}", file=sys.stderr)
+        return 3
+    print(f"⏹ Запись остановлена. Нарушений в речи: {violations}.", file=sys.stderr)
+    return 1 if violations else 0
+
+
 def cmd_words(args: argparse.Namespace) -> int:
     assistant = _assistant(args)
     owner = f"student:{args.student}"
@@ -172,8 +257,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--db", help="путь к базе SQLite (по умолчанию TUTOR_DB_PATH)")
     sub = p.add_subparsers(dest="command", required=True)
 
-    a = sub.add_parser("analyze", help="отчёт и проверка по расшифровке урока")
-    a.add_argument("file", help="файл с расшифровкой (или - для stdin)")
+    a = sub.add_parser("analyze", help="отчёт и проверка по расшифровке или аудио/видеозаписи урока")
+    a.add_argument("file", help="расшифровка .txt (или - для stdin) либо запись урока: mp3, m4a, ogg, wav, mp4, webm…")
+    a.add_argument("--transcript-out", help="для записи: сохранить расшифровку в файл")
     a.add_argument("--title", help="название урока")
     a.add_argument("--student", help="id ученика (для учёта уже изученных слов)")
     a.add_argument("--tutor", action="append", help="имя преподавателя в расшифровке (можно несколько)")
@@ -194,6 +280,23 @@ def build_parser() -> argparse.ArgumentParser:
     ch.add_argument("--title", help="название урока")
     ch.add_argument("--no-llm", action="store_true")
     ch.set_defaults(func=cmd_chat)
+
+    t = sub.add_parser("transcribe", help="расшифровать аудио/видео и проверить на контакты")
+    t.add_argument("file")
+    t.set_defaults(func=cmd_transcribe)
+
+    r = sub.add_parser("record", help="запись занятия с микрофона с проверкой речи в реальном времени")
+    r.add_argument("--lesson", help="id урока")
+    r.add_argument("--api", help="адрес HTTP API школы, например https://school.example/api (без него — локально)")
+    r.add_argument("--token", help="токен API (по умолчанию TUTOR_API_TOKEN)")
+    r.add_argument("--role", default="tutor", choices=["tutor", "student"], help="чей это микрофон")
+    r.add_argument("--name", help="имя говорящего")
+    r.add_argument("--speaker-id", help="id говорящего")
+    r.add_argument("--device", help="номер или название устройства записи (см. --list-devices)")
+    r.add_argument("--chunk", type=float, default=15.0, help="длина фрагмента, секунд (по умолчанию 15)")
+    r.add_argument("--file", help="вместо микрофона отправить готовую запись по фрагментам")
+    r.add_argument("--list-devices", action="store_true", help="показать устройства записи")
+    r.set_defaults(func=cmd_record)
 
     w = sub.add_parser("words", help="словарь ученика")
     w.add_argument("--student", required=True)

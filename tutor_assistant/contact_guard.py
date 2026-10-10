@@ -179,6 +179,10 @@ _URL_RE = re.compile(
 )
 _EMAIL_RE = re.compile(r"(?<![\w.+-])[a-z0-9][a-z0-9._%+-]{0,63}@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
                        r"(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,24}(?![\w-])", re.IGNORECASE)
+# Адрес, продиктованный вслух, после расшифровки речи: «иван точка петров собака джимейл точка ком»
+# → «иван.петров@gmail.com» — имя ящика кириллицей, поэтому обычный шаблон e-mail его не находит.
+_SPOKEN_EMAIL_RE = re.compile(r"(?<![\w.])[\wа-яё][\wа-яё._-]{0,63}@[a-z0-9а-яё-]+(?:\.[a-z0-9а-яё-]+)*\.[a-zа-яё]{2,24}(?![\w-])",
+                              re.IGNORECASE)
 _HANDLE_RE = re.compile(r"(?<![\w@.])@([a-z][a-z0-9_]{3,31})(?![\w@])", re.IGNORECASE)
 _DIGIT_RUN_RE = re.compile(r"\+?\d[\d \t\-()]{4,}\d")
 
@@ -434,9 +438,10 @@ class ContactGuard:
         found: list[Finding] = []
         # e-mail: «собака», «точка», «гмейл», разрядка
         for source in {textnorm.basic(text), norm}:
-            for m in _EMAIL_RE.finditer(textnorm.deobfuscate_email(source)):
+            deob = textnorm.deobfuscate_email(source)
+            for m in list(_EMAIL_RE.finditer(deob)) + list(_SPOKEN_EMAIL_RE.finditer(deob)):
                 email = m.group(0).lower()
-                if email not in known and not self._allowed_email(email):
+                if email not in known and not self._allowed_email(email) and not any(email in k for k in known):
                     known.add(email)
                     found.append(Finding(Kind.EMAIL, Severity.HIGH, email, "замаскированный адрес почты"))
         # телефон: числа словами, буквы вместо цифр
@@ -450,6 +455,10 @@ class ContactGuard:
             if looks_like_strict_phone(raw) or (context and len(digits) >= 10):
                 known.add(digits)
                 found.append(Finding(Kind.PHONE, Severity.HIGH, raw, "номер телефона, записанный в замаскированном виде"))
+        # ник, продиктованный вслух: «мой ник анна нижнее подчёркивание тьютор»
+        if re.search(r"подчеркивани|underscore", norm) and re.search(
+                _B + rf"(?:{_ANY_MESSENGER}|ник\w*|никнейм\w*|логин\w*|username|юзернейм\w*|аккаунт\w*|акк)" + _E, norm):
+            found.append(Finding(Kind.HANDLE, Severity.HIGH, "ник, продиктованный вслух", "ник/аккаунт, продиктованный по частям"))
         # ник после «телеграм:», «ник —», «мой инст …»
         for m in _HANDLE_TRIGGER_RE.finditer(norm):
             handle = m.group(1).strip(".")

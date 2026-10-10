@@ -2,30 +2,68 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
-from collections.abc import Hashable
+import urllib.request
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from . import render
 from .commands import HELP_TEXT, detect_command
 from .config import Settings
-from .contact_guard import ContactGuard, ConversationGuard, ModerationResult
+from .contact_guard import REDACTED_MESSAGE, ContactGuard, ConversationGuard, ModerationResult
 from .homework import HomeworkCollector
 from .llm import LLMClient
 from .models import HomeworkTask, LessonReport, Role, Utterance, VocabItem
 from .report import build_report
+from .speech import AudioInput, Transcriber, Transcription, audio_duration, make_transcriber, segments_to_transcript
 from .storage import Storage
 from .transcript import parse_transcript
 from .vocabulary import VocabularyCollector
 
 log = logging.getLogger(__name__)
 
+SPEECH_TAIL_CHARS = 120  # хвост предыдущего фрагмента речи — номер может разорваться на границе фрагментов
+
 
 class LessonNotFound(LookupError):
     pass
+
+
+@dataclass
+class AudioOutcome:
+    """Результат обработки фрагмента речи (голосовое сообщение или кусок записи урока)."""
+
+    checked: bool  # удалось ли распознать речь и проверить её
+    transcription: Transcription | None = None
+    outcome: MessageOutcome | None = None
+    moderation: ModerationResult | None = None
+    incident_id: int | None = None
+    error: str | None = None
+
+    @property
+    def text(self) -> str:
+        return self.transcription.text if self.transcription else ""
+
+    @property
+    def blocked(self) -> bool:
+        return bool(self.moderation and self.moderation.blocked)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "checked": self.checked,
+            "transcript": self.text if not self.blocked else (self.moderation.redacted_text if self.moderation else ""),
+            "language": self.transcription.language if self.transcription else None,
+            "duration": self.transcription.duration if self.transcription else 0.0,
+            "moderation": self.moderation.to_dict() if self.moderation else None,
+            "incident_id": self.incident_id,
+            "new_words": [w.model_dump() for w in self.outcome.new_words] if self.outcome else [],
+            "new_homework": [h.model_dump() for h in self.outcome.new_homework] if self.outcome else [],
+            "error": self.error,
+        }
 
 
 @dataclass
@@ -53,17 +91,52 @@ class _LiveState:
     guard: ConversationGuard
     words: VocabularyCollector
     homework: HomeworkCollector
+    speech_tail: dict[str, str] = field(default_factory=dict)
+
+
+AlertHandler = Callable[[dict[str, Any]], None]
 
 
 class TutorAssistant:
-    def __init__(self, settings: Settings | None = None, storage: Storage | None = None, llm: LLMClient | None = None):
+    def __init__(self, settings: Settings | None = None, storage: Storage | None = None, llm: LLMClient | None = None,
+                 transcriber: Transcriber | None = None):
         self.settings = settings or Settings()
         self.storage = storage or Storage(self.settings.db_path)
         self.llm = llm if llm is not None else LLMClient(self.settings)
+        self.transcriber = transcriber if transcriber is not None else make_transcriber(self.settings)
         self.guard = ContactGuard(self.settings)
         self._live: dict[str, _LiveState] = {}
         self._chat_guards: dict[str, ConversationGuard] = {}
         self._lock = threading.RLock()
+        self.alert_handlers: list[AlertHandler] = []
+        if self.settings.alert_webhook_url:
+            self.alert_handlers.append(self._post_webhook)
+
+    # -- нарушения и уведомления ----------------------------------------------
+    def _incident(self, **fields: Any) -> int:
+        incident_id = self.storage.add_incident(**fields)
+        payload = {"id": incident_id, **{k: (v.value if isinstance(v, Role) else v) for k, v in fields.items()},
+                   "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        for handler in list(self.alert_handlers):
+            try:
+                handler(payload)
+            except Exception:  # уведомление не должно ломать урок
+                log.exception("Ошибка обработчика уведомлений")
+        return incident_id
+
+    def _post_webhook(self, payload: dict[str, Any]) -> None:
+        def send() -> None:
+            req = urllib.request.Request(self.settings.alert_webhook_url, method="POST",
+                                         data=json.dumps({"type": "incident", "incident": payload},
+                                                         ensure_ascii=False).encode("utf-8"),
+                                         headers={"Content-Type": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=10):
+                    pass
+            except Exception as exc:
+                log.warning("Не удалось отправить уведомление на %s: %s", self.settings.alert_webhook_url, exc)
+
+        threading.Thread(target=send, daemon=True).start()
 
     # -- модерация ------------------------------------------------------------
     def moderate(self, text: str) -> ModerationResult:
@@ -79,7 +152,7 @@ class TutorAssistant:
             result = guard.check(str(user_id or user_name), text, ts=ts, ref=ref)
         incident_id = None
         if result.is_violation:
-            incident_id = self.storage.add_incident(
+            incident_id = self._incident(
                 lesson_id=None, chat_id=chat_id, user_id=user_id, user_name=user_name, role=Role.parse(role),
                 severity=result.severity.name.lower(), action=result.action, summary=result.summary,
                 original_text=text, redacted_text=result.redacted_text, findings=[f.to_dict() for f in result.findings])
@@ -88,12 +161,17 @@ class TutorAssistant:
     # -- уроки ----------------------------------------------------------------
     def start_lesson(self, chat_id: str | None = None, tutor_id: str | None = None, tutor_name: str | None = None,
                      student_id: str | None = None, student_name: str | None = None,
-                     title: str | None = None) -> dict[str, Any]:
+                     title: str | None = None, require_recording: bool | None = None) -> dict[str, Any]:
+        """Начать урок. С ``require_recording`` урок без записи (или с долгим перерывом) — нарушение."""
         if chat_id is not None:
             active = self.storage.active_lesson(chat_id)
             if active:
                 return active
-        return self.storage.create_lesson(chat_id, tutor_id, tutor_name, student_id, student_name, title)
+        lesson = self.storage.create_lesson(chat_id, tutor_id, tutor_name, student_id, student_name, title)
+        required = self.settings.require_recording if require_recording is None else require_recording
+        if required:
+            self.storage.ensure_recording(lesson["id"], required=True)
+        return lesson
 
     def lesson(self, lesson_id: str) -> dict[str, Any]:
         lesson = self.storage.get_lesson(lesson_id)
@@ -133,7 +211,12 @@ class TutorAssistant:
 
     def process_message(self, lesson_id: str, speaker_id: str | None, speaker_name: str | None, text: str,
                         role: Role | str | None = None, ref: Hashable | None = None,
-                        ts: float | None = None) -> MessageOutcome:
+                        ts: float | None = None, context_text: str | None = None) -> MessageOutcome:
+        """Реплика урока: проверка, сохранение (без контактов), сбор слов и ДЗ.
+
+        ``context_text`` — предыдущий фрагмент речи того же говорящего: номер,
+        продиктованный на стыке двух фрагментов записи, проверяется целиком.
+        """
         lesson = self.lesson(lesson_id)
         role_ = self.resolve_role(lesson, speaker_id, role)
         if role_ == Role.STUDENT and not lesson.get("student_id") and speaker_id is not None:
@@ -142,12 +225,18 @@ class TutorAssistant:
 
         with self._lock:
             result = st.guard.check(str(speaker_id or speaker_name or role_.value), text, ts=ts, ref=ref)
+        if context_text and not result.blocked and not self.guard.check(context_text).blocked:
+            joined = self.guard.check(f"{context_text} {text}")
+            if joined.blocked:
+                result = joined
+                result.original_text = text
+                result.redacted_text = REDACTED_MESSAGE
         stored = result.redacted_text if result.blocked else text
         self.storage.add_message(lesson_id, None if speaker_id is None else str(speaker_id), speaker_name, role_, stored)
 
         incident_id = None
         if result.is_violation:
-            incident_id = self.storage.add_incident(
+            incident_id = self._incident(
                 lesson_id=lesson_id, chat_id=lesson.get("chat_id"), user_id=None if speaker_id is None else str(speaker_id),
                 user_name=speaker_name, role=role_, severity=result.severity.name.lower(), action=result.action,
                 summary=result.summary, original_text=text, redacted_text=result.redacted_text,
@@ -185,6 +274,109 @@ class TutorAssistant:
             self._live.pop(lesson_id, None)
         return report
 
+    # -- речь и запись урока -------------------------------------------------
+    @property
+    def speech_available(self) -> bool:
+        return self.transcriber.available
+
+    def transcribe(self, audio: AudioInput) -> tuple[Transcription | None, str | None]:
+        if not self.transcriber.available:
+            return None, self.transcriber.last_error or "распознавание речи недоступно"
+        try:
+            return self.transcriber.transcribe(audio), None
+        except Exception as exc:
+            log.exception("Ошибка распознавания речи")
+            return None, f"не удалось распознать речь: {exc}"
+
+    def process_audio(self, lesson_id: str, speaker_id: str | None, speaker_name: str | None, audio: AudioInput,
+                      role: Role | str | None = None, ref: Hashable | None = None, ts: float | None = None,
+                      recording: bool = False) -> AudioOutcome:
+        """Фрагмент речи урока: распознать → проверить → сохранить в расшифровку урока.
+
+        ``recording=True`` — фрагмент непрерывной записи урока (отмечается для контроля перерывов).
+        """
+        self.lesson(lesson_id)
+        transcription, error = self.transcribe(audio)
+        if recording:
+            self.storage.touch_recording(lesson_id, transcription.duration if transcription else audio_duration(audio))
+        if transcription is None:
+            return AudioOutcome(checked=False, error=error)
+        if not transcription.text:
+            return AudioOutcome(checked=True, transcription=transcription)
+        st = self._state(lesson_id)
+        tail_key = str(speaker_id or speaker_name or role or "")
+        with self._lock:
+            tail = st.speech_tail.get(tail_key)
+        outcome = self.process_message(lesson_id, speaker_id, speaker_name, transcription.text, role=role, ref=ref,
+                                       ts=ts, context_text=tail)
+        with self._lock:
+            st.speech_tail[tail_key] = "" if outcome.moderation.blocked else transcription.text[-SPEECH_TAIL_CHARS:]
+        return AudioOutcome(checked=True, transcription=transcription, outcome=outcome, moderation=outcome.moderation,
+                            incident_id=outcome.incident_id)
+
+    def moderate_chat_audio(self, chat_id: str, user_id: str | None, user_name: str | None, audio: AudioInput,
+                            role: Role | str | None = None, ref: Hashable | None = None,
+                            ts: float | None = None) -> AudioOutcome:
+        """Голосовое сообщение вне урока: распознать и проверить на контакты."""
+        transcription, error = self.transcribe(audio)
+        if transcription is None:
+            return AudioOutcome(checked=False, error=error)
+        if not transcription.text:
+            return AudioOutcome(checked=True, transcription=transcription)
+        result, incident_id = self.moderate_chat_message(chat_id, user_id, user_name, transcription.text, role=role,
+                                                         ref=ref, ts=ts)
+        return AudioOutcome(checked=True, transcription=transcription, moderation=result, incident_id=incident_id)
+
+    def recording_status(self, lesson_id: str, now: datetime | None = None) -> dict[str, Any]:
+        rec = self.storage.get_recording(lesson_id)
+        if not rec:
+            return {"required": False, "active": False, "chunks": 0, "seconds": 0.0, "last_chunk_at": None}
+        now = now or datetime.now(timezone.utc)
+        ref = rec["last_chunk_at"] or rec["started_at"]
+        idle = (now - datetime.fromisoformat(ref)).total_seconds()
+        return {"required": bool(rec["required"]), "active": bool(rec["last_chunk_at"])
+                and idle <= self.settings.recording_gap_seconds, "chunks": rec["chunks"],
+                "seconds": round(rec["seconds"], 1), "last_chunk_at": rec["last_chunk_at"], "idle_seconds": round(idle)}
+
+    def check_recording_gaps(self, now: datetime | None = None) -> list[dict[str, Any]]:
+        """Найти идущие уроки, где запись не включили или она прервалась. Каждый перерыв — одно нарушение."""
+        now = now or datetime.now(timezone.utc)
+        found = []
+        for rec in self.storage.active_recordings():
+            if not rec["required"] and not rec["chunks"]:
+                continue
+            ref = rec["last_chunk_at"] or rec["started_at"]
+            gap = (now - datetime.fromisoformat(ref)).total_seconds()
+            if gap < self.settings.recording_gap_seconds or not self.storage.claim_gap_alert(rec["lesson_id"], ref, now):
+                continue
+            never = not rec["chunks"]
+            summary = (f"запись урока не включена ({int(gap)} с с начала урока)" if never
+                       else f"запись урока прервана: нет звука {int(gap)} с")
+            incident_id = self._incident(
+                lesson_id=rec["lesson_id"], chat_id=rec["chat_id"], user_id=rec["tutor_id"], user_name=rec["tutor_name"],
+                role=Role.TUTOR, severity="medium", action="warn", summary=summary,
+                original_text=f"[{summary}]", redacted_text=f"[{summary}]",
+                findings=[{"kind": "recording_gap", "severity": "medium", "value": str(int(gap)), "reason": summary,
+                           "span": None}])
+            found.append({"lesson_id": rec["lesson_id"], "chat_id": rec["chat_id"], "tutor_id": rec["tutor_id"],
+                          "student_id": rec["student_id"], "title": rec["title"], "gap_seconds": int(gap),
+                          "never_started": never, "summary": summary, "incident_id": incident_id})
+        return found
+
+    def analyze_audio(self, audio: AudioInput, title: str | None = None, student_id: str | None = None,
+                      use_llm: bool = True, persist: bool = False) -> tuple[LessonReport, list[dict[str, Any]], str]:
+        """Запись урока целиком (mp3, m4a, ogg, wav, mp4, webm): расшифровка → проверка → отчёт."""
+        transcription, error = self.transcribe(audio)
+        if transcription is None:
+            raise RuntimeError(error or "распознавание речи недоступно")
+        transcript = segments_to_transcript(transcription.segments)
+        if not transcript:
+            raise RuntimeError("в записи не найдено речи")
+        report, violations = self.analyze_transcript(transcript, title=title, student_id=student_id, use_llm=use_llm,
+                                                     persist=persist)
+        report.notes.append("Отчёт построен по аудиозаписи урока; говорящие в записи не разделяются.")
+        return report, violations, transcript
+
     # -- разбор готовой расшифровки -----------------------------------------
     def analyze_transcript(self, text: str, title: str | None = None, student_id: str | None = None,
                            tutor_names: tuple[str, ...] = (), student_names: tuple[str, ...] = (),
@@ -217,7 +409,7 @@ class TutorAssistant:
             for u in clean:
                 self.storage.add_message(lesson_id, None, u.speaker, u.role, u.text)
             for v in violations:
-                self.storage.add_incident(lesson_id=lesson_id, chat_id=None, user_id=None, user_name=v["speaker"],
+                self._incident(lesson_id=lesson_id, chat_id=None, user_id=None, user_name=v["speaker"],
                                           role=Role(v["role"]), severity=v["severity"], action=v["action"],
                                           summary=v["summary"], original_text=v["original_text"],
                                           redacted_text=v["redacted_text"], findings=v["findings"])

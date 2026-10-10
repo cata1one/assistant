@@ -2,8 +2,12 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 TUTOR_DB_PATH=/data/tutor_assistant.sqlite3
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# WITH_SPEECH=1 — с распознаванием речи (проверка голосовых и записи урока). Модель кэшируется в /data/models.
+ARG WITH_SPEECH=1
+ENV TUTOR_STT_MODEL_DIR=/data/models
+COPY requirements.txt requirements-speech.txt ./
+RUN pip install --no-cache-dir -r requirements.txt \
+    && if [ "$WITH_SPEECH" = "1" ]; then pip install --no-cache-dir -r requirements-speech.txt; fi
 COPY tutor_assistant ./tutor_assistant
 VOLUME ["/data"]
 

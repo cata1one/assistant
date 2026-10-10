@@ -26,10 +26,10 @@ from typing import Any
 from . import render
 from .commands import HELP_TEXT, detect_command
 from .config import Settings
-from .contact_guard import ModerationResult
+from .contact_guard import ModerationResult, Severity
 from .models import Role
 from .relay import TUTOR, Pair, RelayError, RelayService
-from .service import MessageOutcome, TutorAssistant
+from .service import AudioOutcome, MessageOutcome, TutorAssistant
 from .summary import plural
 
 log = logging.getLogger(__name__)
@@ -50,7 +50,14 @@ except ImportError as exc:  # pragma: no cover
     raise SystemExit("Для бота установите зависимость: pip install python-telegram-bot") from exc
 
 MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024
+MAX_BOT_DOWNLOAD = 20 * 1024 * 1024  # ограничение Bot API на скачивание файлов
+WATCHDOG_INTERVAL = 20.0
+RECORDING_NOTICE = ("🔴 Урок записывается: голосовые сообщения и запись занятия расшифровываются и проверяются "
+                    "автоматически. Продолжая урок, участники соглашаются с записью по правилам школы.")
 CAPTION_LIMIT = 1024
+REDACTED_SPEECH = "[голосовое сообщение скрыто: не удалось проверить речь]"
+UNCHECKED_SPEECH_WARNING = ("⚠️ Голосовые сообщения, которые не удалось проверить автоматически, не публикуются. "
+                            "Напишите, пожалуйста, текстом.")
 ROLE_RU = {TUTOR: "преподаватель", "student": "ученик"}
 
 RELAY_HELP = """🔒 Вы общаетесь через бот школы. Собеседник видит только ваш псевдоним — не ваш аккаунт Telegram.
@@ -100,7 +107,7 @@ class TutorBot:
             await context.bot.send_message(chat_id, part, disable_web_page_preview=True)
 
     async def _notify_admin(self, context: ContextTypes.DEFAULT_TYPE, update: Update, result: ModerationResult,
-                            incident_id: int | None, role: Role) -> None:
+                            incident_id: int | None, role: Role, transcript: str | None = None) -> None:
         if not self.settings.admin_chat_id:
             return
         chat = update.effective_chat
@@ -111,7 +118,7 @@ class TutorBot:
             f"Чат: {chat.title if chat and chat.title else chat.id if chat else '—'}\n"
             f"Кто: {self._name(update)} ({role_ru}, id {user.id if user else '—'})\n"
             f"Действие: {'сообщение скрыто' if result.blocked else 'предупреждение'}\n"
-            f"Исходный текст:\n{result.original_text}"
+            + (f"Расшифровка голосового:\n{transcript}" if transcript else f"Исходный текст:\n{result.original_text}")
         )
         try:
             await self._send_long(context, int(self.settings.admin_chat_id), text)
@@ -122,7 +129,7 @@ class TutorBot:
     async def cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text(HELP_TEXT + "\nКоманды: /lesson_start [тема], /lesson_end, /words, "
                                                   "/words_today, /dictionary, /homework, /test, /answers, /summary, "
-                                                  "/report, /check <текст>, /chats\n"
+                                                  "/report, /check <текст>, /chats, /recording\n"
                                                   "Администраторам: /new_pair Преподаватель | Ученик, /pairs, "
                                                   "/unpair <id>, /incidents")
 
@@ -137,10 +144,11 @@ class TutorBot:
             await msg.reply_text("Урок уже идёт. Завершить: /lesson_end")
             return
         lesson = self.assistant.start_lesson(chat_id=str(chat.id), tutor_id=str(user.id), tutor_name=self._name(update),
-                                             title=title)
+                                             title=title, require_recording=self.settings.require_recording)
         text = (f"▶️ Урок начат{f': {title}' if title else ''}. Преподаватель: {self._name(update)}.\n"
                 "Я записываю новые слова («Новые слова сегодня: …») и домашнее задание («ДЗ: …»).\n"
-                "Напоминаю: обмен личными контактами и общение вне платформы запрещены.")
+                "Напоминаю: обмен личными контактами и общение вне платформы запрещены.\n\n"
+                + self._recording_notice(lesson["id"]))
         await msg.reply_text(text)
         await self._check_rights(context, chat.id)
         log.info("Урок %s начат в чате %s", lesson["id"], chat.id)
@@ -224,15 +232,121 @@ class TutorBot:
                  f"{r['summary']} [{r['action']}]" for r in rows]
         await self._send_long(context, chat.id, "🚨 Последние нарушения:\n" + "\n".join(lines))
 
+    # -- речь и запись урока ------------------------------------------------------
+    def _recording_notice(self, lesson_id: str) -> str:
+        notice = RECORDING_NOTICE
+        if not self.assistant.speech_available and not self.settings.relay_unchecked_audio:
+            notice += "\n🎤 Проверка речи на сервере сейчас недоступна — голосовые сообщения не передаются, пишите текстом."
+        if self.settings.require_recording:
+            notice += (f"\n🎙 Включите запись занятия на компьютере:\n"
+                       f"python -m tutor_assistant record --lesson {lesson_id}\n"
+                       "Если записи не будет, администратор школы получит уведомление.")
+        return notice
+
+    @staticmethod
+    def _speech_attachment(msg: Any) -> Any | None:
+        """Голосовое, «кружочек», аудио или видео — всё, где может звучать речь."""
+        return msg.voice or msg.video_note or msg.audio or msg.video or None
+
+    async def _download(self, attachment: Any) -> bytes | None:
+        if attachment.file_size and attachment.file_size > MAX_BOT_DOWNLOAD:
+            return None
+        file = await attachment.get_file()
+        return bytes(await file.download_as_bytearray())
+
+    async def _check_speech(self, update: Update, attachment: Any, lesson: dict[str, Any] | None, chat_id: str,
+                            speaker: str, role: str | None) -> AudioOutcome:
+        """Скачать и проверить речь. Возвращает AudioOutcome; checked=False — проверить не удалось."""
+        msg, user = update.effective_message, update.effective_user
+        if not self.assistant.speech_available:
+            return AudioOutcome(checked=False, error=self.assistant.transcriber.last_error)
+        try:
+            data = await self._download(attachment)
+        except TelegramError as exc:
+            return AudioOutcome(checked=False, error=f"не удалось скачать файл: {exc}")
+        if data is None:
+            return AudioOutcome(checked=False, error="файл больше 20 МБ — бот не может его проверить")
+        ts = msg.date.timestamp() if msg.date else time.time()
+        if lesson:
+            return await asyncio.to_thread(self.assistant.process_audio, lesson["id"], str(user.id), speaker, data,
+                                           role, msg.message_id, ts)
+        return await asyncio.to_thread(self.assistant.moderate_chat_audio, chat_id, str(user.id), speaker, data, role,
+                                       msg.message_id, ts)
+
+    async def cmd_recording(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat, user = update.effective_chat, update.effective_user
+        chat_key = str(chat.id)
+        if chat.type == ChatType.PRIVATE:
+            current = self.relay.current(str(user.id))
+            chat_key = current[0].chat_id if current else chat_key
+        lesson = self.assistant.storage.active_lesson(chat_key)
+        if not lesson:
+            await update.effective_message.reply_text("Сейчас нет активного урока.")
+            return
+        st = self.assistant.recording_status(lesson["id"])
+        speech = "✅ работает" if self.assistant.speech_available else "❌ недоступна"
+        state = "🔴 идёт" if st["active"] else ("⏸ нет звука" if st["chunks"] else "⚪️ не включена")
+        await update.effective_message.reply_text(
+            f"Урок {lesson['id']}\nЗапись: {state} (фрагментов: {st['chunks']}, {int(st['seconds'])} с)\n"
+            f"Проверка речи: {speech}\nВключить запись: python -m tutor_assistant record --lesson {lesson['id']}")
+
+    async def _watchdog(self, app: Application) -> None:
+        """Каждые 20 секунд: на идущих уроках запись не должна пропадать."""
+        while True:
+            await asyncio.sleep(WATCHDOG_INTERVAL)
+            try:
+                gaps = await asyncio.to_thread(self.assistant.check_recording_gaps)
+            except Exception:
+                log.exception("Ошибка проверки записи уроков")
+                continue
+            for gap in gaps:
+                await self._alert_gap(app.bot, gap)
+
+    async def _alert_gap(self, bot: Any, gap: dict[str, Any]) -> None:
+        text = f"⚠️ Урок {gap['lesson_id']}: {gap['summary']}."
+        chat = str(gap.get("chat_id") or "")
+        targets: list[int] = []
+        if chat.startswith("pair:"):
+            pair = self.relay.get(chat.split(":", 1)[1])
+            if pair and pair.tutor_user_id:
+                targets.append(int(pair.tutor_user_id))
+        elif chat.lstrip("-").isdigit():
+            targets.append(int(chat))
+        for target in targets:
+            try:
+                await bot.send_message(target, text + " Включите запись занятия.")
+            except TelegramError as exc:
+                log.warning("Не удалось отправить напоминание о записи: %s", exc)
+        if self.settings.admin_chat_id:
+            try:
+                await bot.send_message(int(self.settings.admin_chat_id),
+                                       f"🚨 Нарушение #{gap['incident_id']}: {text} Преподаватель id {gap['tutor_id']}.")
+            except (TelegramError, ValueError) as exc:
+                log.warning("Не удалось уведомить администратора: %s", exc)
+
     # -- сообщения ---------------------------------------------------------------
     async def on_group_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
         if not msg or not user or user.is_bot:
             return
         text = msg.text or msg.caption or ""
+        lesson = self.assistant.storage.active_lesson(str(chat.id))
+        attachment = self._speech_attachment(msg)
+        if attachment is not None and update.message is not None:
+            role_name = self.assistant.resolve_role(lesson, str(user.id), None).value if lesson else None
+            audio = await self._check_speech(update, attachment, lesson, str(chat.id), self._name(update), role_name)
+            if audio.blocked or (not audio.checked and not self.settings.relay_unchecked_audio):
+                if audio.blocked:
+                    result = audio.moderation
+                else:
+                    result = ModerationResult(audio.error or "", REDACTED_SPEECH, Severity.HIGH, "block")
+                await self._hide(update, context, result)
+                if audio.blocked:
+                    await self._notify_admin(context, update, result, audio.incident_id,
+                                             Role(role_name) if role_name else Role.UNKNOWN, transcript=audio.text)
+                return
         if not text.strip():
             return
-        lesson = self.assistant.storage.active_lesson(str(chat.id))
         ts = msg.date.timestamp() if msg.date else time.time()
         outcome: MessageOutcome | None = None
         if lesson:
@@ -279,11 +393,12 @@ class TutorBot:
         except TelegramError as exc:
             log.warning("Не удалось удалить сообщение %s: %s", msg.message_id, exc)
         name = self._name(update)
+        warning = result.warning if result.findings else UNCHECKED_SPEECH_WARNING
         if deleted:
-            text = f"{result.warning}\n\n{name}: {result.redacted_text}"
+            text = f"{warning}\n\n{name}: {result.redacted_text}"
             await context.bot.send_message(chat.id, text, disable_web_page_preview=True)
         else:
-            await msg.reply_text(f"{result.warning}\n(Не удалось удалить сообщение — нужны права администратора.)")
+            await msg.reply_text(f"{warning}\n(Не удалось удалить сообщение — нужны права администратора.)")
 
     async def on_private_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg = update.effective_message
@@ -323,6 +438,33 @@ class TutorBot:
             return
         await self._analyze(update, context, text, title=doc.file_name)
 
+    async def _analyze_recording(self, update: Update, context: ContextTypes.DEFAULT_TYPE, attachment: Any) -> None:
+        msg = update.effective_message
+        if not self.assistant.speech_available:
+            await msg.reply_text("Распознавание речи на сервере не установлено — пришлите расшифровку текстом.")
+            return
+        if attachment.file_size and attachment.file_size > MAX_BOT_DOWNLOAD:
+            await msg.reply_text("Telegram позволяет боту скачивать файлы до 20 МБ. Длинную запись загрузите командой\n"
+                                 "python -m tutor_assistant analyze запись.mp3")
+            return
+        await msg.reply_text("⏳ Расшифровываю запись урока… Это может занять несколько минут.")
+        try:
+            data = await self._download(attachment)
+            report, violations, _ = await asyncio.to_thread(self.assistant.analyze_audio, data,
+                                                            getattr(attachment, "file_name", None))
+        except Exception as exc:
+            log.exception("Ошибка анализа записи")
+            await msg.reply_text(f"Не удалось обработать запись: {exc}")
+            return
+        await self._send_report_with_violations(context, update.effective_chat.id, report, violations)
+
+    async def _send_report_with_violations(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, report: Any,
+                                           violations: list[dict[str, Any]]) -> None:
+        await self._send_long(context, chat_id, render.render_report(report))
+        if violations:
+            lines = [f"• {v['speaker']}: {v['summary']} — «{v['original_text'][:200]}»" for v in violations]
+            await self._send_long(context, chat_id, "🚨 Нарушения правил общения:\n" + "\n".join(lines))
+
     async def _analyze(self, update: Update, context: ContextTypes.DEFAULT_TYPE, text: str,
                        title: str | None = None) -> None:
         user = update.effective_user
@@ -335,11 +477,7 @@ class TutorBot:
             await update.effective_message.reply_text("Не удалось обработать расшифровку. Проверьте формат: "
                                                       "«Имя: реплика» на каждой строке.")
             return
-        chat_id = update.effective_chat.id
-        await self._send_long(context, chat_id, render.render_report(report))
-        if violations:
-            lines = [f"• {v['speaker']}: {v['summary']} — «{v['original_text'][:200]}»" for v in violations]
-            await self._send_long(context, chat_id, "🚨 Нарушения правил общения:\n" + "\n".join(lines))
+        await self._send_report_with_violations(context, update.effective_chat.id, report, violations)
 
     # -- анонимный мост ------------------------------------------------------------
     def _is_school_admin(self, update: Update) -> bool:
@@ -472,14 +610,17 @@ class TutorBot:
         if self.assistant.storage.active_lesson(pair.chat_id):
             await msg.reply_text("Урок уже идёт. Завершить: /lesson_end")
             return
-        self.assistant.start_lesson(chat_id=pair.chat_id, tutor_id=uid, tutor_name=pair.tutor_alias,
-                                    student_id=pair.student_user_id, student_name=pair.student_alias, title=title)
+        lesson = self.assistant.start_lesson(chat_id=pair.chat_id, tutor_id=uid, tutor_name=pair.tutor_alias,
+                                             student_id=pair.student_user_id, student_name=pair.student_alias,
+                                             title=title, require_recording=self.settings.require_recording)
         text = (f"▶️ Урок начат{f': {title}' if title else ''}. Я записываю новые слова и домашнее задание.\n"
-                "Напоминаю: обмен личными контактами и общение вне платформы запрещены.")
+                "Напоминаю: обмен личными контактами и общение вне платформы запрещены.\n\n"
+                + self._recording_notice(lesson["id"]))
         await msg.reply_text(text)
         if pair.student_user_id:
             await context.bot.send_message(int(pair.student_user_id), f"▶️ «{pair.tutor_alias}» начал урок"
-                                                                       f"{f': {title}' if title else ''}.")
+                                                                       f"{f': {title}' if title else ''}.\n\n"
+                                                                       + RECORDING_NOTICE)
 
     async def _relay_lesson_end(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg, uid = update.effective_message, str(update.effective_user.id)
@@ -545,7 +686,11 @@ class TutorBot:
                 await msg.reply_text("У вас несколько собеседников — выберите, кому писать: /chats")
                 return
         if target is None:
-            if msg.document:
+            recording = self._speech_attachment(msg) or (
+                msg.document if msg.document and (msg.document.mime_type or "").startswith(("audio/", "video/")) else None)
+            if recording is not None:
+                await self._analyze_recording(update, context, recording)
+            elif msg.document:
                 await self.on_private_document(update, context)
             elif msg.text:
                 await self.on_private_text(update, context)
@@ -564,11 +709,31 @@ class TutorBot:
             await self._answer(update, detect_command(msg.text) or "help")
             return
 
+        speech = self._speech_attachment(msg)
+        if (msg.audio or msg.video) and not self.settings.relay_media:
+            await msg.reply_text("Пересылка аудио- и видеофайлов отключена школой.")
+            return
+        audio: AudioOutcome | None = None
+        if speech is not None:
+            lesson = self.assistant.storage.active_lesson(pair.chat_id)
+            audio = await self._check_speech(update, speech, lesson, pair.chat_id, alias, role)
+            if not audio.checked and not self.settings.relay_unchecked_audio:
+                await msg.reply_text("🎤 Сообщение не доставлено: не удалось проверить речь "
+                                     f"({audio.error or 'ошибка распознавания'}). Напишите, пожалуйста, текстом.")
+                return
+            if audio.blocked:
+                await self._notify_admin_text(context, (
+                    f"🚨 Нарушение #{audio.incident_id or '—'} (анонимный мост, пара {pair.id}, голосовое): "
+                    f"{audio.moderation.summary}\nКто: {ROLE_RU[role]} «{alias}» — аккаунт {self._name(update)}, "
+                    f"id {uid}\nРасшифровка:\n{audio.text}"))
+                await msg.reply_text(f"🚫 Голосовое сообщение не доставлено.\n{audio.moderation.warning}")
+                return
+
         text = msg.text or msg.caption or ""
         hidden_check, hidden_show = self._hidden_parts(msg)
         check_text = "\n".join([text, *hidden_check]).strip()
         ts = msg.date.timestamp() if msg.date else time.time()
-        outcome: MessageOutcome | None = None
+        outcome: MessageOutcome | None = audio.outcome if audio else None
         result: ModerationResult | None = None
         incident_id = None
         if check_text:
@@ -610,7 +775,7 @@ class TutorBot:
                                  "сообщение не доставлено. Попробуйте позже.")
             return
         is_media = not msg.text and msg.effective_attachment is not None
-        if is_media and not self.settings.relay_media:
+        if is_media and speech is None and not self.settings.relay_media:
             await msg.reply_text("Пересылка фото, файлов и голосовых сообщений отключена школой.")
             return
 
@@ -647,10 +812,15 @@ class TutorBot:
         log.error("Ошибка при обработке обновления", exc_info=context.error)
 
     # -- сборка ---------------------------------------------------------------
+    async def _post_init(self, app: Application) -> None:
+        if not self.assistant.speech_available:
+            log.warning("Распознавание речи недоступно: %s", self.assistant.transcriber.last_error)
+        app.create_task(self._watchdog(app))
+
     def build(self) -> Application:
         if not self.settings.telegram_token:
             raise SystemExit("Не задан TELEGRAM_BOT_TOKEN (см. .env.example)")
-        app = Application.builder().token(self.settings.telegram_token).build()
+        app = Application.builder().token(self.settings.telegram_token).post_init(self._post_init).build()
         app.add_handler(CommandHandler("start", self.cmd_start))
         app.add_handler(CommandHandler("help", self.cmd_help))
         app.add_handler(CommandHandler("new_pair", self.cmd_new_pair))
@@ -668,7 +838,9 @@ class TutorBot:
             app.add_handler(CommandHandler(cmd, self._command(name)))
         app.add_handler(CommandHandler("check", self.cmd_check))
         app.add_handler(CommandHandler("incidents", self.cmd_incidents))
-        group = filters.ChatType.GROUPS & (filters.TEXT | filters.CAPTION) & ~filters.COMMAND
+        app.add_handler(CommandHandler("recording", self.cmd_recording))
+        speech = filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO | filters.VIDEO
+        group = filters.ChatType.GROUPS & (filters.TEXT | filters.CAPTION | speech) & ~filters.COMMAND
         app.add_handler(MessageHandler(group, self.on_group_message))
         # Правки сообщений в личке не пересылаются и не обрабатываются: собеседник видит только исходную версию.
         app.add_handler(MessageHandler(filters.ChatType.PRIVATE & ~filters.COMMAND & ~filters.UpdateType.EDITED_MESSAGE,

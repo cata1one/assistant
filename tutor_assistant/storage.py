@@ -95,6 +95,17 @@ CREATE TABLE IF NOT EXISTS incidents (
 CREATE INDEX IF NOT EXISTS idx_incidents_lesson ON incidents(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_incidents_user ON incidents(user_id, created_at);
 
+-- Запись урока: когда пришёл последний фрагмент аудио (для контроля перерывов)
+CREATE TABLE IF NOT EXISTS recordings (
+    lesson_id TEXT PRIMARY KEY REFERENCES lessons(id),
+    required INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    last_chunk_at TEXT,
+    chunks INTEGER NOT NULL DEFAULT 0,
+    seconds REAL NOT NULL DEFAULT 0,
+    gap_alerted_at TEXT
+);
+
 -- Анонимный мост: преподаватель и ученик общаются только через бота
 CREATE TABLE IF NOT EXISTS pairs (
     id TEXT PRIMARY KEY,
@@ -395,3 +406,33 @@ class Storage:
     def relay_by_src(self, src_chat: str, src_msg: int) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM relay_messages WHERE src_chat=? AND src_msg=? ORDER BY id",
                          (src_chat, int(src_msg)))
+
+    # -- запись урока -----------------------------------------------------------------
+    def ensure_recording(self, lesson_id: str, required: bool = False, at: datetime | None = None) -> None:
+        when = _iso(at)
+        self._exec("INSERT INTO recordings(lesson_id, required, started_at) VALUES (?,?,?)"
+                   " ON CONFLICT(lesson_id) DO UPDATE SET required=MAX(recordings.required, excluded.required)",
+                   (lesson_id, int(required), when))
+
+    def touch_recording(self, lesson_id: str, seconds: float, at: datetime | None = None) -> None:
+        when = _iso(at)
+        self.ensure_recording(lesson_id, at=at)
+        self._exec("UPDATE recordings SET chunks=chunks+1, seconds=seconds+?, last_chunk_at=? WHERE lesson_id=?",
+                   (float(seconds or 0), when, lesson_id))
+
+    def get_recording(self, lesson_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM recordings WHERE lesson_id=?", (lesson_id,))
+
+    def active_recordings(self) -> list[dict[str, Any]]:
+        return self._all("SELECT r.*, l.chat_id, l.tutor_id, l.tutor_name, l.student_id, l.title FROM recordings r"
+                         " JOIN lessons l ON l.id = r.lesson_id WHERE l.status='active'")
+
+    def claim_gap_alert(self, lesson_id: str, reference: str, at: datetime | None = None) -> bool:
+        """Отметить, что о перерыве уже сообщили (атомарно — без дублей, даже если работают и бот, и API)."""
+        cur = self._exec("UPDATE recordings SET gap_alerted_at=? WHERE lesson_id=?"
+                         " AND (gap_alerted_at IS NULL OR gap_alerted_at < ?)", (_iso(at), lesson_id, reference))
+        return cur.rowcount == 1
+
+
+def _iso(at: datetime | None) -> str:
+    return (at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(timespec="seconds")

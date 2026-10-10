@@ -1,0 +1,5 @@
+# Распознавание речи (локально, аудио не покидает сервер)
+-r requirements.txt
+faster-whisper>=1.1
+# PyAV 17+ несовместим с faster-whisper 1.2 (ошибка metadata_errors при чтении аудио)
+av>=11,<17

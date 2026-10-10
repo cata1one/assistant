@@ -1,0 +1,4 @@
+# Программа записи занятия на компьютере преподавателя
+-r requirements-speech.txt
+sounddevice>=0.4
+numpy>=1.24

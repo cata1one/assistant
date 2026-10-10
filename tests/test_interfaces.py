@@ -119,7 +119,8 @@ class Ctx:
 def make_update(text, user_id=1, name="Анна", chat_id=-100, chat_type="supergroup", message_id=1):
     msg = types.SimpleNamespace(text=text, caption=None, message_id=message_id,
                                 date=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                                reply_text=AsyncMock(), delete=AsyncMock(return_value=True), document=None)
+                                reply_text=AsyncMock(), delete=AsyncMock(return_value=True), document=None,
+                                voice=None, video_note=None, audio=None, video=None)
     user = types.SimpleNamespace(id=user_id, full_name=name, username=None, is_bot=False)
     chat = types.SimpleNamespace(id=chat_id, type=chat_type, title="Урок")
     return types.SimpleNamespace(effective_message=msg, message=msg, effective_user=user, effective_chat=chat)
