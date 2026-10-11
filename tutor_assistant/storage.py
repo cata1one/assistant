@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS messages (
     speaker_name TEXT,
     role TEXT NOT NULL,
     text TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'text'
 );
 CREATE INDEX IF NOT EXISTS idx_messages_lesson ON messages(lesson_id, id);
 
@@ -223,7 +224,14 @@ class Storage:
                 self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
             self._conn.executescript(SCHEMA)
+            self._migrate()
             self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Новые столбцы для баз, созданных прошлыми версиями."""
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(messages)").fetchall()}
+        if "source" not in cols:  # text — набрано в чате, speech — расшифровка речи
+            self._conn.execute("ALTER TABLE messages ADD COLUMN source TEXT NOT NULL DEFAULT 'text'")
 
     def close(self) -> None:
         with self._lock:
@@ -290,10 +298,11 @@ class Storage:
 
     # -- реплики ----------------------------------------------------------------
     def add_message(self, lesson_id: str, speaker_id: str | None, speaker_name: str | None, role: Role, text: str,
-                    created_at: str | None = None) -> int:
+                    created_at: str | None = None, source: str = "text") -> int:
         cur = self._exec(
-            "INSERT INTO messages(lesson_id, speaker_id, speaker_name, role, text, created_at) VALUES (?,?,?,?,?,?)",
-            (lesson_id, speaker_id, speaker_name, role.value, text, created_at or utcnow()),
+            "INSERT INTO messages(lesson_id, speaker_id, speaker_name, role, text, created_at, source)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (lesson_id, speaker_id, speaker_name, role.value, text, created_at or utcnow(), source),
         )
         return int(cur.lastrowid or 0)
 
@@ -301,6 +310,11 @@ class Storage:
         rows = self._all("SELECT * FROM messages WHERE lesson_id=? ORDER BY id", (lesson_id,))
         return [Utterance(r["speaker_name"] or r["speaker_id"] or "—", Role(r["role"]), r["text"], r["created_at"])
                 for r in rows]
+
+    def messages_since(self, lesson_id: str, since: int = 0, limit: int = 300) -> list[dict[str, Any]]:
+        """Реплики урока (уже без контактов) — для чата и живой расшифровки в онлайн-классе."""
+        return self._all("SELECT id, speaker_name, role, text, created_at, source FROM messages "
+                         "WHERE lesson_id=? AND id>? ORDER BY id LIMIT ?", (lesson_id, since, limit))
 
     # -- материалы, собранные по ходу урока --------------------------------------
     def add_lesson_item(self, lesson_id: str, kind: str, payload: dict[str, Any]) -> None:

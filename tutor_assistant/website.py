@@ -31,10 +31,12 @@ from pathlib import Path
 from typing import Any
 
 from . import catalog
+from .classroom import Classroom
 from .portal import Portal, PortalError
 
 WEB_DIR = Path(__file__).with_name("web")
 MAX_SITE_BODY = 1024 * 1024
+MAX_ROOM_AUDIO = 16 * 1024 * 1024  # фрагмент записи урока
 STATIC_RE = re.compile(r"^/static/([\w.-]+)$")
 
 SECURITY_HEADERS = {
@@ -76,11 +78,19 @@ class Website:
         ("GET", re.compile(r"^/site/v1/admin/applications$"), "applications", True),
         ("POST", re.compile(r"^/site/v1/admin/applications/(?P<id>\d+)$"), "application_status", True),
         ("POST", re.compile(r"^/site/v1/admin/classroom$"), "classroom", True),
+        ("POST", re.compile(r"^/site/v1/rooms$"), "room_start", True),
+        ("GET", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)$"), "room_state", True),
+        ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/signal$"), "room_signal", True),
+        ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/chat$"), "room_chat", True),
+        ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/audio$"), "room_audio", True),
+        ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/finish$"), "room_finish", True),
     ]
+    RAW_BODY_RE = re.compile(r"^/site/v1/rooms/[\w-]+/audio$")  # тело — аудио, а не JSON
 
-    def __init__(self, portal: Portal, web_dir: Path = WEB_DIR):
+    def __init__(self, portal: Portal, web_dir: Path = WEB_DIR, classroom: Classroom | None = None):
         self.portal = portal
         self.web_dir = web_dir
+        self.classroom = classroom or Classroom(portal)
 
     @staticmethod
     def handles(path: str) -> bool:
@@ -94,7 +104,7 @@ class Website:
             return self.static(path)
         try:
             body: Any = {}
-            if method == "POST" and raw:
+            if method == "POST" and raw and not self.RAW_BODY_RE.match(path):
                 try:
                     body = json.loads(raw.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError):
@@ -107,7 +117,7 @@ class Website:
                 allowed = True
                 if m != method:
                     continue
-                kwargs: dict[str, Any] = {"body": body, "query": query, "ip": ip, **match.groupdict()}
+                kwargs: dict[str, Any] = {"body": body, "query": query, "ip": ip, "raw": raw, **match.groupdict()}
                 if private:
                     kwargs["viewer"] = self.portal.viewer(headers.get("X-Access-Token"))
                 return json_response(HTTPStatus.OK, getattr(self, name)(**kwargs))
@@ -195,3 +205,29 @@ class Website:
         if url is not None and not isinstance(url, str):
             raise PortalError(400, "url должен быть строкой")
         return self.portal.admin_set_classroom(viewer, body["chat_id"], url or None)
+
+    # -- онлайн-класс ------------------------------------------------------------------
+    def room_start(self, viewer: Any, body: Any, **_: Any) -> Any:
+        if not isinstance(body, dict) or not isinstance(body.get("chat_id"), str):
+            raise PortalError(400, "нужно поле chat_id")
+        title = body.get("title") if isinstance(body.get("title"), str) else None
+        return self.classroom.start(viewer, body["chat_id"], title)
+
+    def room_state(self, viewer: Any, id: str, query: dict[str, str], **_: Any) -> Any:
+        try:
+            since_s, since_m = int(query.get("since_signal", "0")), int(query.get("since_message", "0"))
+        except ValueError:
+            raise PortalError(400, "since_signal и since_message — числа") from None
+        return self.classroom.state(viewer, id, since_s, since_m)
+
+    def room_signal(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.classroom.signal(viewer, id, body)
+
+    def room_chat(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.classroom.chat(viewer, id, body)
+
+    def room_audio(self, viewer: Any, id: str, raw: bytes, **_: Any) -> Any:
+        return self.classroom.audio(viewer, id, raw)
+
+    def room_finish(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.classroom.finish(viewer, id)

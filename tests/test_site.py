@@ -17,7 +17,7 @@ from tutor_assistant.service import TutorAssistant
 from tutor_assistant.storage import Storage
 from tutor_assistant.website import Website
 
-TUTOR_ID, STUDENT_ID, PARENT_ID, ADMIN_ID, STRANGER_ID = "111", "222", "333", "999", "444"
+TUTOR_ID, STUDENT_ID, PARENT_ID, ADMIN_ID, STRANGER_ID = "70000111", "70000222", "70000333", "70000999", "70000444"
 
 LESSON = [
     ("tutor", "Тема урока: Present Perfect."),

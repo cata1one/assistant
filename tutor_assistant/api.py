@@ -34,9 +34,9 @@ from urllib.parse import parse_qs, urlparse
 
 from . import render
 from .config import Settings
-from .portal import Portal
+from .portal import Portal, send_telegram_async
 from .service import LessonNotFound, TutorAssistant
-from .website import MAX_SITE_BODY, Website
+from .website import MAX_ROOM_AUDIO, MAX_SITE_BODY, Website
 
 log = logging.getLogger(__name__)
 
@@ -275,7 +275,7 @@ def make_handler(api: Api, website: Website | None = None) -> type[BaseHTTPReque
             raw = b""
             if method == "POST":
                 length = int(self.headers.get("Content-Length") or 0)
-                if length > MAX_SITE_BODY:
+                if length > (MAX_ROOM_AUDIO if Website.RAW_BODY_RE.match(path) else MAX_SITE_BODY):
                     self._send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "слишком большой запрос"})
                     return
                 raw = self.rfile.read(length) if length else b""
@@ -374,5 +374,9 @@ def recording_watchdog(assistant: TutorAssistant, stop: threading.Event, interva
         try:
             for gap in assistant.check_recording_gaps():
                 log.warning("Урок %s: %s", gap["lesson_id"], gap["summary"])
+                st = assistant.settings
+                if st.telegram_token and st.admin_chat_id:
+                    send_telegram_async(st.telegram_token, st.admin_chat_id,
+                                        f"🔴 Урок {gap['lesson_id']}: {gap['summary']}")
         except Exception:
             log.exception("Ошибка проверки записи уроков")

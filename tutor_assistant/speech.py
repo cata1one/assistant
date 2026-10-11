@@ -143,13 +143,33 @@ def make_transcriber(settings: Settings) -> Transcriber:
 
 
 def audio_duration(audio: AudioInput) -> float:
-    """Длительность WAV-фрагмента без распознавания (для учёта записи, когда речь проверить не удалось)."""
+    """Длительность фрагмента без распознавания (для учёта записи, когда речь проверить не удалось).
+
+    WAV читается стандартной библиотекой; WebM/Ogg/MP4 из браузера — через PyAV, если он установлен
+    (у записей MediaRecorder в заголовке нет длительности, поэтому считаем по последнему пакету).
+    """
     if not isinstance(audio, (bytes, bytearray)):
         return 0.0
     try:
         with wave.open(io.BytesIO(bytes(audio))) as w:
             return w.getnframes() / float(w.getframerate() or 1)
     except (wave.Error, EOFError):
+        pass
+    try:
+        import av
+    except ImportError:
+        return 0.0
+    try:
+        with av.open(io.BytesIO(bytes(audio))) as container:
+            stream = next((s for s in container.streams if s.type == "audio"), None)
+            if stream is None or stream.time_base is None:
+                return 0.0
+            end = 0
+            for packet in container.demux(stream):
+                if packet.pts is not None:
+                    end = max(end, packet.pts + (packet.duration or 0))
+            return round(float(end * stream.time_base), 2)
+    except Exception:  # битый файл — длительность неизвестна
         return 0.0
 
 

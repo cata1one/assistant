@@ -165,6 +165,29 @@ function Pairs({ me }) {
   );
 }
 
+function StartLesson({ chat }) {
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const start = async () => {
+    setBusy(true); setError(null);
+    try {
+      const r = await request("POST", "/site/v1/rooms", { chat_id: chat.chat_id, title: title || null });
+      window.location.hash = `#/room/${r.lesson_id}`;
+    } catch (e) { setError(e); setBusy(false); }
+  };
+  return (
+    <div className="relative mt-5 grid gap-2">
+      <div className="flex flex-wrap gap-2">
+        <input className="field max-w-xs flex-1 !py-2 text-sm" placeholder="Тема урока (необязательно)" maxLength={120}
+          aria-label="Тема урока" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <button type="button" className="btn-primary btn-sm" disabled={busy} onClick={start}><Video size={14} /> Начать урок в онлайн-классе</button>
+      </div>
+      {error && <ErrorBox error={error} />}
+    </div>
+  );
+}
+
 function Chats({ me }) {
   const mine = me.chats.filter((c) => c.role !== "admin");
   if (!mine.length) {
@@ -178,6 +201,17 @@ function Chats({ me }) {
           <div className="relative flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-2xl">{c.title}</h3><span className="chip">вы — {c.role_ru}</span>
           </div>
+          {(() => {
+            const live = me.lessons.find((l) => l.chat_id === c.chat_id && l.status === "active");
+            if (live) {
+              return (
+                <a className="btn relative mt-5 bg-rose-500 text-white hover:shadow-[0_10px_40px_-10px_rgba(244,63,94,.8)]" href={`#/room/${live.id}`}>
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> Идёт урок — войти в онлайн-класс
+                </a>
+              );
+            }
+            return c.role === "tutor" ? <StartLesson chat={c} /> : null;
+          })()}
           <div className="relative mt-5 flex flex-wrap gap-2">
             {c.classroom_url
               ? <a className="btn-primary btn-sm" href={c.classroom_url} target="_blank" rel="noopener"><Video size={14} /> Войти в класс ProgressMe</a>

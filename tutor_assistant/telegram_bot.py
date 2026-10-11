@@ -286,11 +286,16 @@ class TutorBot:
             await msg.reply_text("Не могу написать вам в личку — откройте диалог с ботом (/start) и повторите.")
 
     # -- сайт школы: личный кабинет и класс ProgressMe ---------------------------------
-    def _classroom_markup(self, chat_key: str) -> InlineKeyboardMarkup | None:
+    def _classroom_markup(self, chat_key: str, lesson_id: str | None = None) -> InlineKeyboardMarkup | None:
+        """Кнопки урока: онлайн-класс на сайте школы и/или класс ProgressMe."""
+        rows = []
+        site = self.settings.site_url
+        if lesson_id and site.startswith("https://"):
+            rows.append([InlineKeyboardButton("🎥 Онлайн-класс школы", url=f"{site}/#/room/{lesson_id}")])
         url = self.assistant.storage.get_classroom(chat_key)
-        if not url:
-            return None
-        return InlineKeyboardMarkup([[InlineKeyboardButton("🎥 Войти в класс ProgressMe", url=url)]])
+        if url:
+            rows.append([InlineKeyboardButton("📘 Класс ProgressMe", url=url)])
+        return InlineKeyboardMarkup(rows) if rows else None
 
     async def cmd_cabinet(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg, user = update.effective_message, update.effective_user
@@ -820,7 +825,7 @@ class TutorBot:
         text = (f"▶️ Урок начат{f': {title}' if title else ''}. Я записываю новые слова и домашнее задание.\n"
                 "Напоминаю: обмен личными контактами и общение вне платформы запрещены.\n\n"
                 + self._recording_notice(lesson["id"]))
-        markup = self._classroom_markup(pair.chat_id)
+        markup = self._classroom_markup(pair.chat_id, lesson["id"])
         await msg.reply_text(text, reply_markup=markup)
         if pair.student_user_id:
             await context.bot.send_message(int(pair.student_user_id), f"▶️ «{pair.tutor_alias}» начал урок"

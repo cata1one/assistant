@@ -16,9 +16,12 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import queue
 import re
 import secrets
 import threading
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -486,15 +489,34 @@ def _validate_item(kind: str, data: Any) -> dict[str, Any]:
 
 
 # -- уведомления в Telegram без запущенного бота ------------------------------------------
-def send_telegram_async(token: str, chat_id: str, text: str) -> None:
-    def send() -> None:
-        body = json.dumps({"chat_id": chat_id, "text": text[:4000], "disable_web_page_preview": True}).encode()
+_outbox: queue.Queue[tuple[str, str, str]] = queue.Queue()
+_outbox_started = threading.Event()
+_outbox_lock = threading.Lock()
+
+
+def _outbox_worker() -> None:
+    while True:
+        token, chat_id, text = _outbox.get()
+        body = json.dumps({"chat_id": chat_id, "text": text[:4096], "disable_web_page_preview": True}).encode()
         req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=body, method="POST",
                                      headers={"Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=15):
-                pass
-        except Exception as exc:
-            log.warning("Не удалось отправить уведомление в Telegram: %s", exc)
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=20):
+                    break
+            except urllib.error.HTTPError as exc:  # 400/403 — бот заблокирован или чат не найден: не повторяем
+                log.warning("Telegram отклонил сообщение в %s: %s", chat_id, exc)
+                break
+            except Exception as exc:
+                log.warning("Не удалось отправить сообщение в Telegram (попытка %s): %s", attempt + 1, exc)
+                time.sleep(2 * (attempt + 1))
+        _outbox.task_done()
 
-    threading.Thread(target=send, daemon=True).start()
+
+def send_telegram_async(token: str, chat_id: str, text: str) -> None:
+    """Отправить сообщение через Bot API в фоне. Очередь одна, поэтому части длинного отчёта не перемешаются."""
+    with _outbox_lock:
+        if not _outbox_started.is_set():
+            threading.Thread(target=_outbox_worker, name="telegram-outbox", daemon=True).start()
+            _outbox_started.set()
+    _outbox.put((token, str(chat_id), text))

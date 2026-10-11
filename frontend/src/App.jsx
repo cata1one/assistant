@@ -13,8 +13,9 @@ import Cabinet from "./pages/Cabinet.jsx";
 import { Chinese, Course, Courses, Exams, How } from "./pages/Catalog.jsx";
 import Home from "./pages/Home.jsx";
 import Lesson from "./pages/Lesson.jsx";
+import Room from "./pages/Room.jsx";
 
-const ACTIVE = { course: "courses", lesson: "cabinet", apply: "" };
+const ACTIVE = { course: "courses", lesson: "cabinet", room: "cabinet", apply: "" };
 
 function Page({ name, parts, params }) {
   switch (name) {
@@ -28,6 +29,7 @@ function Page({ name, parts, params }) {
     case "board": return <Board params={params} />;
     case "cabinet": return <Cabinet params={params} />;
     case "lesson": return <Lesson id={parts[1]} />;
+    case "room": return <Room id={parts[1]} />;
     default: return <PageHead title="Страница не найдена"><a className="link mt-6 inline-block" href="#/">На главную</a></PageHead>;
   }
 }

@@ -112,6 +112,9 @@ class Settings:
     bot_username: str = ""  # имя Telegram-бота школы без @ — кнопки «Написать в Telegram» на сайте
     classroom_domains: tuple[str, ...] = ("progressme.ru",)  # где проходят уроки: ссылки на класс только отсюда
     access_token_days: int = 30  # срок действия ссылки в личный кабинет
+    # Онлайн-класс (видеосвязь WebRTC в браузере). JSON-список ICE-серверов; для учеников за строгим NAT
+    # нужен свой TURN-сервер, например [{"urls":"turn:turn.myschool.ru:3478","username":"u","credential":"p"}]
+    ice_servers: str = ""
     trust_proxy: bool = False  # сайт за nginx: брать IP посетителя из X-Forwarded-For (для защиты от спама)
 
     @classmethod
@@ -157,6 +160,7 @@ class Settings:
             classroom_domains=tuple(x.lower() for x in _env_list("TUTOR_CLASSROOM_DOMAINS")) or cls.classroom_domains,
             access_token_days=_env_int("TUTOR_ACCESS_TOKEN_DAYS", cls.access_token_days),
             trust_proxy=_env_bool("TUTOR_TRUST_PROXY", cls.trust_proxy),
+            ice_servers=_env("TUTOR_ICE_SERVERS"),
         )
 
     @property

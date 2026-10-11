@@ -5,7 +5,7 @@ import { ErrorBox, PageHead } from "../components/ui.jsx";
 import { getToken, request } from "../lib/api.js";
 
 /** Обёртка над board.js (canvas-доска без зависимостей): монтируем в div и уничтожаем при уходе. */
-function Canvas({ remote, canClear }) {
+export function Canvas({ remote, canClear }) {
   const ref = useRef(null);
   useEffect(() => {
     if (!ref.current || !window.SchoolBoard) return undefined;
