@@ -1,0 +1,27 @@
+{
+  "name": "better-study-site",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Сайт школы Better study: React + Tailwind + Framer Motion + Lenis. Сборка кладётся в tutor_assistant/web.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "5.2.5",
+    "@fontsource/playfair-display": "5.2.5",
+    "framer-motion": "11.18.2",
+    "lenis": "1.3.4",
+    "lucide-react": "0.460.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.17",
+    "vite": "5.4.19"
+  }
+}

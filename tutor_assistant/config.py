@@ -107,7 +107,7 @@ class Settings:
     api_port: int = 8080
 
     # Сайт школы (раздаётся тем же сервером, что и API)
-    school_name: str = "Онлайн-школа языков"
+    school_name: str = "Better study"
     site_url: str = ""  # публичный адрес сайта, например https://myschool.ru — для ссылок в личный кабинет
     bot_username: str = ""  # имя Telegram-бота школы без @ — кнопки «Написать в Telegram» на сайте
     classroom_domains: tuple[str, ...] = ("progressme.ru",)  # где проходят уроки: ссылки на класс только отсюда

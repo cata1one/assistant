@@ -12,3 +12,4 @@ venv/
 *.sqlite3-wal
 *.sqlite3-shm
 data/
+node_modules/

@@ -3,37 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Онлайн-школа языков</title>
+  <meta name="theme-color" content="#050505">
+  <title>Better study — онлайн-школа языков</title>
   <meta name="description" content="Английский, IT English, авиационный и медицинский английский, IELTS, TOEFL, Duolingo, Cambridge, китайский и HSK 1–9. Уроки на ProgressMe, связь в Telegram, конспект после каждого урока.">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/app.css">
   <script src="/static/board.js" defer></script>
-  <script src="/static/app.js" defer></script>
+  <script type="module" crossorigin src="/static/app.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/app.css">
 </head>
-<body>
-  <header class="top">
-    <div class="wrap">
-      <a class="logo" href="#/"><span class="logo-mark">Я</span><span id="school-name">Онлайн-школа языков</span></a>
-      <nav class="tabs" id="tabs" aria-label="Разделы">
-        <a href="#/" data-route="home">Главная</a>
-        <a href="#/courses" data-route="courses">Направления</a>
-        <a href="#/exams" data-route="exams">Экзамены</a>
-        <a href="#/chinese" data-route="chinese">Китайский</a>
-        <a href="#/how" data-route="how">Как учимся</a>
-        <a href="#/board" data-route="board">Доска</a>
-        <a href="#/cabinet" data-route="cabinet">Кабинет</a>
-      </nav>
-      <a class="btn small cta-top" href="#/apply">Пробный урок</a>
-    </div>
-  </header>
-  <main class="wrap" id="app" tabindex="-1">
-    <noscript><div class="notice warn">Для работы сайта включите JavaScript.</div></noscript>
-  </main>
-  <footer>
-    <div class="wrap">
-      <div>© <span id="year"></span> <span id="school-name-foot">Онлайн-школа языков</span>. Уроки проходят на платформе ProgressMe.</div>
-      <div>Общение с преподавателем — только через бота школы. Мы не передаём ваши контакты преподавателям.</div>
-    </div>
-  </footer>
+<body class="bg-obsidian">
+  <div id="root"></div>
+  <noscript>Для работы сайта включите JavaScript.</noscript>
 </body>
 </html>

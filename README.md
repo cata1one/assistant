@@ -195,7 +195,24 @@ python -m tutor_assistant api          # только сайт и API (без б
 | Доска | Доска для рисования: ручка, маркер, линии, стрелки, фигуры, текст, ластик, отмена, сетка, выгрузка PNG. Без входа — личная (хранится в браузере), из кабинета — **общая для преподавателя и ученика** |
 | Кабинет | Вход по ссылке от бота, см. ниже |
 
-Каталог программ — в `tutor_assistant/catalog.py`, оформление — в `tutor_assistant/web/`.
+Каталог программ — в `tutor_assistant/catalog.py`.
+
+**Оформление (Better study).** Интерфейс написан на React, Tailwind CSS, Framer Motion и Lenis.
+Исходники лежат в `frontend/`, готовая сборка — в `tutor_assistant/web/` и уже входит
+в репозиторий. Поэтому для запуска сайта Node.js не нужен: Python-сервер раздаёт
+готовые файлы. Node.js 18+ нужен, только если вы меняете дизайн:
+
+```bash
+cd frontend
+npm install
+npm run dev      # живой просмотр на http://localhost:5173 (запросы /site идут на сервер :8080)
+npm run build    # пересобрать tutor_assistant/web
+```
+
+Компоненты: `CustomLogo` (SVG-знак, цвет через currentColor), `Navbar`, `Hero`, `FeaturesCard`,
+`DirectionsGrid`, `MagneticButton`, `Aurora` (фон), `Reveal` (появление при скролле).
+Шрифты встроены в сборку: Playfair Display и Inter, оба с кириллицей.
+Для пользователей с настройкой «уменьшить движение» анимации и плавный скролл отключаются.
 Шкалы и форматы экзаменов указаны на 2026 год. Организаторы иногда их меняют,
 поэтому перед публикацией сверьте данные с официальными сайтами.
 
@@ -501,6 +518,7 @@ tutor_assistant/
   catalog.py        направления и курсы школы для сайта
   portal.py         личный кабинет: доступ по ссылке, роли, тест, словарь, доска, заявки
   website.py        маршруты сайта и раздача страниц
-  web/              страницы сайта: index.html, app.js, board.js, app.css
+  web/              собранный сайт (из frontend/): index.html, app.js, app.css, board.js, шрифты
+frontend/           исходники сайта: React + Tailwind + Framer Motion + Lenis
   cli.py            консоль
 ```
