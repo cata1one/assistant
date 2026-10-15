@@ -30,7 +30,7 @@ from datetime import date, datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from . import render
 from .config import Settings
@@ -301,7 +301,8 @@ def make_handler(api: Api, website: Website | None = None) -> type[BaseHTTPReque
             try:
                 parsed = urlparse(self.path)
                 if website is not None and Website.handles(parsed.path):
-                    self._site(method, parsed.path, parsed.query)
+                    # «pair:…» в адресе браузер кодирует как pair%3A… — раскодируем до разбора маршрутов
+                    self._site(method, unquote(parsed.path), parsed.query)
                     return
                 body: dict[str, Any] = {}
                 audio: bytes | None = None

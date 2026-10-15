@@ -152,8 +152,9 @@ def test_me_by_role(env):
     assert portal.me(viewer(env, TUTOR_ID))["chats"][0]["role"] == "tutor"
     parent = portal.me(viewer(env, PARENT_ID))["chats"][0]
     assert parent["role"] == "parent" and "chat_url" not in parent  # родитель не пишет преподавателю
-    assert portal.me(viewer(env, STRANGER_ID)) == {"admin": False, "chats": [], "lessons": [],
-                                                    "school_name": env["settings"].school_name}
+    stranger = portal.me(viewer(env, STRANGER_ID))
+    assert stranger["chats"] == [] and stranger["lessons"] == [] and stranger["admin"] is False
+    assert stranger["teacher_status"] is None and stranger["unread"] == 0
     assert portal.me(viewer(env, ADMIN_ID))["admin"] is True
 
 

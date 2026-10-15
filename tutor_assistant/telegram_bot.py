@@ -135,7 +135,7 @@ class TutorBot:
         await update.effective_message.reply_text(HELP_TEXT + "\nКоманды: /lesson_start [тема], /lesson_end, /words, "
                                                   "/words_today, /dictionary, /homework, /test, /answers, /summary, "
                                                   "/report, /check <текст>, /chats, /recording, /note <текст>, /cabinet — личный кабинет на сайте, "
-                                                  "/classroom — класс ProgressMe\n"
+                                                  "/classroom — класс ProgressMe, /teacher — анкета преподавателя для биржи учеников\n"
                                                   "Администраторам: /new_pair Преподаватель | Ученик, /pairs, "
                                                   "/unpair <id>, /parent_link, /incidents, /classroom <id пары> <ссылка>")
 
@@ -304,7 +304,8 @@ class TutorBot:
             return
         uid = str(user.id)
         admin = self._is_school_admin(update)
-        if not admin and not self.relay.pairs_for(uid) and not self.assistant.storage.parent_chats(uid):
+        if not admin and not self.relay.pairs_for(uid) and not self.assistant.storage.parent_chats(uid) \
+                and not self.assistant.storage.get_teacher(uid):
             await msg.reply_text("Личный кабинет откроется после подключения к школе: откройте ссылку-приглашение "
                                  "от администратора.")
             return
@@ -319,6 +320,31 @@ class TutorBot:
                              f"Ссылка действует {self.settings.access_token_days} дн. Никому её не пересылайте — "
                              "по ней открывается ваш кабинет. Выйти на всех устройствах — кнопка «Выйти» в кабинете.",
                              reply_markup=markup, disable_web_page_preview=True)
+
+    async def cmd_teacher(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Анкета преподавателя для биржи учеников: /teacher Имя Фамилия."""
+        msg, user = update.effective_message, update.effective_user
+        if update.effective_chat.type != ChatType.PRIVATE:
+            await msg.reply_text("Напишите мне /teacher в личном чате.")
+            return
+        uid = str(user.id)
+        name = " ".join(context.args or []).strip()[:60] or (user.full_name or "Преподаватель")[:60]
+        if self.assistant.moderate(name).is_violation:
+            await msg.reply_text("Имя — без ников, телефонов и ссылок.")
+            return
+        existing = self.assistant.storage.get_teacher(uid)
+        is_tutor = any(p.tutor_user_id == uid for p, _ in self.relay.pairs_for(uid))
+        self.assistant.storage.upsert_teacher(uid, name, status="approved" if is_tutor else "pending")
+        status = self.assistant.storage.get_teacher(uid)["status"]
+        text = ("✅ Анкета преподавателя сохранена." if existing else "📝 Анкета преподавателя создана.") + (
+            " Вы можете откликаться на заявки учеников на бирже." if status == "approved"
+            else " Школа проверит её и сообщит здесь.")
+        if self.settings.site_url:
+            text += "\nЗаполните о себе и ставку в личном кабинете: /cabinet"
+        await msg.reply_text(text)
+        if not existing and status != "approved":
+            await self._notify_admin_text(context, f"👩‍🏫 Анкета преподавателя «{name}» (id {uid}) ждёт одобрения "
+                                                   "в кабинете на сайте → «Преподаватели».")
 
     async def cmd_classroom(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Ссылка на класс ProgressMe. Задаёт администратор школы: /classroom <id пары> <ссылка|->."""
@@ -1010,6 +1036,15 @@ class TutorBot:
             await msg.reply_text("Не удалось доставить сообщение (возможно, собеседник остановил бота).")
             return
         self.relay.record(pair, uid, msg.message_id, other, sent.message_id)
+        # Общая история переписки пары: её видно и в кабинете на сайте (уже без контактов)
+        if msg.text:
+            history = msg.text
+        elif audio is not None and audio.text:
+            history = f"🎙 {audio.text}"
+        else:
+            kind = "фото" if msg.photo else "файл" if msg.document else "видео" if msg.video else "вложение"
+            history = f"[{kind}]" + (f" {msg.caption}" if msg.caption else "")
+        self.assistant.storage.add_pair_message(pair.chat_id, role, alias, history, source="telegram")
 
         if outcome and (outcome.new_words or outcome.new_homework):
             parts = []
@@ -1058,6 +1093,7 @@ class TutorBot:
         app.add_handler(CommandHandler("parent_link", self.cmd_parent_link))
         app.add_handler(CommandHandler("cabinet", self.cmd_cabinet))
         app.add_handler(CommandHandler("classroom", self.cmd_classroom))
+        app.add_handler(CommandHandler("teacher", self.cmd_teacher))
         speech = filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO | filters.VIDEO
         group = filters.ChatType.GROUPS & (filters.TEXT | filters.CAPTION | speech) & ~filters.COMMAND
         app.add_handler(MessageHandler(group, self.on_group_message))

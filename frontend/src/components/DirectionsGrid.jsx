@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowUpRight, Briefcase, GraduationCap, Languages } from "lucide-react";
 import { useState } from "react";
+import { forAudience, useAudience } from "../lib/audience.js";
 import { categoryHref, useCatalog } from "../lib/catalog.js";
 import { Stagger, StaggerItem } from "./Reveal.jsx";
 
@@ -59,7 +60,7 @@ function Tile({ cat, count, courses }) {
         </div>
 
         <div className="relative mt-10">
-          <p className="text-xs uppercase tracking-[.2em] text-zinc-400">{count} программ</p>
+          <p className="text-xs uppercase tracking-[.2em] text-zinc-400"><span className="num">{count}</span> {count === 1 ? "программа" : count < 5 ? "программы" : "программ"}</p>
           <h3 className={`mt-2 ${big ? "text-4xl md:text-5xl" : "text-2xl md:text-3xl"}`}>{cat.title}</h3>
           <p className="mt-3 max-w-md text-sm text-zinc-300">{t.tagline}</p>
           {big && (
@@ -75,7 +76,8 @@ function Tile({ cat, count, courses }) {
 
 export default function DirectionsGrid() {
   const catalog = useCatalog();
-  const byCat = (id) => catalog.courses.filter((c) => c.category === id);
+  const { audience } = useAudience();
+  const byCat = (id) => catalog.courses.filter((c) => c.category === id && forAudience(c, audience));
   const order = ["english", "exams", "professional", "chinese"];
   const cats = order.map((id) => catalog.categories.find((c) => c.id === id)).filter(Boolean);
   return (

@@ -5,14 +5,17 @@ import CustomLogo from "./CustomLogo.jsx";
 import MagneticButton from "./MagneticButton.jsx";
 
 export const NAV = [
-  ["home", "#/", "Главная"],
   ["courses", "#/courses", "Направления"],
   ["exams", "#/exams", "Экзамены"],
   ["chinese", "#/chinese", "Китайский"],
+  ["market", "#/market", "Биржа"],
+  ["reviews", "#/reviews", "Отзывы"],
   ["how", "#/how", "Как учимся"],
-  ["board", "#/board", "Доска"],
   ["cabinet", "#/cabinet", "Кабинет"],
 ];
+
+// В подвале — все разделы, включая главную и доску
+export const FOOTER_NAV = [["home", "#/", "Главная"], ...NAV.slice(0, 6), ["board", "#/board", "Доска"], NAV[6]];
 
 /**
  * Плавающий стеклянный навбар. После 40px скролла сжимается: меньше отступы и ширина,
@@ -29,7 +32,7 @@ export default function Navbar({ active }) {
     <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
       <motion.nav
         aria-label="Разделы"
-        animate={{ maxWidth: compact ? 980 : 1180, paddingTop: compact ? 8 : 12, paddingBottom: compact ? 8 : 12 }}
+        animate={{ maxWidth: compact ? 1120 : 1180, paddingTop: compact ? 8 : 12, paddingBottom: compact ? 8 : 12 }}
         transition={{ type: "spring", stiffness: 260, damping: 30 }}
         className={`flex w-full items-center gap-4 rounded-full border px-4 transition-colors duration-300 ease-out md:px-5 ${
           compact ? "border-white/10 bg-black/60 backdrop-blur-2xl shadow-glow-violet" : "border-white/10 bg-white/5 backdrop-blur-2xl"}`}>
@@ -39,7 +42,7 @@ export default function Navbar({ active }) {
           {NAV.map(([id, href, label]) => (
             <li key={id}>
               <a href={href} aria-current={active === id ? "page" : undefined}
-                className={`relative rounded-full px-3.5 py-2 text-sm transition-all duration-300 ease-out ${
+                className={`relative whitespace-nowrap rounded-full px-2.5 py-2 text-sm transition-all duration-300 ease-out xl:px-3.5 ${
                   active === id ? "text-white" : "text-mist hover:text-white"}`}>
                 {active === id && (
                   // Подложка активной вкладки «перетекает» между пунктами (shared layout)
@@ -53,7 +56,7 @@ export default function Navbar({ active }) {
         </ul>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
-          <MagneticButton href="#/apply" className="!px-4 !py-2 text-xs sm:!px-5 sm:text-sm">
+          <MagneticButton href="#/apply" className="whitespace-nowrap !px-4 !py-2 text-xs sm:!px-5 sm:text-sm">
             Пробный урок <ArrowUpRight size={15} />
           </MagneticButton>
           <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="Меню"

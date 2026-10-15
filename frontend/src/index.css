@@ -17,6 +17,9 @@
     font-feature-settings: "cv11", "ss01";
   }
   h1, h2, h3 { @apply font-display text-white; letter-spacing: -0.02em; line-height: 1.05; }
+  /* У Playfair по умолчанию «старинные» цифры, которые висят ниже строки — включаем ровные (lining) */
+  h1, h2, h3, .font-display { font-variant-numeric: lining-nums proportional-nums; font-feature-settings: "lnum" 1, "pnum" 1; }
+  .num { @apply font-sans; font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1; }
   ::selection { background: rgba(124, 58, 237, .45); color: #fff; }
   :focus-visible { outline: 2px solid #A78BFA; outline-offset: 3px; border-radius: 10px; }
 }
@@ -53,6 +56,11 @@
   .label { @apply grid gap-2 text-sm font-medium text-zinc-200; }
 
   .eyebrow { @apply text-xs font-semibold uppercase tracking-[.22em] text-emerald-soft; }
+  /* Цифра в круге — строго по центру: Inter, табличные цифры, без межстрочного смещения */
+  .num-badge {
+    @apply num grid shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet to-emerald font-bold leading-none text-white;
+  }
+  .stat-num { @apply num font-semibold leading-none tracking-tight text-white; }
   .link { @apply text-violet-soft underline-offset-4 transition-all duration-300 hover:text-white hover:underline; }
 }
 
@@ -61,6 +69,11 @@
   position: fixed; inset: -50%; z-index: 60; pointer-events: none; opacity: .07;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
+
+/* Бегущая строка фраз */
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee { animation: marquee 48s linear infinite; }
+.marquee:hover { animation-play-state: paused; }
 
 /* --- Доска (board.js рисует свою разметку с этими классами) ------------------------- */
 .board-shell { display: grid; gap: 12px; }

@@ -21,7 +21,7 @@ CEFR = ["A1", "A2", "B1", "B2", "C1", "C2"]
 COURSES: list[dict[str, Any]] = [
     # --- Английский ------------------------------------------------------------------
     {
-        "id": "general-english", "category": "english", "language": "en",
+        "id": "general-english", "audience": ["adult", "kid"], "category": "english", "language": "en",
         "title": "Общий английский", "levels": CEFR,
         "short": "От нуля до свободного общения: грамматика, словарный запас, разговорная практика.",
         "for_whom": ["начинающим с нуля", "тем, кто хочет «разговориться»", "школьникам и взрослым"],
@@ -35,7 +35,7 @@ COURSES: list[dict[str, Any]] = [
         "result": "Уверенное общение на своём уровне и переход на следующий примерно за 4–6 месяцев занятий 2 раза в неделю.",
     },
     {
-        "id": "speaking-club", "category": "english", "language": "en",
+        "id": "speaking-club", "audience": ["adult", "kid"], "category": "english", "language": "en",
         "title": "Разговорный английский", "levels": ["A2", "B1", "B2", "C1"],
         "short": "Только живая речь: снимаем языковой барьер, учим звучать естественно.",
         "for_whom": ["тем, кто понимает, но не говорит", "перед переездом или собеседованием"],
@@ -48,7 +48,7 @@ COURSES: list[dict[str, Any]] = [
         "result": "Свободная речь без долгих пауз и перевода в голове.",
     },
     {
-        "id": "kids-english", "category": "english", "language": "en",
+        "id": "kids-english", "audience": ["kid"], "category": "english", "language": "en",
         "title": "Английский для детей и подростков", "levels": ["7–10 лет", "11–14 лет", "15–17 лет"],
         "short": "Игровой формат для младших, подготовка к школьным контрольным, ОГЭ и ЕГЭ для старших.",
         "for_whom": ["детям 7–17 лет", "родителям, которым важен прозрачный прогресс"],
@@ -62,7 +62,7 @@ COURSES: list[dict[str, Any]] = [
     },
     # --- Профессиональный английский --------------------------------------------------
     {
-        "id": "it-english", "category": "professional", "language": "en",
+        "id": "it-english", "audience": ["adult"], "category": "professional", "language": "en",
         "title": "IT English", "levels": ["A2", "B1", "B2", "C1"],
         "short": "Английский для разработчиков, тестировщиков, аналитиков, дизайнеров и менеджеров IT-проектов.",
         "for_whom": ["разработчикам и QA", "аналитикам, PM и дизайнерам", "тем, кто ищет работу в международной компании"],
@@ -76,7 +76,7 @@ COURSES: list[dict[str, Any]] = [
         "result": "Уверенное участие в митингах, собеседованиях и переписке в международной команде.",
     },
     {
-        "id": "aviation-english", "category": "professional", "language": "en",
+        "id": "aviation-english", "audience": ["adult"], "category": "professional", "language": "en",
         "title": "Авиационный английский (ICAO)", "levels": ["ICAO 3", "ICAO 4", "ICAO 5", "ICAO 6"],
         "short": "Подготовка пилотов и диспетчеров к оценке языковой квалификации по шкале ИКАО.",
         "for_whom": ["пилотам и курсантам", "авиадиспетчерам", "бортпроводникам и инженерам"],
@@ -92,7 +92,7 @@ COURSES: list[dict[str, Any]] = [
                  "note": "Уровень 4 подтверждают раз в 3 года, уровень 5 — раз в 6 лет, 6 — бессрочно."},
     },
     {
-        "id": "medical-english", "category": "professional", "language": "en",
+        "id": "medical-english", "audience": ["adult"], "category": "professional", "language": "en",
         "title": "Медицинский английский", "levels": ["B1", "B2", "C1"],
         "short": "Для врачей, медсестёр, фармацевтов и студентов-медиков: общение с пациентами и коллегами.",
         "for_whom": ["врачам и ординаторам", "медсёстрам и фармацевтам", "тем, кто готовится к OET"],
@@ -106,7 +106,7 @@ COURSES: list[dict[str, Any]] = [
         "result": "Профессиональное общение с пациентами и коллегами, готовность к OET.",
     },
     {
-        "id": "business-english", "category": "professional", "language": "en",
+        "id": "business-english", "audience": ["adult"], "category": "professional", "language": "en",
         "title": "Деловой английский", "levels": ["B1", "B2", "C1"],
         "short": "Переговоры, презентации, деловая переписка и собеседования.",
         "for_whom": ["менеджерам и предпринимателям", "тем, кто работает с иностранными партнёрами"],
@@ -120,7 +120,7 @@ COURSES: list[dict[str, Any]] = [
     },
     # --- Экзамены --------------------------------------------------------------------
     {
-        "id": "ielts", "category": "exams", "language": "en",
+        "id": "ielts", "audience": ["adult", "kid"], "category": "exams", "language": "en",
         "title": "IELTS Academic и General Training", "levels": ["цель 5.5", "6.5", "7.5+"],
         "short": "Для учёбы, работы и иммиграции: Великобритания, Австралия, Канада и другие страны.",
         "program": ["Listening", "Reading", "Writing: Task 1 и Task 2 с проверкой по критериям", "Speaking: 3 части",
@@ -129,7 +129,7 @@ COURSES: list[dict[str, Any]] = [
                  "note": "Сдаётся на бумаге или на компьютере; результат действителен 2 года."},
     },
     {
-        "id": "toefl", "category": "exams", "language": "en",
+        "id": "toefl", "audience": ["adult", "kid"], "category": "exams", "language": "en",
         "title": "TOEFL iBT", "levels": ["цель 80+", "100+"],
         "short": "Для поступления в университеты США, Канады и Европы.",
         "program": ["Reading", "Listening", "Writing", "Speaking", "Пробные тесты в формате экзамена"],
@@ -138,7 +138,7 @@ COURSES: list[dict[str, Any]] = [
                  "duration": "около 2 часов", "note": "Можно сдавать в центре или дома (Home Edition)."},
     },
     {
-        "id": "duolingo", "category": "exams", "language": "en",
+        "id": "duolingo", "audience": ["adult", "kid"], "category": "exams", "language": "en",
         "title": "Duolingo English Test", "levels": ["цель 100+", "120+", "130+"],
         "short": "Онлайн-экзамен из дома, который принимают тысячи университетов мира.",
         "program": ["Все типы заданий: Read and Complete, Read and Select, Listen and Type, Write About the Photo",
@@ -148,7 +148,7 @@ COURSES: list[dict[str, Any]] = [
                  "note": "Сдаётся онлайн с компьютера, результат — в течение 2 дней."},
     },
     {
-        "id": "cambridge", "category": "exams", "language": "en",
+        "id": "cambridge", "audience": ["adult", "kid"], "category": "exams", "language": "en",
         "title": "Кембриджские экзамены", "levels": ["A2 Key", "B1 Preliminary", "B2 First", "C1 Advanced",
                                                      "C2 Proficiency"],
         "short": "KET, PET, FCE, CAE, CPE — бессрочные сертификаты Cambridge English.",
@@ -158,7 +158,7 @@ COURSES: list[dict[str, Any]] = [
                  "note": "Сертификат не имеет срока действия."},
     },
     {
-        "id": "pte-toeic", "category": "exams", "language": "en",
+        "id": "pte-toeic", "audience": ["adult"], "category": "exams", "language": "en",
         "title": "PTE Academic, TOEIC, Linguaskill", "levels": ["по цели ученика"],
         "short": "Компьютерные экзамены для учёбы, работы и визы.",
         "program": ["Формат и типы заданий выбранного экзамена", "Стратегии компьютерного формата",
@@ -167,7 +167,7 @@ COURSES: list[dict[str, Any]] = [
                  "scale": "PTE: 10–90; TOEIC Listening & Reading: 10–990; Linguaskill: шкала Cambridge"},
     },
     {
-        "id": "oet", "category": "exams", "language": "en",
+        "id": "oet", "audience": ["adult"], "category": "exams", "language": "en",
         "title": "OET — экзамен для медиков", "levels": ["цель B (350+)"],
         "short": "Английский для работы в здравоохранении Великобритании, Австралии, Ирландии и других стран.",
         "program": ["Listening и Reading на медицинских материалах", "Writing: письмо-направление по профессии",
@@ -175,14 +175,14 @@ COURSES: list[dict[str, Any]] = [
         "exam": {"name": "OET", "scale": "0–500, оценки A–E", "note": "Задания по вашей специальности."},
     },
     {
-        "id": "oge-ege", "category": "exams", "language": "en",
+        "id": "oge-ege", "audience": ["kid"], "category": "exams", "language": "en",
         "title": "ОГЭ и ЕГЭ по английскому", "levels": ["9 класс", "11 класс"],
         "short": "Подготовка к государственным экзаменам на высокий балл.",
         "program": ["Все разделы экзамена", "Письмо и эссе по критериям", "Устная часть", "Пробные варианты"],
     },
     # --- Китайский ---------------------------------------------------------------------
     {
-        "id": "chinese-general", "category": "chinese", "language": "zh",
+        "id": "chinese-general", "audience": ["adult", "kid"], "category": "chinese", "language": "zh",
         "title": "Китайский язык с нуля", "levels": ["начальный", "средний", "продвинутый"],
         "short": "Тоны, иероглифы, пиньинь и живая речь — от первых фраз до свободного общения.",
         "for_whom": ["начинающим", "для путешествий и работы с Китаем", "школьникам и студентам"],
@@ -195,14 +195,24 @@ COURSES: list[dict[str, Any]] = [
         "result": "Через 3–4 месяца — общение на бытовые темы и уровень HSK 1–2.",
     },
     {
-        "id": "business-chinese", "category": "chinese", "language": "zh",
+        "id": "kids-chinese", "audience": ["kid"], "category": "chinese", "language": "zh",
+        "title": "Китайский для детей", "levels": ["6–9 лет", "10–13 лет", "14–17 лет"],
+        "short": "Тоны через песни и игры, первые иероглифы, подготовка к YCT и HSK 1–3.",
+        "for_whom": ["детям с 6 лет", "школьникам, которые учат китайский в школе"],
+        "program": ["Пиньинь и тоны в игровой форме", "Иероглифы с картинками и историями",
+                    "Диалоги на бытовые темы", "Подготовка к YCT 1–4 и HSK 1–3", "Отчёт родителям после урока"],
+        "result": "Ребёнок уверенно читает пиньинь, знает первые 150–300 иероглифов и не боится говорить.",
+    },
+    {
+        "id": "business-chinese", "audience": ["adult"], "category": "chinese", "language": "zh",
         "title": "Деловой китайский", "levels": ["HSK 3+"],
         "short": "Переговоры, переписка и поездки к партнёрам в Китай.",
         "program": ["Деловой этикет и переговоры", "Переписка в WeChat и по почте", "Выставки, закупки, логистика"],
     },
     *[
         {
-            "id": f"hsk-{lvl}", "category": "chinese", "language": "zh", "hsk": lvl, "words": int(words),
+            "id": f"hsk-{lvl}", "audience": ["adult", "kid"] if lvl in ("1", "2", "3", "4") else ["adult"],
+            "category": "chinese", "language": "zh", "hsk": lvl, "words": int(words),
             "title": f"Подготовка к HSK {lvl}", "levels": [f"HSK {lvl}"],
             "short": short,
             "program": program,
@@ -227,7 +237,7 @@ COURSES: list[dict[str, Any]] = [
         ]
     ],
     {
-        "id": "hskk-yct", "category": "chinese", "language": "zh",
+        "id": "hskk-yct", "audience": ["adult", "kid"], "category": "chinese", "language": "zh",
         "title": "HSKK и YCT", "levels": ["HSKK начальный", "средний", "высокий", "YCT 1–4"],
         "short": "Устный экзамен HSKK и детский экзамен YCT.",
         "program": ["HSKK: пересказ, ответы на вопросы, монолог", "YCT: игровая подготовка для школьников"],
@@ -243,11 +253,33 @@ FORMATS: list[dict[str, str]] = [
 STEPS: list[dict[str, str]] = [
     {"title": "Заявка", "text": "Оставьте заявку на сайте — менеджер школы свяжется с вами в течение рабочего дня."},
     {"title": "Пробный урок", "text": "Определим уровень и цель, подберём преподавателя."},
-    {"title": "Уроки на ProgressMe", "text": "Интерактивные учебники, общая доска и видеосвязь в одном окне."},
-    {"title": "Связь в Telegram", "text": "Вопросы преподавателю, ДЗ и материалы — в чате через бота школы."},
+    {"title": "Онлайн-класс", "text": "Видеосвязь, общая доска и запись урока прямо на сайте школы — или на ProgressMe."},
+    {"title": "Чат с преподавателем", "text": "Вопросы и ДЗ между уроками — на сайте и в Telegram через бота школы."},
     {"title": "Конспект после урока", "text": "Новые слова, правила, тест и ДЗ приходят автоматически, "
                                              "родителям — отчёт об успехах."},
 ]
+
+
+AUDIENCES: dict[str, dict[str, Any]] = {
+    "adult": {
+        "title": "Для взрослых",
+        "headline": "Язык для работы, переезда и экзаменов",
+        "text": "Программа под вашу цель: собеседование, IT-команда, авиация, медицина, IELTS или HSK. "
+                "Удобное время, конспект после каждого урока.",
+        "points": ["Занятия в удобное время, в том числе утром и вечером", "Профессиональные курсы: IT, авиация, "
+                   "медицина, бизнес", "Подготовка к IELTS, TOEFL, Duolingo, Cambridge, HSK",
+                   "Конспект, слова и тест после урока — в Telegram"],
+    },
+    "kid": {
+        "title": "Для детей и подростков",
+        "headline": "Учиться интересно, а родители видят прогресс",
+        "text": "Игровой формат для младших, школьная программа, ОГЭ и ЕГЭ — для старших. "
+                "После каждого урока родители получают отчёт.",
+        "points": ["Игровые уроки с 6–7 лет, английский и китайский", "Помощь со школьной программой, ОГЭ и ЕГЭ",
+                   "Отчёт родителям: успехи, замечания, домашнее задание", "Безопасно: общение только через "
+                   "платформу школы, без личных контактов"],
+    },
+}
 
 
 def catalog(settings: Any) -> dict[str, Any]:
@@ -258,6 +290,7 @@ def catalog(settings: Any) -> dict[str, Any]:
         "courses": COURSES,
         "formats": FORMATS,
         "steps": STEPS,
+        "audiences": AUDIENCES,
     }
 
 

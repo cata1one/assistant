@@ -1,10 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Aurora from "./components/Aurora.jsx";
 import Footer from "./components/Footer.jsx";
 import Navbar from "./components/Navbar.jsx";
 import { ErrorBox, Loading, PageHead } from "./components/ui.jsx";
 import { request } from "./lib/api.js";
+import { AudienceContext, loadAudience, saveAudience } from "./lib/audience.js";
+import { Market, MarketMy, MarketNew } from "./pages/Market.jsx";
+import ReviewsPage from "./pages/ReviewsPage.jsx";
 import { CatalogContext } from "./lib/catalog.js";
 import { useRoute } from "./lib/router.js";
 import Apply from "./pages/Apply.jsx";
@@ -30,6 +33,11 @@ function Page({ name, parts, params }) {
     case "cabinet": return <Cabinet params={params} />;
     case "lesson": return <Lesson id={parts[1]} />;
     case "room": return <Room id={parts[1]} />;
+    case "reviews": return <ReviewsPage />;
+    case "market":
+      if (parts[1] === "new") return <MarketNew />;
+      if (parts[1] === "my") return <MarketMy params={params} />;
+      return <Market params={params} />;
     default: return <PageHead title="Страница не найдена"><a className="link mt-6 inline-block" href="#/">На главную</a></PageHead>;
   }
 }
@@ -39,6 +47,8 @@ export default function App({ lenis }) {
   const name = parts[0] || "home";
   const [catalog, setCatalog] = useState(null);
   const [error, setError] = useState(null);
+  const [audience, setAud] = useState(loadAudience);
+  const audienceValue = useMemo(() => ({ audience, setAudience: (a) => { setAud(a); saveAudience(a); } }), [audience]);
 
   useEffect(() => { request("GET", "/site/v1/catalog").then(setCatalog).catch(setError); }, []);
   // Смена страницы — сразу наверх (Lenis прокручивает без анимации)
@@ -46,6 +56,7 @@ export default function App({ lenis }) {
 
   const key = `${name}/${parts[1] || ""}/${params.get("id") || ""}/${name === "courses" ? params.get("cat") || "" : ""}`;
   return (
+    <AudienceContext.Provider value={audienceValue}>
     <CatalogContext.Provider value={catalog}>
       <Aurora />
       <div className="noise" aria-hidden="true" />
@@ -63,5 +74,6 @@ export default function App({ lenis }) {
       </main>
       {catalog && <Footer />}
     </CatalogContext.Provider>
+    </AudienceContext.Provider>
   );
 }

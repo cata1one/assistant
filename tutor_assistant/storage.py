@@ -204,6 +204,87 @@ CREATE TABLE IF NOT EXISTS board_items (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_board_items ON board_items(board_id, id);
+
+-- Чат пары вне урока (сайт и Telegram-мост пишут в одну историю, уже без контактов)
+CREATE TABLE IF NOT EXISTS pair_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    author TEXT NOT NULL,
+    text TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'site',
+    blocked INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pair_messages ON pair_messages(chat_id, id);
+
+CREATE TABLE IF NOT EXISTS chat_reads (
+    chat_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    last_id INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (chat_id, user_id)
+);
+
+-- Отзывы: публикуются только после одобрения администратором
+CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    author_role TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    audience TEXT,
+    course_id TEXT,
+    rating INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL
+);
+
+-- Преподаватели школы (для биржи учеников)
+CREATE TABLE IF NOT EXISTS teachers (
+    user_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    bio TEXT,
+    languages TEXT,
+    specialties TEXT,
+    rate INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL
+);
+
+-- Биржа учеников: заявка ученика и отклики преподавателей
+CREATE TABLE IF NOT EXISTS market_requests (
+    id TEXT PRIMARY KEY,
+    owner_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    age INTEGER,
+    audience TEXT NOT NULL,
+    language TEXT NOT NULL,
+    course_id TEXT,
+    level TEXT NOT NULL,
+    goals TEXT NOT NULL,
+    teacher_wishes TEXT,
+    comment TEXT,
+    budget TEXT NOT NULL,
+    schedule TEXT,
+    contact TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    chosen_proposal INTEGER,
+    pair_id TEXT,
+    ip TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_market_status ON market_requests(status, created_at);
+
+CREATE TABLE IF NOT EXISTS market_proposals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id TEXT NOT NULL REFERENCES market_requests(id),
+    teacher_id TEXT NOT NULL,
+    message TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'sent',
+    created_at TEXT NOT NULL,
+    UNIQUE (request_id, teacher_id)
+);
 """
 
 
@@ -653,6 +734,115 @@ class Storage:
         marks = ",".join("?" * len(ids))
         return self._all(f"SELECT * FROM lessons WHERE chat_id IN ({marks}) ORDER BY started_at DESC LIMIT ?",
                          (*ids, limit))
+
+
+    # -- чат пары -----------------------------------------------------------------------
+    def add_pair_message(self, chat_id: str, role: str, author: str, text: str, source: str = "site",
+                         blocked: bool = False) -> int:
+        cur = self._exec("INSERT INTO pair_messages(chat_id, role, author, text, source, blocked, created_at)"
+                         " VALUES (?,?,?,?,?,?,?)", (chat_id, role, author, text, source, int(blocked), utcnow()))
+        return int(cur.lastrowid)
+
+    def pair_messages(self, chat_id: str, since: int = 0, limit: int = 200) -> list[dict[str, Any]]:
+        if since:
+            return self._all("SELECT * FROM pair_messages WHERE chat_id=? AND id>? ORDER BY id LIMIT ?",
+                             (chat_id, since, limit))
+        rows = self._all("SELECT * FROM pair_messages WHERE chat_id=? ORDER BY id DESC LIMIT ?", (chat_id, limit))
+        return rows[::-1]
+
+    def mark_read(self, chat_id: str, user_id: str, last_id: int) -> None:
+        self._exec("INSERT INTO chat_reads(chat_id, user_id, last_id) VALUES (?,?,?) ON CONFLICT(chat_id, user_id) "
+                   "DO UPDATE SET last_id=MAX(last_id, excluded.last_id)", (chat_id, user_id, last_id))
+
+    def unread_count(self, chat_id: str, user_id: str, my_role: str) -> int:
+        row = self._one("SELECT COUNT(*) AS n FROM pair_messages WHERE chat_id=? AND role<>? AND id>"
+                        "COALESCE((SELECT last_id FROM chat_reads WHERE chat_id=? AND user_id=?), 0)",
+                        (chat_id, my_role, chat_id, user_id))
+        return int(row["n"]) if row else 0
+
+    # -- отзывы -----------------------------------------------------------------------------
+    def add_review(self, **f: Any) -> int:
+        cur = self._exec("INSERT INTO reviews(user_id, author_role, author_name, audience, course_id, rating, text,"
+                         " status, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                         (f["user_id"], f["author_role"], f["author_name"], f.get("audience"), f.get("course_id"),
+                          f["rating"], f["text"], f.get("status", "pending"), utcnow()))
+        return int(cur.lastrowid)
+
+    def reviews(self, status: str | None = "approved", limit: int = 200) -> list[dict[str, Any]]:
+        if status:
+            return self._all("SELECT * FROM reviews WHERE status=? ORDER BY id DESC LIMIT ?", (status, limit))
+        return self._all("SELECT * FROM reviews ORDER BY id DESC LIMIT ?", (limit,))
+
+    def set_review_status(self, review_id: int, status: str) -> bool:
+        return bool(self._exec("UPDATE reviews SET status=? WHERE id=?", (status, review_id)).rowcount)
+
+    def reviews_by_user(self, user_id: str) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM reviews WHERE user_id=? ORDER BY id DESC", (user_id,))
+
+    # -- преподаватели ---------------------------------------------------------------------------
+    def upsert_teacher(self, user_id: str, name: str, **f: Any) -> None:
+        self._exec("INSERT INTO teachers(user_id, name, bio, languages, specialties, rate, status, created_at) "
+                   "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET name=excluded.name, "
+                   "bio=COALESCE(excluded.bio, bio), languages=COALESCE(excluded.languages, languages), "
+                   "specialties=COALESCE(excluded.specialties, specialties), rate=COALESCE(excluded.rate, rate)",
+                   (user_id, name, f.get("bio"), f.get("languages"), f.get("specialties"), f.get("rate"),
+                    f.get("status", "pending"), utcnow()))
+
+    def get_teacher(self, user_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM teachers WHERE user_id=?", (user_id,))
+
+    def teachers(self, status: str | None = None) -> list[dict[str, Any]]:
+        if status:
+            return self._all("SELECT * FROM teachers WHERE status=? ORDER BY created_at", (status,))
+        return self._all("SELECT * FROM teachers ORDER BY created_at DESC")
+
+    def set_teacher_status(self, user_id: str, status: str) -> bool:
+        return bool(self._exec("UPDATE teachers SET status=? WHERE user_id=?", (status, user_id)).rowcount)
+
+    # -- биржа учеников ------------------------------------------------------------------------------
+    def add_market_request(self, **f: Any) -> None:
+        cols = ("id", "owner_hash", "name", "age", "audience", "language", "course_id", "level", "goals",
+                "teacher_wishes", "comment", "budget", "schedule", "contact", "ip")
+        self._exec(f"INSERT INTO market_requests({', '.join(cols)}, created_at) VALUES ({','.join('?' * len(cols))},?)",
+                   (*(f.get(c) for c in cols), utcnow()))
+
+    def market_request(self, request_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM market_requests WHERE id=?", (request_id,))
+
+    def market_requests(self, status: str | None = "open", limit: int = 200) -> list[dict[str, Any]]:
+        sql = ("SELECT r.*, (SELECT COUNT(*) FROM market_proposals p WHERE p.request_id=r.id) AS proposals "
+               "FROM market_requests r")
+        if status:
+            return self._all(sql + " WHERE r.status=? ORDER BY r.created_at DESC LIMIT ?", (status, limit))
+        return self._all(sql + " ORDER BY r.created_at DESC LIMIT ?", (limit,))
+
+    def update_market_request(self, request_id: str, **fields: Any) -> None:
+        sets = ", ".join(f"{k}=?" for k in fields)
+        self._exec(f"UPDATE market_requests SET {sets} WHERE id=?", (*fields.values(), request_id))
+
+    def market_requests_since(self, ip: str, since: datetime) -> int:
+        row = self._one("SELECT COUNT(*) AS n FROM market_requests WHERE ip=? AND created_at>=?", (ip, _iso(since)))
+        return int(row["n"]) if row else 0
+
+    def add_proposal(self, request_id: str, teacher_id: str, message: str, price: int) -> int:
+        cur = self._exec("INSERT INTO market_proposals(request_id, teacher_id, message, price, created_at) "
+                         "VALUES (?,?,?,?,?) ON CONFLICT(request_id, teacher_id) DO UPDATE SET "
+                         "message=excluded.message, price=excluded.price", (request_id, teacher_id, message, price,
+                                                                             utcnow()))
+        return int(cur.lastrowid)
+
+    def proposals(self, request_id: str) -> list[dict[str, Any]]:
+        return self._all("SELECT p.*, t.name AS teacher_name, t.bio, t.languages, t.specialties FROM market_proposals p "
+                         "LEFT JOIN teachers t ON t.user_id=p.teacher_id WHERE p.request_id=? ORDER BY p.id",
+                         (request_id,))
+
+    def proposals_by_teacher(self, teacher_id: str) -> list[dict[str, Any]]:
+        return self._all("SELECT p.*, r.name, r.status AS request_status, r.goals FROM market_proposals p "
+                         "JOIN market_requests r ON r.id=p.request_id WHERE p.teacher_id=? ORDER BY p.id DESC",
+                         (teacher_id,))
+
+    def set_proposal_status(self, proposal_id: int, status: str) -> None:
+        self._exec("UPDATE market_proposals SET status=? WHERE id=?", (status, proposal_id))
 
 
 def _iso(at: datetime | None) -> str:

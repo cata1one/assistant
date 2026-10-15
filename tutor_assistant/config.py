@@ -115,6 +115,8 @@ class Settings:
     # Онлайн-класс (видеосвязь WebRTC в браузере). JSON-список ICE-серверов; для учеников за строгим NAT
     # нужен свой TURN-сервер, например [{"urls":"turn:turn.myschool.ru:3478","username":"u","credential":"p"}]
     ice_servers: str = ""
+    demo_reviews: bool = False  # показывать примеры отзывов с пометкой «пример», пока нет настоящих
+    market_fee_percent: int = 20  # комиссия школы с занятий, найденных через биржу (показывается преподавателям)
     trust_proxy: bool = False  # сайт за nginx: брать IP посетителя из X-Forwarded-For (для защиты от спама)
 
     @classmethod
@@ -160,6 +162,8 @@ class Settings:
             classroom_domains=tuple(x.lower() for x in _env_list("TUTOR_CLASSROOM_DOMAINS")) or cls.classroom_domains,
             access_token_days=_env_int("TUTOR_ACCESS_TOKEN_DAYS", cls.access_token_days),
             trust_proxy=_env_bool("TUTOR_TRUST_PROXY", cls.trust_proxy),
+            demo_reviews=_env_bool("TUTOR_DEMO_REVIEWS", cls.demo_reviews),
+            market_fee_percent=_env_int("TUTOR_MARKET_FEE", cls.market_fee_percent),
             ice_servers=_env("TUTOR_ICE_SERVERS"),
         )
 

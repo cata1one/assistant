@@ -32,6 +32,7 @@ from typing import Any
 
 from . import catalog
 from .classroom import Classroom
+from .community import Community
 from .portal import Portal, PortalError
 
 WEB_DIR = Path(__file__).with_name("web")
@@ -84,6 +85,31 @@ class Website:
         ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/chat$"), "room_chat", True),
         ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/audio$"), "room_audio", True),
         ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/finish$"), "room_finish", True),
+        # чат пары вне урока
+        ("GET", re.compile(r"^/site/v1/chats$"), "chats", True),
+        ("GET", re.compile(r"^/site/v1/chats/(?P<chat>pair:[0-9a-f]+)/messages$"), "chat_messages", True),
+        ("POST", re.compile(r"^/site/v1/chats/(?P<chat>pair:[0-9a-f]+)/messages$"), "chat_send", True),
+        # отзывы
+        ("GET", re.compile(r"^/site/v1/reviews$"), "reviews", False),
+        ("POST", re.compile(r"^/site/v1/reviews$"), "review_submit", True),
+        ("GET", re.compile(r"^/site/v1/reviews/mine$"), "reviews_mine", True),
+        ("GET", re.compile(r"^/site/v1/admin/reviews$"), "admin_reviews", True),
+        ("POST", re.compile(r"^/site/v1/admin/reviews/(?P<id>\d+)$"), "admin_review_status", True),
+        # преподаватели
+        ("GET", re.compile(r"^/site/v1/teacher$"), "teacher", True),
+        ("POST", re.compile(r"^/site/v1/teacher$"), "teacher_save", True),
+        ("GET", re.compile(r"^/site/v1/admin/teachers$"), "admin_teachers", True),
+        ("POST", re.compile(r"^/site/v1/admin/teachers/(?P<uid>[\w-]+)$"), "admin_teacher_status", True),
+        # биржа учеников
+        ("GET", re.compile(r"^/site/v1/market$"), "market", False),
+        ("POST", re.compile(r"^/site/v1/market$"), "market_create", False),
+        ("GET", re.compile(r"^/site/v1/market/(?P<id>[0-9a-f]+)$"), "market_owner", False),
+        ("POST", re.compile(r"^/site/v1/market/(?P<id>[0-9a-f]+)/choose$"), "market_choose", False),
+        ("POST", re.compile(r"^/site/v1/market/(?P<id>[0-9a-f]+)/close$"), "market_close", False),
+        ("POST", re.compile(r"^/site/v1/market/(?P<id>[0-9a-f]+)/proposals$"), "market_propose", True),
+        ("GET", re.compile(r"^/site/v1/market-mine$"), "market_mine", True),
+        ("GET", re.compile(r"^/site/v1/admin/market$"), "admin_market", True),
+        ("GET", re.compile(r"^/site/v1/parent$"), "parent", True),
     ]
     RAW_BODY_RE = re.compile(r"^/site/v1/rooms/[\w-]+/audio$")  # тело — аудио, а не JSON
 
@@ -91,6 +117,7 @@ class Website:
         self.portal = portal
         self.web_dir = web_dir
         self.classroom = classroom or Classroom(portal)
+        self.community = Community(portal)
 
     @staticmethod
     def handles(path: str) -> bool:
@@ -120,6 +147,7 @@ class Website:
                 kwargs: dict[str, Any] = {"body": body, "query": query, "ip": ip, "raw": raw, **match.groupdict()}
                 if private:
                     kwargs["viewer"] = self.portal.viewer(headers.get("X-Access-Token"))
+                kwargs["key"] = headers.get("X-Request-Key")  # секретный ключ заявки на бирже
                 return json_response(HTTPStatus.OK, getattr(self, name)(**kwargs))
             if allowed:
                 raise PortalError(405, "метод не поддерживается")
@@ -231,3 +259,77 @@ class Website:
 
     def room_finish(self, viewer: Any, id: str, **_: Any) -> Any:
         return self.classroom.finish(viewer, id)
+
+    # -- чат пары ------------------------------------------------------------------------
+    def chats(self, viewer: Any, **_: Any) -> Any:
+        return self.community.chats(viewer)
+
+    def chat_messages(self, viewer: Any, chat: str, query: dict[str, str], **_: Any) -> Any:
+        return self.community.messages(viewer, chat, _int(query.get("since", "0")))
+
+    def chat_send(self, viewer: Any, chat: str, body: Any, **_: Any) -> Any:
+        return self.community.send(viewer, chat, body)
+
+    # -- отзывы ----------------------------------------------------------------------------
+    def reviews(self, **_: Any) -> Any:
+        return self.community.public_reviews()
+
+    def review_submit(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.community.submit_review(viewer, body)
+
+    def reviews_mine(self, viewer: Any, **_: Any) -> Any:
+        return self.community.my_reviews(viewer)
+
+    def admin_reviews(self, viewer: Any, **_: Any) -> Any:
+        return self.community.admin_reviews(viewer)
+
+    def admin_review_status(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.community.set_review_status(viewer, int(id), body.get("status") if isinstance(body, dict) else None)
+
+    # -- преподаватели ------------------------------------------------------------------------
+    def teacher(self, viewer: Any, **_: Any) -> Any:
+        return self.community.teacher_profile(viewer)
+
+    def teacher_save(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.community.save_teacher_profile(viewer, body)
+
+    def admin_teachers(self, viewer: Any, **_: Any) -> Any:
+        return self.community.admin_teachers(viewer)
+
+    def admin_teacher_status(self, viewer: Any, uid: str, body: Any, **_: Any) -> Any:
+        return self.community.set_teacher_status(viewer, uid, body.get("status") if isinstance(body, dict) else None)
+
+    # -- биржа ----------------------------------------------------------------------------------
+    def market(self, **_: Any) -> Any:
+        return self.community.public_requests()
+
+    def market_create(self, body: Any, ip: str | None, **_: Any) -> Any:
+        return self.community.create_request(body, ip)
+
+    def market_owner(self, id: str, key: str | None, **_: Any) -> Any:
+        return self.community.owner_view(id, key)
+
+    def market_choose(self, id: str, key: str | None, body: Any, **_: Any) -> Any:
+        return self.community.choose(id, key, body.get("proposal_id") if isinstance(body, dict) else None)
+
+    def market_close(self, id: str, key: str | None, **_: Any) -> Any:
+        return self.community.close_request(id, key)
+
+    def market_propose(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.community.propose(viewer, id, body)
+
+    def market_mine(self, viewer: Any, **_: Any) -> Any:
+        return self.community.my_proposals(viewer)
+
+    def admin_market(self, viewer: Any, **_: Any) -> Any:
+        return self.community.admin_requests(viewer)
+
+    def parent(self, viewer: Any, **_: Any) -> Any:
+        return self.community.parent_overview(viewer)
+
+
+def _int(value: str) -> int:
+    try:
+        return max(0, int(value))
+    except ValueError:
+        raise PortalError(400, "ожидалось число") from None

@@ -6,6 +6,7 @@ import { fmtDate, getToken, request, setToken } from "../lib/api.js";
 import { botUrl, courseById, useCatalog } from "../lib/catalog.js";
 import { replaceHash } from "../lib/router.js";
 import { BoardList } from "./Board.jsx";
+import { AdminMarket, AdminReviews, AdminTeachers, Messages, ParentOverview, ReviewForm, TeacherProfile } from "./CabinetExtra.jsx";
 
 export function CabinetLogin({ message }) {
   const bot = botUrl(useCatalog());
@@ -18,7 +19,7 @@ export function CabinetLogin({ message }) {
         <ol className="mt-5 grid gap-3">
           {["Откройте бота школы в Telegram", "Отправьте команду /cabinet", "Нажмите на ссылку — кабинет откроется здесь"].map((s, i) => (
             <li key={s} className="flex items-center gap-4">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet to-emerald text-sm font-bold text-white">{i + 1}</span>
+              <span className="num-badge h-8 w-8 text-sm">{i + 1}</span>
               <span>{s}</span>
             </li>
           ))}
@@ -215,7 +216,7 @@ function Chats({ me }) {
           <div className="relative mt-5 flex flex-wrap gap-2">
             {c.classroom_url
               ? <a className="btn-primary btn-sm" href={c.classroom_url} target="_blank" rel="noopener"><Video size={14} /> Войти в класс ProgressMe</a>
-              : <span className="text-sm text-zinc-500">Ссылку на класс ProgressMe добавит школа</span>}
+              : c.role === "parent" ? <a className="btn-ghost btn-sm" href="#/cabinet?tab=lessons">Отчёты по урокам</a> : null}
             {c.chat_url && <a className="btn-ghost btn-sm" href={c.chat_url} target="_blank" rel="noopener"><MessagesSquare size={14} /> Чат в Telegram</a>}
           </div>
         </div>
@@ -247,8 +248,14 @@ export default function Cabinet({ params }) {
   if (error) return <><PageHead title="Личный кабинет" /><ErrorBox error={error} /></>;
   if (!me) return <><PageHead title="Личный кабинет" /><Loading /></>;
 
-  const tabs = [{ id: "lessons", title: "Уроки" }, { id: "words", title: "Словарь" }, { id: "boards", title: "Доски" }];
-  if (me.admin) tabs.push({ id: "applications", title: "Заявки" }, { id: "pairs", title: "Пары и классы" });
+  const inPair = me.chats.some((c) => c.role === "tutor" || c.role === "student");
+  const tabs = [{ id: "lessons", title: me.is_parent && !inPair ? "Отчёты" : "Уроки" }];
+  if (inPair) tabs.push({ id: "messages", title: me.unread ? `Сообщения · ${me.unread}` : "Сообщения" },
+    { id: "words", title: "Словарь" }, { id: "boards", title: "Доски" });
+  if (me.teacher_status) tabs.push({ id: "teacher", title: "Анкета и биржа" });
+  tabs.push({ id: "review", title: "Отзыв о школе" });
+  if (me.admin) tabs.push({ id: "applications", title: "Заявки" }, { id: "pairs", title: "Пары и классы" },
+    { id: "reviews-admin", title: "Отзывы" }, { id: "teachers-admin", title: "Преподаватели" }, { id: "market-admin", title: "Биржа" });
   const current = tabs.some((t) => t.id === tab) ? tab : "lessons";
   const pick = (id) => { setTab(id); replaceHash(`#/cabinet?tab=${id}`); };
   const logout = async () => {
@@ -258,10 +265,11 @@ export default function Cabinet({ params }) {
 
   return (
     <>
-      <PageHead eyebrow={me.admin ? "Администратор" : "Добро пожаловать"} title="Личный кабинет">
+      <PageHead eyebrow={me.admin ? "Администратор" : me.is_parent && !inPair ? "Для родителей" : "Добро пожаловать"} title="Личный кабинет">
         <button type="button" onClick={logout} className="btn-ghost btn-sm mt-6"><LogOut size={14} /> Выйти на всех устройствах</button>
       </PageHead>
       <div className="grid gap-8">
+        {me.is_parent && <ParentOverview />}
         <Chats me={me} />
         <div><Segmented label="Разделы кабинета" items={tabs} value={current} onChange={pick} /></div>
         <div>
@@ -270,6 +278,12 @@ export default function Cabinet({ params }) {
           {current === "boards" && <Boards />}
           {current === "applications" && <Applications />}
           {current === "pairs" && <Pairs me={me} />}
+          {current === "messages" && <Messages />}
+          {current === "teacher" && <TeacherProfile />}
+          {current === "review" && <ReviewForm />}
+          {current === "reviews-admin" && <AdminReviews />}
+          {current === "teachers-admin" && <AdminTeachers />}
+          {current === "market-admin" && <AdminMarket />}
         </div>
       </div>
     </>

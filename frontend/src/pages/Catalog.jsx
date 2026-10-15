@@ -4,6 +4,8 @@ import MagneticButton from "../components/MagneticButton.jsx";
 import { Reveal, Stagger, StaggerItem } from "../components/Reveal.jsx";
 import { Bullets, CourseCard, PageHead, Panel, SectionHead, Segmented } from "../components/ui.jsx";
 import { botUrl, categoryById, categoryHref, courseById, useCatalog } from "../lib/catalog.js";
+import AudienceSwitch from "../components/AudienceSwitch.jsx";
+import { forAudience, useAudience } from "../lib/audience.js";
 import { replaceHash } from "../lib/router.js";
 import { Steps } from "./Home.jsx";
 
@@ -17,15 +19,20 @@ function Grid({ courses }) {
 
 export function Courses({ params }) {
   const catalog = useCatalog();
+  const { audience } = useAudience();
   const [cat, setCat] = useState(params.get("cat") || "all");
   const tabs = [{ id: "all", title: "Все" }, ...catalog.categories];
   const pick = (id) => { setCat(id); replaceHash(`#/courses${id === "all" ? "" : `?cat=${id}`}`); };
-  const list = catalog.courses.filter((x) => cat === "all" || x.category === cat);
+  const list = catalog.courses.filter((x) => (cat === "all" || x.category === cat) && forAudience(x, audience));
   return (
     <>
       <PageHead eyebrow="Каталог" title="Направления" text="Выберите направление — программу подстроим под вашу цель на пробном уроке." />
-      <div className="mb-8"><Segmented label="Категории" items={tabs} value={cat} onChange={pick} /></div>
-      <Grid key={cat} courses={list} />
+      <div className="mb-8 flex flex-wrap items-center gap-3">
+        <AudienceSwitch />
+        <Segmented label="Категории" items={tabs} value={cat} onChange={pick} />
+      </div>
+      {list.length ? <Grid key={`${cat}-${audience}`} courses={list} />
+        : <p>Для этой категории программ {audience === "kid" ? "для детей" : "для взрослых"} нет — переключите «для кого» выше.</p>}
     </>
   );
 }
@@ -55,10 +62,16 @@ export function Chinese() {
           </tbody>
         </table>
       </Reveal>
-      <SectionHead title="Программы" />
-      <Grid courses={catalog.courses.filter((x) => x.category === "chinese")} />
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4"><h2 className="text-4xl">Программы</h2><AudienceSwitch /></div>
+      <ChineseGrid />
     </>
   );
+}
+
+function ChineseGrid() {
+  const catalog = useCatalog();
+  const { audience } = useAudience();
+  return <Grid key={audience} courses={catalog.courses.filter((x) => x.category === "chinese" && forAudience(x, audience))} />;
 }
 
 export function Exams() {

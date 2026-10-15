@@ -110,6 +110,22 @@ class Portal:
         self.storage = assistant.storage
         self.settings = assistant.settings
         self.application_handlers: list[Any] = []
+        self.telegram_send: Any = None  # подменяется в тестах; по умолчанию — Bot API через очередь
+
+    def telegram(self, chat_id: str | None, text: str) -> bool:
+        """Сообщение в Telegram без запущенного бота. False — некуда или нечем отправить."""
+        if not chat_id:
+            return False
+        if self.telegram_send is not None:
+            self.telegram_send(str(chat_id), text)
+            return True
+        if not self.settings.telegram_token:
+            return False
+        send_telegram_async(self.settings.telegram_token, str(chat_id), text)
+        return True
+
+    def notify_admin(self, text: str) -> None:
+        self.telegram(self.settings.admin_chat_id or None, text)
 
     # -- доступ -----------------------------------------------------------------
     def issue_token(self, user_id: str, admin: bool = False) -> str:
@@ -192,7 +208,13 @@ class Portal:
                 "has_report": report is not None,
                 "words": len(report.vocabulary) if report else 0,
             })
-        return {"admin": viewer.admin, "chats": chats, "lessons": items, "school_name": self.settings.school_name}
+        teacher = self.storage.get_teacher(viewer.user_id)
+        is_tutor = any(a.role == TUTOR for a in accesses)
+        unread = sum(self.storage.unread_count(a.chat_id, viewer.user_id, a.role) for a in accesses
+                     if a.role in (TUTOR, STUDENT))
+        return {"admin": viewer.admin, "chats": chats, "lessons": items, "school_name": self.settings.school_name,
+                "teacher_status": "approved" if is_tutor or viewer.admin else (teacher["status"] if teacher else None),
+                "is_parent": any(a.role == PARENT for a in accesses), "unread": unread}
 
     def lesson(self, viewer: Viewer, lesson_id: str) -> dict[str, Any]:
         lesson, access = self._lesson_access(viewer, lesson_id)
@@ -358,8 +380,7 @@ class Portal:
                 + (f"\nУровень: {application['level']}" if application.get("level") else "")
                 + (f"\nЦель: {application['goal']}" if application.get("goal") else "")
                 + (f"\nКомментарий: {application['comment']}" if application.get("comment") else ""))
-        if self.settings.telegram_token and self.settings.admin_chat_id:
-            send_telegram_async(self.settings.telegram_token, self.settings.admin_chat_id, text)
+        self.notify_admin(text)
         self.assistant._send_webhook({"type": "application", "application": application})
         for handler in list(self.application_handlers):
             try:

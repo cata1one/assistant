@@ -11,8 +11,8 @@ export function setToken(t) {
   try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* хранилище недоступно */ }
 }
 
-export async function request(method, path, body) {
-  const headers = { Accept: "application/json" };
+export async function request(method, path, body, extra = {}) {
+  const headers = { Accept: "application/json", ...extra };
   const token = getToken();
   if (token) headers["X-Access-Token"] = token;
   if (body !== undefined) headers["Content-Type"] = "application/json";
