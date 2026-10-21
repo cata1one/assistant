@@ -30,6 +30,7 @@ done
 say() { printf '\n\033[1;35m▶ %s\033[0m\n' "$*"; }
 IP="$(curl -4 -s -m 10 https://ifconfig.me || hostname -I | awk '{print $1}')"
 
+grep -qi ubuntu /etc/os-release || echo "⚠️  Скрипт рассчитан на Ubuntu — продолжаю, но возможны отличия."
 say "1/8 Системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
@@ -47,10 +48,17 @@ mkdir -p "$DATA_DIR/models"
 say "3/8 Python-окружение (несколько минут)"
 python3 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -q --upgrade pip
+"$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
+SPEECH_OK=0
 if [ "$SPEECH" = 1 ]; then
-  "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements-speech.txt"
-else
-  "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
+  # Для самых новых версий Python у библиотеки распознавания может ещё не быть готовых сборок —
+  # тогда сайт и бот всё равно ставятся, а расшифровка выключается с предупреждением.
+  if "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements-speech.txt"; then
+    SPEECH_OK=1
+  else
+    echo "⚠️  Распознавание речи не установилось для $(python3 --version). Сайт и бот работают, расшифровка выключена."
+    SPEECH=0
+  fi
 fi
 
 say "4/8 Настройки (.env)"
@@ -180,4 +188,5 @@ else
   echo "   systemctl restart better-study"
   echo "   Сайт: $SITE"
 fi
+[ "$SPEECH_OK" = 1 ] || echo "ℹ️  Расшифровка речи выключена (TUTOR_STT=off). Напишите разработчику — подберём вариант."
 echo "Журнал: journalctl -u better-study -f    Обновление: bash $APP_DIR/deploy/update.sh"
