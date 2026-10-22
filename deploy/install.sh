@@ -38,6 +38,7 @@ apt-get install -y -q python3 python3-venv python3-pip git curl sqlite3 ufw debi
 
 say "2/8 Код школы ($BRANCH)"
 id "$APP_USER" >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin "$APP_USER"
+git config --global --get-all safe.directory | grep -qx "$APP_DIR" || git config --global --add safe.directory "$APP_DIR"  # папка принадлежит school, а git запускает root
 if [ -d "$APP_DIR/.git" ]; then
   git -C "$APP_DIR" fetch -q origin "$BRANCH" && git -C "$APP_DIR" checkout -q "$BRANCH" && git -C "$APP_DIR" reset -q --hard "origin/$BRANCH"
 else
