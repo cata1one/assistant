@@ -41,8 +41,13 @@ ROLE_RU = {TUTOR: "преподаватель", STUDENT: "ученик", PARENT:
 
 APPLICATION_STATUSES = ("new", "in_progress", "done", "rejected")
 APPLICATIONS_PER_HOUR = 5  # с одного IP
-BOARD_ITEM_LIMIT = 20000
-BOARD_KINDS = ("stroke", "shape", "text", "erase", "clear")
+BOARD_ITEM_LIMIT = 50000
+BOARD_KINDS = ("stroke", "shape", "text", "erase", "clear", "obj", "del")
+# Доска v2: объекты с id, которые можно двигать, менять и удалять (последняя версия объекта побеждает)
+OBJ_TYPES = ("stroke", "shape", "text", "note", "sticker", "image", "video", "file", "link")
+OID_RE = re.compile(r"^[\w-]{4,32}$")
+FILE_SRC_RE = re.compile(r"^/site/v1/files/[0-9a-f]{24}$")
+STICKER_RE = re.compile(r"^[\w-]{1,40}$")
 SHAPES = ("line", "rect", "ellipse", "arrow")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 BOARD_W, BOARD_H = 1600, 1000
@@ -366,12 +371,13 @@ class Portal:
             raise PortalError(403, "очистить доску может преподаватель")
         if self.storage.board_item_count(board_id) >= BOARD_ITEM_LIMIT:
             raise PortalError(409, "доска заполнена — создайте новую")
-        data = _validate_item(kind, body.get("data") or {})
+        data = _validate_obj(body.get("data") or {}) if kind == "obj" else _validate_item(kind, body.get("data") or {})
+        text = data.get("text") if kind == "text" else _obj_text(data) if kind == "obj" else None
         warning = None
-        if kind == "text":
+        if text and self.is_strict(board["chat_id"]):
             result, _ = self.assistant.moderate_chat_message(
                 f"board:{board_id}", viewer.user_id, access.pair.alias(access.role) if access.pair and access.role in
-                (TUTOR, STUDENT) else None, data["text"], role=_lesson_role(access.role))
+                (TUTOR, STUDENT) else None, text, role=_lesson_role(access.role))
             if result.blocked:
                 raise PortalError(422, "на доске нельзя оставлять контакты: " + result.summary
                                   + ". Нарушение передано администратору школы.")
@@ -509,6 +515,75 @@ def _color(v: Any) -> str:
     return v.lower()
 
 
+def _obj_text(data: dict[str, Any]) -> str | None:
+    parts = [data.get(k) for k in ("text", "title") if isinstance(data.get(k), str)]
+    return " ".join(parts) or None
+
+
+def _validate_obj(data: Any) -> dict[str, Any]:
+    """Объект доски v2. Координаты — в «мировых» единицах бесконечного холста."""
+    if not isinstance(data, dict):
+        raise PortalError(400, "data должно быть объектом")
+    oid, typ = data.get("oid"), data.get("type")
+    if not isinstance(oid, str) or not OID_RE.match(oid):
+        raise PortalError(400, "oid — 4–32 символа")
+    if typ not in OBJ_TYPES:
+        raise PortalError(400, "type: " + ", ".join(OBJ_TYPES))
+    out: dict[str, Any] = {"oid": oid, "type": typ, "x": _num(data.get("x", 0), -100000, 100000),
+                           "y": _num(data.get("y", 0), -100000, 100000), "w": _num(data.get("w", 100), 1, 40000),
+                           "h": _num(data.get("h", 100), 1, 40000), "rot": _num(data.get("rot", 0), -360, 360),
+                           "z": int(_num(data.get("z", 0), 0, 1e12))}
+    if typ in ("stroke", "shape", "text", "note"):
+        out["color"] = _color(data.get("color", "#1f2937"))
+    if typ == "stroke":
+        pts = data.get("points")
+        if not isinstance(pts, list) or not 1 <= len(pts) <= 5000:
+            raise PortalError(400, "линия: от 1 до 5000 точек")
+        out["points"] = [[_num(p[0], -40000, 40000), _num(p[1], -40000, 40000)] if isinstance(p, (list, tuple))
+                         and len(p) == 2 else _point(p) for p in pts]
+        out["width"] = _num(data.get("width", 3), 1, 80)
+        out["marker"] = bool(data.get("marker"))
+    elif typ == "shape":
+        if data.get("shape") not in SHAPES:
+            raise PortalError(400, "shape: " + ", ".join(SHAPES))
+        out["shape"] = data["shape"]
+        out["width"] = _num(data.get("width", 3), 1, 80)
+        out["fill"] = _color(data["fill"]) if data.get("fill") else None
+    elif typ in ("text", "note"):
+        text = data.get("text", "")
+        if not isinstance(text, str) or len(text) > 1000:
+            raise PortalError(400, "текст: до 1000 символов")
+        out["text"] = text
+        out["size"] = _num(data.get("size", 24), 8, 240)
+    elif typ == "sticker":
+        sticker = data.get("sticker")
+        if not isinstance(sticker, str) or not (STICKER_RE.match(sticker) or FILE_SRC_RE.match(sticker)):
+            raise PortalError(400, "неизвестный стикер")
+        out["sticker"] = sticker
+    elif typ in ("image", "file"):
+        src = data.get("src")
+        if not isinstance(src, str) or not FILE_SRC_RE.match(src):
+            raise PortalError(400, "картинки и файлы — только из материалов платформы")
+        out["src"] = src
+        title = data.get("title", "")
+        out["title"] = title[:120] if isinstance(title, str) else ""
+    elif typ in ("video", "link"):
+        from .learning import video_embed
+
+        url = data.get("url")
+        if not isinstance(url, str) or not url.startswith(("https://", "http://")) or len(url) > 500:
+            raise PortalError(400, "ссылка должна начинаться с https://")
+        if typ == "video":
+            embed = video_embed(url)
+            if not embed:
+                raise PortalError(400, "видео: ссылка на VK Видео, YouTube или Rutube")
+            out["embed"] = embed
+        out["url"] = url
+        title = data.get("title", "")
+        out["title"] = title[:120] if isinstance(title, str) else ""
+    return out
+
+
 def _validate_item(kind: str, data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise PortalError(400, "data должно быть объектом")
@@ -533,6 +608,10 @@ def _validate_item(kind: str, data: Any) -> dict[str, Any]:
             raise PortalError(400, "текст: от 1 до 500 символов")
         return {"text": text.strip(), "color": _color(data.get("color")), "size": _num(data.get("size", 28), 10, 120),
                 "at": _point(data.get("at"))}
+    if kind == "del":
+        if not isinstance(data, dict) or not isinstance(data.get("oid"), str) or not OID_RE.match(data["oid"]):
+            raise PortalError(400, "del: нужен oid")
+        return {"oid": data["oid"]}
     if kind == "erase":
         ids = data.get("ids")
         if not isinstance(ids, list) or not 1 <= len(ids) <= 1000 or not all(

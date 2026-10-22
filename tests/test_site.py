@@ -364,3 +364,48 @@ def test_http_site(env, server):
 def test_website_handles():
     assert Website.handles("/") and Website.handles("/site/v1/me") and Website.handles("/static/app.js")
     assert not Website.handles("/v1/lessons") and not Website.handles("/health")
+
+
+# -- доска v2: объекты ---------------------------------------------------------------------------
+
+def obj(oid, typ, **kw):
+    return {"kind": "obj", "data": {"oid": oid, "type": typ, "x": 10, "y": 20, "w": 200, "h": 120, **kw}}
+
+
+def test_board_v2_objects(env):
+    portal = env["portal"]
+    tutor, student = viewer(env, TUTOR_ID), viewer(env, STUDENT_ID)
+    board = portal.create_board(tutor, env["pair"].chat_id, "v2")
+    portal.add_board_item(tutor, board["id"], obj("note1", "note", text="Present Perfect = have + V3", color="#fde68a"))
+    portal.add_board_item(student, board["id"], obj("stk1", "sticker", sticker="ny-tree"))
+    portal.add_board_item(tutor, board["id"], obj("vid1", "video", url="https://vk.com/video-1_2", title="Песня"))
+    portal.add_board_item(tutor, board["id"], obj("note1", "note", text="moved", color="#fde68a", x=500))  # перемещение
+    portal.add_board_item(tutor, board["id"], {"kind": "del", "data": {"oid": "stk1"}})
+    items = portal.board_items(tutor, board["id"])["items"]
+    assert [i["kind"] for i in items] == ["obj", "obj", "obj", "obj", "del"]
+    assert items[2]["data"]["embed"].startswith("https://vk.com/video_ext.php")
+    with pytest.raises(PortalError) as e:  # контакты в заметке (пара из бота — строгий режим)
+        portal.add_board_item(tutor, board["id"], obj("n2", "note", text="пиши в телеграм @anna_english", color="#fde68a"))
+    assert e.value.status == 422
+
+
+@pytest.mark.parametrize("bad", [
+    obj("x", "note", text="a"),  # короткий oid
+    obj("ok12", "magic"),
+    obj("ok12", "image", src="https://evil.example/x.png"),
+    obj("ok12", "video", url="https://example.com/v"),
+    obj("ok12", "sticker", sticker="../../etc"),
+    obj("ok12", "note", text="a" * 1001, color="#ffffff"),
+    {"kind": "del", "data": {"oid": "!"}},
+])
+def test_board_v2_validation(env, bad):
+    tutor = viewer(env, TUTOR_ID)
+    board = env["portal"].create_board(tutor, env["pair"].chat_id, "v2")
+    with pytest.raises(PortalError):
+        env["portal"].add_board_item(tutor, board["id"], bad)
+
+
+def test_student_cannot_create_board(env):
+    with pytest.raises(PortalError) as e:
+        env["portal"].create_board(viewer(env, STUDENT_ID), env["pair"].chat_id, "моя")
+    assert e.value.status == 403
