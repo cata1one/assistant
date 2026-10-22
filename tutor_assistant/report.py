@@ -120,12 +120,14 @@ def build_report(
             student_name=student_name,
         )
         if llm_result is None and llm.last_error:
-            report.notes.append(f"Claude недоступен ({llm.last_error}); отчёт подготовлен офлайн.")
+            report.notes.append(f"{_who(llm)} недоступен ({llm.last_error}); отчёт подготовлен офлайн.")
     elif llm is not None and llm.last_error:
-        report.notes.append(f"Claude недоступен ({llm.last_error}); отчёт подготовлен офлайн.")
+        report.notes.append(f"{_who(llm)} недоступен ({llm.last_error}); отчёт подготовлен офлайн.")
 
     if llm_result is not None:
         _merge_llm(report, llm_result, known_keys={word_key(k) for k in known})
+        if getattr(llm, "provider", None) == "ai":
+            report.generated_by = "ai"
     else:
         report.summary, report.key_points = offline_summary(topic, rules, vocabulary, corrections, len(assigned))
         report.test = generate_test(vocabulary or extra, seed=lesson_id or day, target_language=settings.target_language)
@@ -144,6 +146,10 @@ def build_report(
         report.parent = offline_parent
         report.review_items = build_review_items(report, collect_signals(utterances)["attention"])
     return report
+
+
+def _who(llm: LLMClient) -> str:
+    return "ИИ" if getattr(llm, "provider", None) == "ai" else "Claude"
 
 
 def _progress_text(previous: LessonReport | None, lessons_before: int) -> str | None:

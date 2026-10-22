@@ -192,7 +192,7 @@ export default function Room({ id }) {
     return (
       <div className="mx-auto max-w-xl py-16 text-center">
         <h1 className="text-3xl">Спасибо за урок!</h1>
-        <p className="mt-3 text-ink-soft">Конспект, новые слова, тест и домашнее задание готовятся по записи урока и появятся в кабинете.</p>
+        <p className="mt-3 text-ink-soft">{result?.ai_pending ? "ИИ готовит конспект по записи урока — это займёт несколько минут. Ученик и родители получат его, как только он будет готов, а вы сможете его отредактировать." : "Конспект, новые слова, тест и домашнее задание готовятся по записи урока и появятся в кабинете."}</p>
         {result?.violations ? <Notice tone="warn" className="mt-5">Нарушений на уроке: {result.violations}.</Notice> : null}
         <div className="mt-6 flex justify-center gap-3"><a className="btn-brand" href={`#/lesson/${id}`}>Материалы урока</a><a className="btn-light" href="#/app">В кабинет</a></div>
       </div>

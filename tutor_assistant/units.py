@@ -400,7 +400,8 @@ class Units:
             if not topic:
                 raise PortalError(400, "укажите тему занятия")
             answer = self.ai.complete(AI_PROMPT, ai_user_prompt(topic, language, level, words_text, extra)
-                                      + (f"Используй этот текст:\n{text}\n" if text else ""))
+                                      + (f"Используй этот текст:\n{text}\n" if text else ""),
+                                      timeout=min(self.portal.settings.ai_timeout, 300))  # преподаватель ждёт ответа
             data = parse_ai_json(answer or "")
             if data:
                 try:

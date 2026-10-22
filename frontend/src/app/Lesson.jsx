@@ -2,7 +2,7 @@ import {
   ArrowLeft, BookOpen, CheckCircle2, Lightbulb, MessageSquareQuote, NotebookPen, Repeat, Ruler, Sparkles, TriangleAlert, Trophy,
   Wrench, XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fmtDate, request } from "../lib/api.js";
 import { Bullets, ErrorBox, Loading, Notice, PageTitle } from "../ui/kit.jsx";
 import { Flashcard, Panel, useApi } from "./common.jsx";
@@ -110,6 +110,12 @@ function Parent({ res }) {
   );
 }
 
+/** ИИ ещё готовит конспект по расшифровке: показываем черновик и обновляем страницу сами. */
+function AiPending({ reload }) {
+  useEffect(() => { const t = setInterval(reload, 15000); return () => clearInterval(t); }, [reload]);
+  return <Notice className="mb-4">ИИ готовит подробный конспект по записи урока — обычно это занимает несколько минут. Пока показан черновик; страница обновится сама.</Notice>;
+}
+
 const joinLines = (a) => (a || []).join("\n");
 
 /** Преподаватель правит отчёт: то, что увидят ученик и родители. */
@@ -173,8 +179,9 @@ export default function Lesson({ id }) {
   if (error) return <><Back /><ErrorBox error={error} /></>;
   if (!res) return <Loading />;
   if (!res.report) return <><Back /><PageTitle title={res.title || "Урок"} /><Notice>Материалы появятся после урока.</Notice></>;
-  if (res.role === "student") return <Student res={res} id={id} />;
-  if (res.role === "parent") return <Parent res={res} />;
+  const pending = res.generated_by === "pending" && <AiPending reload={reload} />;
+  if (res.role === "student") return <>{pending}<Student res={res} id={id} /></>;
+  if (res.role === "parent") return <>{pending}<Parent res={res} /></>;
   if (editing) {
     return (
       <>
@@ -187,6 +194,7 @@ export default function Lesson({ id }) {
   return (
     <>
       <Back />
+      {pending}
       <PageTitle title={res.report.topic || res.title || "Урок"} text={`${fmtDate(res.started_at)} · ${res.with}`}
         actions={res.role === "tutor" && <button type="button" className="btn-brand" onClick={() => setEditing(true)}>Редактировать отчёт</button>} />
       <pre className="card whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-soft">{res.text}</pre>

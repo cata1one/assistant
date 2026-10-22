@@ -239,15 +239,34 @@ class Classroom:
         if lesson["status"] != "active":
             report = self.storage.get_report(lesson_id)
             return {"status": lesson["status"], "delivered": None, "has_report": report is not None}
-        report = self.assistant.finish_lesson(lesson_id)
+        slow_ai = self.assistant.llm.slow  # бесплатная модель думает минутами — не держим преподавателя
+        report = self.assistant.finish_lesson(lesson_id, use_llm=not slow_ai, ai_pending=slow_ai)
         with self._lock:
             room = self._rooms.setdefault(lesson_id, _Room())  # ученику — сигнал о завершении
             room.signals.append({"id": room.next_id, "from": TUTOR, "to": STUDENT, "kind": "bye",
                                  "data": {"finished": True}})
             room.next_id += 1
+        if slow_ai:
+            threading.Thread(target=self._improve_and_deliver, args=(access, lesson_id), daemon=True).start()
+            return {"status": "finished", "delivered": None, "has_report": True, "ai_pending": True,
+                    "violations": report.stats.violations}
         delivered = self.deliver(access, report)
         return {"status": "finished", "delivered": delivered, "has_report": True,
                 "violations": report.stats.violations}
+
+    def _improve_and_deliver(self, access: Access, lesson_id: str) -> None:
+        """Фон: ИИ делает конспект по расшифровке, затем отчёты уходят ученику, родителям и преподавателю."""
+        try:
+            self.assistant.improve_report(lesson_id)
+        except Exception:  # ИИ упал — остаётся офлайн-отчёт
+            log.exception("ИИ не доработал отчёт урока %s", lesson_id)
+            current = self.storage.get_report(lesson_id)
+            if current and current.generated_by == "pending":
+                current.generated_by = "offline"
+                self.storage.save_report(lesson_id, current)
+        report = self.storage.get_report(lesson_id)
+        if report:
+            self.deliver(access, report)
 
     def deliver(self, access: Access, report: LessonReport) -> dict[str, int]:
         """Отчёты в Telegram: ученику — конспект, родителям — отчёт об успехах, преподавателю — полный."""

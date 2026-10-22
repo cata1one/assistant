@@ -266,6 +266,7 @@ class Portal:
                 "title": lesson.get("title"), "with": access.title}
         if report is None:
             return {**base, "report": None}
+        base["generated_by"] = report.generated_by  # pending — ИИ ещё готовит конспект
         if access.role == STUDENT:
             return {**base, "report": student_view(report)}
         if access.role == PARENT:

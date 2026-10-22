@@ -112,6 +112,60 @@ def _language_name(code: str) -> str:
     return LANGUAGE_NAMES.get(code, code)
 
 
+FREE_MAX_CHARS = 24_000  # ≈ 8–9 тыс. токенов: с промптом и ответом влезает в окно 16K у небольших моделей
+FREE_JSON_HINT = """
+
+Верни ТОЛЬКО один JSON-объект без пояснений и без ```, со всеми полями:
+{"topic": "", "summary": "", "key_points": [], "rules": [{"title": "", "explanation": "", "examples": []}],
+"vocabulary": [{"word": "", "translation": "", "transcription": null, "part_of_speech": null, "example": null}],
+"corrections": [{"wrong": "", "correct": "", "note": null}],
+"test": [{"kind": "choice", "question": "", "options": [], "answer": "", "explanation": null}],
+"homework_teacher": [], "homework_generated": [], "review_items": [], "parent_summary": "",
+"parent_achievements": [], "parent_attention": [], "parent_teacher_remarks": [], "homework_status": "unknown",
+"parent_recommendations": []}"""
+
+
+def _lenient(data: dict) -> dict:
+    """Бесплатные модели часто пропускают поля или путают типы — приводим ответ к схеме."""
+    def strs(v: object) -> list[str]:
+        return [str(x).strip() for x in v if str(x).strip()] if isinstance(v, list) else \
+            [x.strip() for x in str(v).split("\n") if x.strip()] if isinstance(v, str) else []
+
+    def items(key: str, fields: dict[str, object]) -> list[dict]:
+        out = []
+        for x in data.get(key) or []:
+            if isinstance(x, dict):
+                row = {k: x.get(k, d) for k, d in fields.items()}
+                for k, d in fields.items():
+                    if isinstance(d, list):
+                        row[k] = strs(row[k])
+                    elif d == "" and not isinstance(row[k], str):
+                        row[k] = "" if row[k] is None else str(row[k])
+                out.append(row)
+        return out
+
+    test = items("test", {"kind": "open", "question": "", "options": [], "answer": "", "explanation": None})
+    for q in test:
+        if q["kind"] not in ("choice", "open", "gap", "true_false"):
+            q["kind"] = "choice" if q["options"] else "open"
+    status = data.get("homework_status")
+    return {
+        "topic": str(data.get("topic") or ""), "summary": str(data.get("summary") or ""),
+        "key_points": strs(data.get("key_points")),
+        "rules": items("rules", {"title": "", "explanation": "", "examples": []}),
+        "vocabulary": [v for v in items("vocabulary", {"word": "", "translation": "", "transcription": None,
+                                                         "part_of_speech": None, "example": None}) if v["word"]],
+        "corrections": [c for c in items("corrections", {"wrong": "", "correct": "", "note": None}) if c["correct"]],
+        "test": [q for q in test if q["question"] and q["answer"]],
+        "homework_teacher": strs(data.get("homework_teacher")), "homework_generated": strs(data.get("homework_generated")),
+        "review_items": strs(data.get("review_items")), "parent_summary": str(data.get("parent_summary") or ""),
+        "parent_achievements": strs(data.get("parent_achievements")), "parent_attention": strs(data.get("parent_attention")),
+        "parent_teacher_remarks": strs(data.get("parent_teacher_remarks")),
+        "homework_status": status if status in ("done", "partial", "not_done", "unknown") else "unknown",
+        "parent_recommendations": strs(data.get("parent_recommendations")),
+    }
+
+
 class LLMClient:
     """Тонкая обёртка над Anthropic SDK с безопасной деградацией."""
 
@@ -119,6 +173,8 @@ class LLMClient:
         self.settings = settings
         self.last_error: str | None = None
         self._client = None
+        # Бесплатный ИИ (Ollama, OpenRouter и др.) — если Claude не подключён
+        self._free = bool(settings.ai_url and settings.ai_model)
         if settings.llm_enabled and anthropic is not None:
             try:
                 self._client = anthropic.Anthropic(timeout=settings.llm_timeout, max_retries=2)
@@ -130,7 +186,17 @@ class LLMClient:
 
     @property
     def available(self) -> bool:
-        return self._client is not None
+        return self._client is not None or self._free
+
+    @property
+    def provider(self) -> str | None:
+        """claude — Claude; ai — бесплатный OpenAI-совместимый ИИ; None — только офлайн."""
+        return "claude" if self._client is not None else "ai" if self._free else None
+
+    @property
+    def slow(self) -> bool:
+        """Бесплатная модель на своём сервере может думать минутами — отчёт дорабатывается в фоне."""
+        return self._client is None and self._free
 
     def generate_lesson_report(
         self,
@@ -143,9 +209,12 @@ class LLMClient:
         progress: str | None = None,
         student_name: str | None = None,
     ) -> LLMLessonReport | None:
-        if not self._client:
+        if not self.available:
             return None
         s = self.settings
+        if self._client is None:  # бесплатный ИИ: длинную расшифровку сокращаем под небольшое окно модели
+            transcript = transcript if len(transcript) <= FREE_MAX_CHARS else \
+                transcript[: FREE_MAX_CHARS // 2] + "\n…\n" + transcript[-FREE_MAX_CHARS // 2:]
         system = SYSTEM_PROMPT.format(native=_language_name(s.native_language), target=_language_name(s.target_language))
         user = (
             f"Изучаемый язык: {_language_name(s.target_language)}. Язык ученика: {_language_name(s.native_language)}.\n"
@@ -159,6 +228,8 @@ class LLMClient:
             + "<transcript>\n" + transcript + "\n</transcript>\n\n"
             "Подготовь материалы после урока по требованиям: для ученика и отчёт для родителей."
         )
+        if self._client is None:
+            return self._free_report(system, user)
         kwargs = dict(
             model=s.llm_model,
             max_tokens=32000,
@@ -196,6 +267,22 @@ class LLMClient:
         if parsed is None:
             self.last_error = "модель вернула ответ не в ожидаемом формате"
         return parsed
+
+    def _free_report(self, system: str, user: str) -> LLMLessonReport | None:
+        from .ai import AIClient
+        from .units import parse_ai_json
+
+        ai = AIClient(self.settings)
+        answer = ai.complete(system + FREE_JSON_HINT, user)
+        data = parse_ai_json(answer or "")
+        if data is None:
+            self.last_error = ai.last_error or "ИИ вернул ответ не в формате JSON"
+            return None
+        try:
+            return LLMLessonReport.model_validate(_lenient(data))
+        except ValueError as exc:
+            self.last_error = f"ИИ вернул неполный отчёт: {str(exc)[:200]}"
+            return None
 
     @staticmethod
     def _describe(exc: Exception) -> str:

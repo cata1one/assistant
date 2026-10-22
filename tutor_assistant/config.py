@@ -80,7 +80,7 @@ class Settings:
     ai_url: str = ""
     ai_key: str = ""
     ai_model: str = ""
-    ai_timeout: float = 120.0
+    ai_timeout: float = 1200.0  # конспект урока на процессоре без видеокарты может готовиться 10–15 минут
 
     # Контроль контактов
     block_contacts: bool = True  # скрывать сообщения с контактами

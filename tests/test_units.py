@@ -172,13 +172,13 @@ def test_units_flow(env):
 def test_ai_generation(env, monkeypatch):
     u = env["u"]
     monkeypatch.setattr(type(u.ai), "provider", property(lambda self: "openai"))
-    monkeypatch.setattr(u.ai, "complete", lambda system, user: 'Вот занятие:\n```json\n' + json.dumps({
+    monkeypatch.setattr(u.ai, "complete", lambda system, user, timeout=None: 'Вот занятие:\n```json\n' + json.dumps({
         "title": "Travel", "level": "B1", "blocks": [
             {"type": "words", "items": [{"word": "luggage", "translation": "багаж"}]},
             {"type": "gap", "text": "Where is my [luggage]?"}, {"type": "unknown"}]}) + "\n```")
     d = u.generate(env["tutor"], {"topic": "Travel"})
     assert d["generated_by"] == "ai" and [b["type"] for b in d["blocks"]] == ["words", "gap"]
-    monkeypatch.setattr(u.ai, "complete", lambda system, user: None)
+    monkeypatch.setattr(u.ai, "complete", lambda system, user, timeout=None: None)
     assert u.generate(env["tutor"], {"topic": "Travel", "words": "bag — сумка\nticket — билет"})["generated_by"] == "offline"
     with pytest.raises(PortalError):
         u.generate(env["tutor"], {"topic": "Travel"})

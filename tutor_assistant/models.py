@@ -147,7 +147,7 @@ class LessonReport(BaseModel):
     review_items: list[str] = Field(default_factory=list)  # что повторить к следующему уроку
     parent: ParentReport = Field(default_factory=ParentReport)
     progress: Progress | None = None
-    generated_by: str = "offline"  # offline | claude
+    generated_by: str = "offline"  # offline | claude | ai (бесплатный ИИ) | pending (ИИ ещё дорабатывает)
     notes: list[str] = Field(default_factory=list)
 
     @property

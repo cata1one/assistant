@@ -278,20 +278,49 @@ class TutorAssistant:
             self.storage.add_lesson_item(lesson_id, "homework", h.model_dump())
         return MessageOutcome(lesson_id, result, stored, incident_id, new_words, new_hw)
 
-    def finish_lesson(self, lesson_id: str, use_llm: bool = True) -> LessonReport:
-        lesson = self.lesson(lesson_id)
-        utterances = self.storage.lesson_utterances(lesson_id)
+    def _build_report(self, lesson: dict[str, Any], use_llm: bool) -> LessonReport:
+        lesson_id = lesson["id"]
         owner = self.owner_for(lesson)
-        known = self.storage.known_words(owner, exclude_lesson=lesson_id)
         prev_lesson = self.storage.previous_finished_lesson(lesson)
-        report = build_report(
-            utterances, self.settings, llm=self.llm if use_llm else None, known_words=known, title=lesson.get("title"),
+        return build_report(
+            self.storage.lesson_utterances(lesson_id), self.settings, llm=self.llm if use_llm else None,
+            known_words=self.storage.known_words(owner, exclude_lesson=lesson_id), title=lesson.get("title"),
             lesson_id=lesson_id, violations=self.storage.incident_count(lesson_id=lesson_id),
             announced=self.storage.lesson_words_live(lesson_id), assigned=self.storage.lesson_homework_live(lesson_id),
             notes=self.lesson_notes(lesson_id),
             previous=self.storage.get_report(prev_lesson["id"]) if prev_lesson else None,
             lessons_before=self.storage.finished_lessons_count(lesson), student_name=lesson.get("student_name"),
         )
+
+    def improve_report(self, lesson_id: str) -> LessonReport | None:
+        """Доработка готового офлайн-отчёта ИИ (для медленных бесплатных моделей — в фоне после урока).
+
+        Если преподаватель уже отредактировал отчёт, его правки не перезаписываются.
+        """
+        lesson = self.lesson(lesson_id)
+        report = self._build_report(lesson, use_llm=True)
+        current = self.storage.get_report(lesson_id)
+        if current and "отредактировано преподавателем" in current.notes:
+            if current.generated_by == "pending":  # правки преподавателя важнее — черновик больше не ждёт ИИ
+                current.generated_by = "offline"
+                self.storage.save_report(lesson_id, current)
+            return None
+        if report.generated_by == "offline" and current:  # ИИ не справился — оставляем офлайн-отчёт
+            current.generated_by = "offline"
+            current.notes = [*current.notes, *report.notes][-10:]
+            self.storage.save_report(lesson_id, current)
+            return None
+        self.storage.add_words(self.owner_for(lesson), lesson_id, report.vocabulary)
+        self.storage.save_report(lesson_id, report)
+        return report
+
+    def finish_lesson(self, lesson_id: str, use_llm: bool = True, ai_pending: bool = False) -> LessonReport:
+        """Завершает урок и строит отчёт. ai_pending — отчёт пока офлайн, ИИ доработает его в фоне."""
+        lesson = self.lesson(lesson_id)
+        owner = self.owner_for(lesson)
+        report = self._build_report(lesson, use_llm=use_llm)
+        if ai_pending:
+            report.generated_by = "pending"
         self.storage.add_words(owner, lesson_id, report.vocabulary)
         self.storage.save_report(lesson_id, report)
         self.storage.finish_lesson(lesson_id)

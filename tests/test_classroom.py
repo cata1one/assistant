@@ -203,3 +203,21 @@ def test_http_room_audio(env):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_finish_with_slow_free_ai_runs_in_background(env, monkeypatch):
+    import threading
+
+    lid = start(env)
+    room, v, sent, a = env["room"], env["v"], env["sent"], env["assistant"]
+    room.chat(v[TUTOR], lid, {"text": "Новые слова сегодня: kitchen — кухня"})
+    monkeypatch.setattr(type(a.llm), "slow", property(lambda self: True))
+    done = threading.Event()
+    monkeypatch.setattr(a, "improve_report", lambda lesson_id: done.set())
+    started = []
+    monkeypatch.setattr(threading, "Thread", lambda target, args, daemon: started.append((target, args))
+                        or type("T", (), {"start": lambda self: target(*args)})())
+    sent.clear()
+    res = room.finish(v[TUTOR], lid)
+    assert res["ai_pending"] and res["delivered"] is None and done.is_set()
+    assert a.storage.get_report(lid).generated_by == "pending" and sent  # отчёт ушёл после доработки
