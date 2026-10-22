@@ -162,23 +162,23 @@ def test_video_embed(url, embed):
 
 def test_materials(env):
     tutor, student, *_ = private_pair(env)
-    l = env["l"]
-    up = l.upload(tutor, PNG, Headers({"Content-Type": "image/png", "X-File-Name": "%D0%BA%D0%BE%D1%82.png"}))
+    lrn = env["l"]
+    up = lrn.upload(tutor, PNG, Headers({"Content-Type": "image/png", "X-File-Name": "%D0%BA%D0%BE%D1%82.png"}))
     assert up["title"] == "кот.png" and up["url"] == f"/site/v1/files/{up['id']}"
-    data, mime, disp = l.file(up["id"])
+    data, mime, disp = lrn.file(up["id"])
     assert data == PNG and mime == "image/png" and disp.startswith("inline")
-    vid = l.add_link(tutor, {"url": "https://vk.com/video-1_2", "title": "Песня"})
+    vid = lrn.add_link(tutor, {"url": "https://vk.com/video-1_2", "title": "Песня"})
     assert vid["kind"] == "video" and vid["embed"]
-    assert {m["id"] for m in l.materials(tutor)["materials"]} == {up["id"], vid["id"]}
+    assert {m["id"] for m in lrn.materials(tutor)["materials"]} == {up["id"], vid["id"]}
     for bad, hdr in ((b"<svg/>", {"Content-Type": "image/svg+xml"}), (b"notpng", {"Content-Type": "image/png"}),
                      (b"", {"Content-Type": "image/png"})):
         with pytest.raises(PortalError):
-            l.upload(tutor, bad, Headers(hdr))
+            lrn.upload(tutor, bad, Headers(hdr))
     with pytest.raises(PortalError):
-        l.upload(student, PNG, Headers({"Content-Type": "image/png"}))  # ученик материалы не добавляет
-    l.delete_material(tutor, up["id"])
+        lrn.upload(student, PNG, Headers({"Content-Type": "image/png"}))  # ученик материалы не добавляет
+    lrn.delete_material(tutor, up["id"])
     with pytest.raises(PortalError):
-        l.file(up["id"])
+        lrn.file(up["id"])
 
 
 def test_school_materials_are_shared(env):
@@ -192,19 +192,19 @@ def test_school_materials_are_shared(env):
 
 def test_homework_flow(env):
     tutor, student, parent, added = private_pair(env)
-    l, sent = env["l"], env["sent"]
+    lrn, sent = env["l"], env["sent"]
     chat = f"pair:{added['pair_id']}"
     with pytest.raises(PortalError):
-        l.assign(student, {"chat_id": chat, "text": "сам себе"})
-    hid = l.assign(tutor, {"chat_id": chat, "text": "Упражнение 4, выучить слова", "due": "2026-11-01"})["id"]
-    assert l.homework(student)["homework"][0]["status"] == "open"
-    assert l.homework(parent)["homework"][0]["text"].startswith("Упражнение")
-    l.update_homework(student, hid, {"status": "done", "answer": "Сделал!"})
-    hw = l.homework(tutor)["homework"][0]
+        lrn.assign(student, {"chat_id": chat, "text": "сам себе"})
+    hid = lrn.assign(tutor, {"chat_id": chat, "text": "Упражнение 4, выучить слова", "due": "2026-11-01"})["id"]
+    assert lrn.homework(student)["homework"][0]["status"] == "open"
+    assert lrn.homework(parent)["homework"][0]["text"].startswith("Упражнение")
+    lrn.update_homework(student, hid, {"status": "done", "answer": "Сделал!"})
+    hw = lrn.homework(tutor)["homework"][0]
     assert hw["status"] == "done" and hw["answer"] == "Сделал!"
-    l.update_homework(tutor, hid, {"status": "checked"})
+    lrn.update_homework(tutor, hid, {"status": "checked"})
     with pytest.raises(PortalError):
-        l.update_homework(parent, hid, {"status": "done"})
+        lrn.update_homework(parent, hid, {"status": "done"})
 
 
 # -- карточки --------------------------------------------------------------------------------------
@@ -224,20 +224,20 @@ def test_sm2_intervals():
 
 def test_cards_from_lesson_words(env):
     tutor, student, parent, added = private_pair(env)
-    a, l = env["a"], env["l"]
+    a, lrn = env["a"], env["l"]
     chat = f"pair:{added['pair_id']}"
     lesson = a.start_lesson(chat_id=chat, tutor_id=tutor.user_id, student_id=student.user_id)
     a.process_message(lesson["id"], tutor.user_id, "Анна", "Новые слова сегодня: kitchen — кухня, cozy — уютный",
                       role="tutor")
     a.finish_lesson(lesson["id"], use_llm=False)
-    cards = l.cards(student)
+    cards = lrn.cards(student)
     assert cards["stats"]["new"] == 2 and {c["word"] for c in cards["queue"]} == {"kitchen", "cozy"}
-    l.review(student, {"key": "kitchen", "grade": "good"})
+    lrn.review(student, {"key": "kitchen", "grade": "good"})
     later = datetime.now(timezone.utc) + timedelta(hours=1)
-    assert [c["word"] for c in l.cards(student, now=later)["queue"]] == ["cozy"]  # kitchen — через день
+    assert [c["word"] for c in lrn.cards(student, now=later)["queue"]] == ["cozy"]  # kitchen — через день
     tomorrow = datetime.now(timezone.utc) + timedelta(days=1, minutes=1)
-    assert {c["word"] for c in l.cards(student, now=tomorrow)["queue"]} == {"kitchen", "cozy"}
+    assert {c["word"] for c in lrn.cards(student, now=tomorrow)["queue"]} == {"kitchen", "cozy"}
     with pytest.raises(PortalError):
-        l.review(student, {"key": "nope", "grade": "good"})
+        lrn.review(student, {"key": "nope", "grade": "good"})
     with pytest.raises(PortalError):
-        l.cards(tutor)  # карточки — для учеников
+        lrn.cards(tutor)  # карточки — для учеников
