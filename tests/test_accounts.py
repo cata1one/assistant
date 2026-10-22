@@ -192,7 +192,7 @@ def test_school_materials_are_shared(env):
 
 def test_homework_flow(env):
     tutor, student, parent, added = private_pair(env)
-    lrn, sent = env["l"], env["sent"]
+    lrn = env["l"]
     chat = f"pair:{added['pair_id']}"
     with pytest.raises(PortalError):
         lrn.assign(student, {"chat_id": chat, "text": "сам себе"})
