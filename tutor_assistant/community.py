@@ -28,7 +28,8 @@ log = logging.getLogger(__name__)
 
 LEVELS = {"beginner": "начальный", "intermediate": "средний", "advanced": "продвинутый"}
 AUDIENCES = {"adult": "взрослый", "kid": "ребёнок или подросток"}
-LANGUAGES = {"en": "английский", "zh": "китайский"}
+LANGUAGES = {"en": "английский", "zh": "китайский", "es": "испанский", "fr": "французский", "it": "итальянский",
+             "pt": "португальский", "ar": "арабский", "sr": "сербский", "hi": "хинди", "el": "греческий"}
 BUDGETS = {
     "lt1000": "до 1 000 ₽", "1000-1500": "1 000–1 500 ₽", "1500-2500": "1 500–2 500 ₽",
     "gt2500": "от 2 500 ₽", "discuss": "обсуждается",
@@ -444,6 +445,26 @@ class Community:
             self.storage.upsert_teacher(viewer.user_id, self.teacher_name(viewer.user_id), status="approved")
         proposal_id = self.storage.add_proposal(request_id, viewer.user_id, message, price)
         return {"id": proposal_id, "request_id": request_id}
+
+    # == обратная связь команде платформы ===============================================
+    FEEDBACK_KINDS = {"idea": "💡 Идея", "bug": "🐞 Ошибка", "praise": "❤️ Спасибо", "other": "✉️ Другое"}
+
+    def feedback(self, viewer: Viewer, body: Any) -> dict[str, Any]:
+        body = body if isinstance(body, dict) else {}
+        kind = body.get("kind") if body.get("kind") in self.FEEDBACK_KINDS else "other"
+        text = body.get("text")
+        if not isinstance(text, str) or not 5 <= len(text.strip()) <= 3000:
+            raise PortalError(400, "напишите пару слов — от 5 до 3000 символов")
+        acc = self.storage.get_account(viewer.user_id) if viewer.user_id.startswith("a_") else None
+        name, role = (acc["name"], acc["role"]) if acc else (None, None)
+        fid = self.storage.add_feedback(viewer.user_id, name, role, kind, text.strip())
+        who = f"{name} ({role}, {acc['email']})" if acc else f"пользователь {viewer.user_id}"
+        self.portal.notify_admin(f"{self.FEEDBACK_KINDS[kind]} — обратная связь #{fid} от {who}:\n{text.strip()[:1500]}")
+        return {"id": fid}
+
+    def feedback_list(self, viewer: Viewer) -> dict[str, Any]:
+        self._admin(viewer)
+        return {"feedback": self.storage.feedback_list()}
 
     def my_proposals(self, viewer: Viewer) -> dict[str, Any]:
         return {"proposals": self.storage.proposals_by_teacher(viewer.user_id),

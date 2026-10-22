@@ -13,13 +13,13 @@ export default function Landing() {
       {/* Первый экран: что это и для кого — за три секунды */}
       <section className="grid items-center gap-14 pb-16 pt-28 md:pt-36 lg:grid-cols-[1.05fr_1fr]">
         <div className="animate-fadeup">
-          <span className="chip"><span className="h-1.5 w-1.5 rounded-full bg-mint" /> Английский, китайский и другие языки</span>
+          <span className="chip"><span className="h-1.5 w-1.5 rounded-full bg-mint" /> 10 языков: английский, китайский, испанский, французский и другие</span>
           <h1 className="mt-5 text-[clamp(2.4rem,6vw,4.4rem)]">
-            Уроки языков,<br />где всё <span className="relative whitespace-nowrap text-brand">в одном окне<svg aria-hidden="true" viewBox="0 0 300 20" className="absolute -bottom-2 left-0 h-3 w-full text-sun"><path d="M4 14 Q 150 0 296 12" stroke="currentColor" strokeWidth="7" fill="none" strokeLinecap="round" /></svg></span>
+            Уроки языков,<br />которые <span className="relative whitespace-nowrap text-brand">запоминаются<svg aria-hidden="true" viewBox="0 0 300 20" className="absolute -bottom-2 left-0 h-3 w-full text-sun"><path d="M4 14 Q 150 0 296 12" stroke="currentColor" strokeWidth="7" fill="none" strokeLinecap="round" /></svg></span>
           </h1>
           <p className="mt-6 max-w-xl text-lg text-ink-soft">
-            Видеосвязь, доска, материалы и видео — на одном экране. А после урока конспект, домашка, карточки
-            слов и отчёт родителям готовы сами.
+            Урок, доска, материалы и видео — в одном окне, прямо в браузере и на телефоне. После занятия ученик
+            получает конспект и карточки новых слов, родители — отчёт, а преподаватель — свободный вечер.
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
             <a href="#/teach" data-brand="teach" className="group card card-hover flex items-center gap-4 !p-5">
@@ -57,7 +57,7 @@ export default function Landing() {
         <FeatureGrid items={[
           { icon: Video, title: "Видеоурок в браузере", text: "Без установки программ. Запись и расшифровка урока — для конспекта.", tone: "study" },
           { icon: PenTool, title: "Доска, на которой приятно работать", text: "Заметки, фигуры, рисование, стикеры к праздникам — Хэллоуин, Новый год, китайский Новый год.", tone: "teach" },
-          { icon: Clapperboard, title: "Видео без демонстрации экрана", text: "VK Видео, YouTube и Rutube встраиваются прямо на доску — ученик смотрит вместе с вами.", tone: "lilac" },
+          { icon: Clapperboard, title: "Видео без демонстрации экрана", text: "Добавляйте видео прямо на доску — ученик смотрит вместе с вами, без зависаний и задержки звука.", tone: "lilac" },
           { icon: FileStack, title: "Своя база материалов", text: "PDF, картинки, презентации, аудио. Перенесите материалы с ProgressMe пачкой файлов.", tone: "sun" },
           { icon: NotebookPen, title: "Конспект и ДЗ сами", text: "После урока — правила, ошибки, новые слова, тест и домашнее задание.", tone: "mint" },
           { icon: Repeat, title: "Карточки как в ReWord", text: "Новые слова урока сразу превращаются в карточки с повторением по кривой забывания.", tone: "study" },
@@ -89,14 +89,14 @@ export default function Landing() {
             </ul>
           </div>
           <div className="text-center">
-            <p className="num font-display text-5xl font-extrabold">250 ₽</p>
+            <p className="num font-display text-5xl font-extrabold">500 ₽</p>
             <p className="text-sm text-ink-mute">за преподавателя в месяц</p>
             <a href="#/register?role=school" className="btn-brand mt-5">Подключить школу</a>
           </div>
         </div>
       </Section>
 
-      <Section eyebrow="Тарифы" title="Начните бесплатно" text="До трёх учеников — бесплатно и со всеми возможностями. Карта не нужна.">
+      <Section eyebrow="Тарифы" title="300 ₽ в месяц — и всё включено" text="Попробуйте 3 дня бесплатно со всеми функциями. Карта не нужна.">
         <PricingCards />
       </Section>
 
@@ -117,7 +117,7 @@ export default function Landing() {
           <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(30rem_20rem_at_15%_0%,rgba(242,100,61,.45),transparent),radial-gradient(30rem_20rem_at_85%_100%,rgba(61,99,245,.45),transparent)]" />
           <div className="relative">
             <h2 className="text-3xl !text-white md:text-5xl">Проведите первый урок сегодня</h2>
-            <p className="mx-auto mt-4 max-w-xl text-white/75">Регистрация за минуту. Пригласите ученика по ссылке — и начинайте.</p>
+            <p className="mx-auto mt-4 max-w-xl text-white/75">3 дня бесплатно со всеми функциями. Регистрация за минуту — пригласите ученика по ссылке и начинайте.</p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <a href="#/register?role=tutor" className="btn-brand btn-lg">Я преподаю</a>
               <a href="#/register?role=student" className="btn btn-lg bg-white text-ink hover:bg-cream">Я учусь</a>

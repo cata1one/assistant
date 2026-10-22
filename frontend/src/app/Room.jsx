@@ -214,7 +214,7 @@ export default function Room({ id }) {
     <div className={`relative overflow-hidden rounded-2xl bg-ink ${cls}`}>
       {connected ? <VideoView stream={remote} className="h-full w-full object-cover" />
         : <div className="grid h-full place-items-center p-3 text-center text-xs text-white/60">{peer?.online ? "Соединяемся…" : `Ждём: ${peer?.name || "собеседник"}`}</div>}
-      <span className="absolute bottom-2 left-2 rounded-full bg-ink/60 px-2 py-0.5 text-[11px] font-semibold text-white">{peer?.name}</span>
+      {connected && <span className="absolute bottom-2 left-2 max-w-[90%] truncate rounded-full bg-ink/60 px-2 py-0.5 text-[11px] font-semibold text-white">{peer?.name}</span>}
     </div>
   );
   const localTile = (cls) => (

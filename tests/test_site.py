@@ -431,6 +431,19 @@ def test_board_v2_validation(env, bad):
         env["portal"].add_board_item(tutor, board["id"], bad)
 
 
+def test_board_image_crop(env):
+    portal = env["portal"]
+    tutor = viewer(env, TUTOR_ID)
+    chat = portal.accesses(tutor)[0].chat_id
+    b = portal.create_board(tutor, chat, "Фото")
+    src = "/site/v1/files/" + "a" * 24
+    portal.add_board_item(tutor, b["id"], obj("img1", "image", src=src, crop=[0.1, 0.2, 0.95, 0.5]))
+    item = portal.board_items(tutor, b["id"])["items"][-1]["data"]
+    assert item["crop"] == [0.1, 0.2, 0.9, 0.5]  # ширина урезана до края картинки
+    with pytest.raises(PortalError):
+        portal.add_board_item(tutor, b["id"], obj("img2", "image", src=src, crop=[0, 0, "x", 1]))
+
+
 def test_student_cannot_create_board(env):
     with pytest.raises(PortalError) as e:
         env["portal"].create_board(viewer(env, STUDENT_ID), env["pair"].chat_id, "моя")

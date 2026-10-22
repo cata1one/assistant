@@ -2,24 +2,28 @@ import {
   ArrowRight, FileStack, Gift, Lock, NotebookPen, PenTool, Repeat, Search, Sparkles, Users, Video,
 } from "lucide-react";
 import { useState } from "react";
+import { useSession } from "../lib/session.js";
 import { copy } from "../ui/kit.jsx";
 import { Faq, FeatureGrid, Marquee, PricingCards, ProductMock, Section } from "./parts.jsx";
 
 export default function Teach() {
+  const session = useSession();
+  const ref = session?.account?.referral?.code;
   const [copied, setCopied] = useState(false);
-  const share = () => { copy(`${window.location.origin}/#/teach`); setCopied(true); };
+  // У вошедшего преподавателя — личная ссылка: по ней начисляется скидка
+  const share = () => { copy(ref ? `${window.location.origin}/#/register?role=tutor&ref=${ref}` : `${window.location.origin}/#/teach`); setCopied(true); };
   return (
     <>
       <section className="grid items-center gap-14 pb-14 pt-28 md:pt-36 lg:grid-cols-[1.05fr_1fr]">
         <div className="animate-fadeup">
           <span className="chip chip-brand">BetterTeach — для репетиторов</span>
-          <h1 className="mt-5 text-[clamp(2.3rem,5.6vw,4.2rem)]">Ведите уроки,<br />а не <span className="text-brand">пять программ</span></h1>
-          <p className="mt-6 max-w-xl text-lg text-ink-soft">Созвон, доска со стикерами, ваши материалы и видео из VK — на одном экране. Конспект, ДЗ и отчёт родителям после урока делаются сами.</p>
+          <h1 className="mt-5 text-[clamp(2.2rem,5.2vw,3.9rem)]">Возможности онлайн-школы —<br /><span className="text-brand">в руках одного преподавателя</span></h1>
+          <p className="mt-6 max-w-xl text-lg text-ink-soft">Видеоурок, доска, материалы, интерактивные задания и отчёты родителям — в одном кабинете. Занятия становятся сильнее, подготовка — быстрее, а стоит всё 300 ₽ в месяц: дешевле одного урока.</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="#/register?role=tutor" className="btn-brand btn-lg">Начать бесплатно <ArrowRight size={18} /></a>
+            <a href="#/register?role=tutor" className="btn-brand btn-lg">Попробовать 3 дня бесплатно <ArrowRight size={18} /></a>
             <a href="#/pricing" className="btn-light btn-lg">Тарифы</a>
           </div>
-          <p className="mt-4 text-sm text-ink-mute">До 3 учеников бесплатно, без карты. Регистрация — минута.</p>
+          <p className="mt-4 text-sm text-ink-mute">Все функции сразу, без карты. Регистрация — минута.</p>
         </div>
         <ProductMock />
       </section>
@@ -27,7 +31,7 @@ export default function Teach() {
 
       <Section eyebrow="Почему удобно" title="Уроки, которые приятно готовить и вести">
         <FeatureGrid items={[
-          { icon: PenTool, title: "Доска лучше, чем просто доска", text: "Заметки, фигуры, рисование, стикеры к праздникам и видео из VK, YouTube и Rutube прямо на доске — без демонстрации экрана.", tone: "teach" },
+          { icon: PenTool, title: "Доска лучше, чем просто доска", text: "Рисуйте пальцем или мышкой, добавляйте видео, фото и стикеры, обрезайте картинки прямо на доске — без демонстрации экрана.", tone: "teach" },
           { icon: FileStack, title: "Все материалы под рукой", text: "Загрузите учебники, карточки, аудио и презентации один раз — и кладите их на доску в два клика.", tone: "sun" },
           { icon: Video, title: "Урок в браузере", text: "Ученик заходит по кнопке из кабинета. Звонок и доску открываете только вы.", tone: "study" },
           { icon: NotebookPen, title: "Отчёты без рутины", text: "Конспект ученику, отчёт родителю, ДЗ и тест — автоматически по записи урока.", tone: "mint" },
@@ -58,7 +62,7 @@ export default function Teach() {
         </div>
       </Section>
 
-      <Section eyebrow="Тарифы" title="Дешевле, чем собирать всё по отдельности"><PricingCards /></Section>
+      <Section eyebrow="Тарифы" title="Один тариф — и всё включено"><PricingCards /></Section>
 
       <Section title="Вопросы преподавателей" center>
         <Faq items={[
@@ -70,10 +74,10 @@ export default function Teach() {
       </Section>
 
       <section className="pb-6">
-        <div className="card flex flex-wrap items-center justify-between gap-4 md:!p-10">
-          <div className="flex items-center gap-4"><span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-soft text-brand"><Gift size={26} /></span>
-            <div><h3 className="text-xl">Расскажите коллеге</h3><p className="text-sm text-ink-mute">Отправьте ссылку тем, кто тоже устал переключаться между программами.</p></div></div>
-          <button type="button" onClick={share} className="btn-light"><Sparkles size={16} />{copied ? "Ссылка скопирована" : "Скопировать ссылку"}</button>
+        <div className="card flex flex-wrap items-center justify-between gap-5 md:!p-10">
+          <div className="flex min-w-0 flex-1 items-center gap-4"><span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-brand-soft text-brand"><Gift size={26} /></span>
+            <div><h3 className="text-xl">Приведите коллегу — получите скидку 50%</h3><p className="mt-1 text-sm text-ink-soft">Поделитесь ссылкой с теми, кто тоже устал переключаться между пятью программами. Когда коллега оформит тариф, ваше следующее продление обойдётся вдвое дешевле.</p></div></div>
+          <button type="button" onClick={share} className="btn-light"><Sparkles size={16} />{copied ? "Ссылка скопирована" : ref ? "Скопировать мою ссылку" : "Скопировать ссылку"}</button>
         </div>
       </section>
     </>

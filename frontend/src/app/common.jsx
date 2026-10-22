@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { fmtDate, request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Notice, PageTitle } from "../ui/kit.jsx";
+import { DecorSettings } from "./decor.jsx";
 
 /** Загрузка данных с сервера: { data, error, reload }. */
 export function useApi(path, deps = []) {
@@ -262,6 +263,7 @@ export function ProfilePage() {
   return (
     <>
       <PageTitle title="Профиль" />
+      {session.role === "student" && acc && <div className="mb-4"><DecorSettings /></div>}
       <div className="grid gap-4 lg:grid-cols-2">
         {acc ? (
           <form onSubmit={save} className="card grid gap-4">
@@ -285,11 +287,37 @@ export function ProfilePage() {
                   : <button type="button" className="btn-light mt-4" onClick={linkTelegram}>{acc.telegram ? "Привязать другой аккаунт" : "Привязать Telegram"}</button>}
             </div>
           )}
+          <FeedbackForm />
           {session.role !== "school" && <ReviewForm />}
           <button type="button" className="btn-ghost w-fit" onClick={() => { session.logout(); window.location.hash = "#/"; }}>Выйти на всех устройствах</button>
         </div>
       </div>
     </>
+  );
+}
+
+const FEEDBACK = [["idea", "💡 Идея"], ["bug", "🐞 Что-то не работает"], ["praise", "❤️ Спасибо"], ["other", "✉️ Другое"]];
+
+/** Обратная связь команде платформы: идеи, ошибки, пожелания. */
+function FeedbackForm() {
+  const [kind, setKind] = useState("idea");
+  const [text, setText] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [error, setError] = useState(null);
+  const send = async (e) => {
+    e.preventDefault(); setError(null);
+    try { await request("POST", "/site/v1/feedback", { kind, text }); setText(""); setMsg("Спасибо! Мы прочитаем и ответим на почту, если нужно."); } catch (x) { setError(x); }
+  };
+  return (
+    <form id="feedback" onSubmit={send} className="card grid gap-3">
+      <h2 className="text-lg">Обратная связь</h2>
+      <p className="-mt-1 text-sm text-ink-mute">Предложите идею или расскажите, что неудобно, — мы читаем каждое сообщение.</p>
+      <div className="flex flex-wrap gap-1.5">{FEEDBACK.map(([k, t]) => <button key={k} type="button" onClick={() => setKind(k)} className={`chip !text-sm ${kind === k ? "chip-brand" : ""}`}>{t}</button>)}</div>
+      <textarea className="field min-h-[90px]" required minLength={5} maxLength={3000} value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === "bug" ? "Что делали, что произошло, с телефона или компьютера" : "Ваше сообщение"} aria-label="Сообщение" />
+      {msg && <Notice tone="ok">{msg}</Notice>}
+      <ErrorBox error={error} />
+      <button type="submit" className="btn-light w-fit">Отправить</button>
+    </form>
   );
 }
 

@@ -5,6 +5,10 @@ import { brandOf, useSession } from "../lib/session.js";
 import { ErrorBox, Loading, Notice } from "../ui/kit.jsx";
 import Logo from "../ui/Logo.jsx";
 
+// Почта последнего входа — чтобы не вбивать её каждый раз (особенно с телефона)
+const LAST_EMAIL = "better-last-email";
+const lastEmail = () => { try { return localStorage.getItem(LAST_EMAIL) || ""; } catch { return ""; } };
+
 const ROLES = [
   { id: "tutor", title: "Преподаватель", text: "Веду уроки сам или в школе", icon: PenTool, brand: "teach" },
   { id: "student", title: "Ученик", text: "Учусь у преподавателя", icon: GraduationCap, brand: "study" },
@@ -45,7 +49,7 @@ export default function Auth({ route }) {
   const code = route.params.get("code") || "";
   const { info, error: inviteError } = useInvite(code);
   const [role, setRole] = useState(route.params.get("role") || "");
-  const [f, setF] = useState({ name: "", email: "", password: "", school_name: "", consent: false });
+  const [f, setF] = useState({ name: "", email: mode === "login" ? lastEmail() : "", password: "", school_name: "", consent: false });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(null);
@@ -62,6 +66,8 @@ export default function Auth({ route }) {
       const body = mode === "login" ? { email: f.email, password: f.password }
         : { ...f, role, school_name: role === "school" ? f.school_name : undefined };
       if (code) body.invite = code;
+      if (route.params.get("ref")) body.ref = route.params.get("ref");
+      try { localStorage.setItem(LAST_EMAIL, f.email.trim()); } catch { /* нет хранилища */ }
       const res = await request("POST", mode === "login" ? "/site/v1/auth/login" : "/site/v1/auth/register", body);
       await session.signIn(res.token);
       window.location.hash = "#/app";
@@ -134,16 +140,17 @@ export default function Auth({ route }) {
           )}
           {!login && (
             <label className="label">{role === "school" ? "Ваше имя" : "Имя"}
-              <input className="field" required maxLength={60} autoComplete="name" value={f.name} onChange={set("name")}
+              <input className="field" required maxLength={60} name="name" autoComplete="name" value={f.name} onChange={set("name")}
                 placeholder={role === "student" || role === "parent" ? "Другие увидят только имя" : "Ученики увидят только имя"} />
             </label>
           )}
           {role === "school" && !login && (
             <label className="label">Название школы<input className="field" required maxLength={80} value={f.school_name} onChange={set("school_name")} /></label>
           )}
-          <label className="label">Почта<input className="field" type="email" required autoComplete="email" value={f.email} onChange={set("email")} /></label>
+          <label className="label">Почта<input className="field" type="email" name="email" id="email" required inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+            autoComplete={login ? "username" : "email"} value={f.email} onChange={set("email")} /></label>
           <label className="label">Пароль
-            <input className="field" type="password" required minLength={login ? 1 : 8} autoComplete={login ? "current-password" : "new-password"}
+            <input className="field" type="password" name="password" id="password" required minLength={login ? 1 : 8} autoComplete={login ? "current-password" : "new-password"}
               value={f.password} onChange={set("password")} placeholder={login ? "" : "Не меньше 8 символов"} />
           </label>
           {!login && (

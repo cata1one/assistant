@@ -21,6 +21,8 @@ const PHRASES = [
   ["Nice to meet you", "Приятно познакомиться"], ["你好", "nǐ hǎo · привет"], ["Practice makes perfect", "Повторение — мать учения"],
   ["加油!", "jiā yóu · вперёд!"], ["Piece of cake", "Проще простого"], ["Bonjour", "Здравствуйте"],
   ["谢谢", "xièxie · спасибо"], ["Keep it up!", "Так держать!"], ["¡Hola!", "Привет"], ["Break a leg", "Ни пуха ни пера"],
+  ["Grazie mille", "Большое спасибо"], ["Obrigado", "Спасибо"], ["شكراً", "shúkran · спасибо"], ["Хвала", "hvala · спасибо"],
+  ["नमस्ते", "namaste · здравствуйте"], ["Γεια σου", "yia sou · привет"],
 ];
 
 export function Marquee() {
@@ -103,37 +105,69 @@ export function FeatureGrid({ items }) {
 }
 
 export const PLANS = [
-  { id: "free", title: "Старт", price: 0, note: "навсегда", students: "до 3 учеников",
-    features: ["Видеоуроки с записью", "Доска со стикерами и видео", "Материалы и домашние задания", "Конспект и карточки слов после урока", "Отчёты родителям"] },
-  { id: "pro", title: "Про", price: 290, note: "в месяц", students: "до 30 учеников", hot: true,
-    features: ["Всё из «Старта»", "До 30 учеников", "Приоритетная поддержка"] },
-  { id: "max", title: "Безлимит", price: 490, note: "в месяц", students: "без ограничений",
-    features: ["Всё из «Про»", "Неограниченно учеников", "Для тех, кто преподаёт много и в группах"] },
-  { id: "school", title: "Школа", price: 250, note: "за преподавателя в месяц", students: "команда преподавателей",
-    features: ["Кабинет школы: преподаватели и ученики", "Сигналы при попытке обменяться контактами", "Общая база материалов", "Отчёты по всем урокам школе и родителям"] },
+  { id: "teacher", title: "Преподаватель", who: "Для частных репетиторов", prices: { 1: 300, 3: 810, 12: 2880 }, hot: true,
+    features: [
+      "Ученики без ограничений",
+      "Видеоуроки в браузере — без Zoom и Skype",
+      "Доска: рисование, стикеры, фото с обрезкой, видео",
+      "Конспект, новые слова, ДЗ и тест после урока — сами",
+      "Интерактивные занятия: пропуски, пары, тесты, аудирование",
+      "Создание занятий с ИИ и готовые уроки IELTS и HSK",
+      "Своя база материалов: файлы, ссылки, видео",
+      "Домашние задания с проверкой, фото ответа и вашим комментарием",
+      "Карточки слов с интервальным повторением для учеников",
+      "Отчёты родителям на сайте и переписка с ними",
+      "Поиск новых учеников",
+      "10 языков: английский, китайский, испанский и другие",
+    ] },
+  { id: "school", title: "Онлайн-школа", who: "Цена за одного преподавателя", prices: { 1: 500, 3: 1350, 12: 4800 },
+    features: [
+      "Всё из тарифа «Преподаватель» — каждому в команде",
+      "Кабинет школы: преподаватели, ученики, уроки и отчёты",
+      "Защита учеников: контакты в чате, речи и на доске блокируются",
+      "Сигналы школе о попытках увести ученика",
+      "Общая база материалов и занятий для всей команды",
+      "Родители пишут напрямую в школу",
+      "Преподаватели подключаются по одной ссылке",
+    ] },
 ];
 
-export function PricingCards({ compact }) {
+const PERIODS = [[1, "Месяц"], [3, "3 месяца · −10%"], [12, "Год · −20%"]];
+
+export function PricingCards({ inApp }) {
+  const [months, setMonths] = useState(1);
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {PLANS.map((p) => (
-        <div key={p.id} data-brand={p.id === "school" ? "study" : "teach"}
-          className={`card relative flex flex-col ${p.hot ? "border-brand shadow-teach-glow" : ""}`}>
-          {p.hot && <span className="chip chip-brand absolute -top-3 left-6">Выбор репетиторов</span>}
-          <h3 className="text-xl">{p.title}</h3>
-          <p className="mt-1 text-sm text-ink-mute">{p.students}</p>
-          <p className="mt-4 flex items-baseline gap-1.5"><span className="num font-display text-4xl font-extrabold">{p.price ? `${p.price} ₽` : "0 ₽"}</span><span className="text-sm text-ink-mute">{p.note}</span></p>
-          {!compact && (
-            <ul className="mt-5 grid flex-1 gap-2 text-sm">
-              {p.features.map((f) => <li key={f} className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-mint" />{f}</li>)}
-            </ul>
-          )}
-          <a href={p.id === "school" ? "#/register?role=school" : "#/register?role=tutor"} className={`mt-6 ${p.hot ? "btn-brand" : "btn-light"}`}>
-            {p.id === "school" ? "Подключить школу" : p.price ? "Попробовать" : "Начать бесплатно"}
-          </a>
+    <>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div role="tablist" aria-label="Срок оплаты" className="inline-flex flex-wrap gap-1 rounded-full border border-line bg-white p-1">
+          {PERIODS.map(([m, t]) => (
+            <button key={m} type="button" role="tab" aria-selected={months === m} onClick={() => setMonths(m)}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${months === m ? "bg-ink text-white" : "text-ink-soft hover:bg-cream"}`}>{t}</button>
+          ))}
         </div>
-      ))}
-    </div>
+        {!inApp && <span className="chip chip-brand">3 дня бесплатно — со всеми функциями, без карты</span>}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {PLANS.map((p) => {
+          const total = p.prices[months];
+          const perMonth = Math.round(total / months);
+          return (
+            <div key={p.id} data-brand={p.id === "school" ? "study" : "teach"} className={`card relative flex flex-col ${p.hot ? "border-brand shadow-teach-glow" : ""}`}>
+              {p.hot && <span className="chip chip-brand absolute -top-3 left-6">Выбор репетиторов</span>}
+              <h3 className="text-2xl">{p.title}</h3>
+              <p className="mt-1 text-sm text-ink-mute">{p.who}</p>
+              <p className="mt-4 flex items-baseline gap-1.5"><span className="num font-display text-5xl font-extrabold">{perMonth} ₽</span><span className="text-sm text-ink-mute">в месяц{p.id === "school" ? " за преподавателя" : ""}</span></p>
+              <p className="mt-1 h-5 text-sm text-ink-mute">{months > 1 ? `${total.toLocaleString("ru-RU")} ₽ за ${months === 12 ? "год" : "3 месяца"}` : "Оплата помесячно"}</p>
+              <ul className="mt-5 grid flex-1 content-start gap-2 text-sm">
+                {p.features.map((f) => <li key={f} className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-mint" />{f}</li>)}
+              </ul>
+              {!inApp && <a href={p.id === "school" ? "#/register?role=school" : "#/register?role=tutor"} className={`mt-6 ${p.hot ? "btn-brand" : "btn-light"}`}>Попробовать 3 дня бесплатно</a>}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-sm text-ink-mute">Ученики и родители пользуются платформой бесплатно.</p>
+    </>
   );
 }
 

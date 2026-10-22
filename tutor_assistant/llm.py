@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import Literal
 
@@ -208,10 +209,13 @@ class LLMClient:
         teacher_notes: list[str] | None = None,
         progress: str | None = None,
         student_name: str | None = None,
+        target_language: str | None = None,
     ) -> LLMLessonReport | None:
         if not self.available:
             return None
         s = self.settings
+        if target_language and target_language != s.target_language:  # язык конкретного ученика
+            s = dataclasses.replace(s, target_language=target_language)
         if self._client is None:  # бесплатный ИИ: длинную расшифровку сокращаем под небольшое окно модели
             transcript = transcript if len(transcript) <= FREE_MAX_CHARS else \
                 transcript[: FREE_MAX_CHARS // 2] + "\n…\n" + transcript[-FREE_MAX_CHARS // 2:]

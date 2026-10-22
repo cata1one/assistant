@@ -1,5 +1,6 @@
 import { CheckCircle2, Headphones, Pause, Volume2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ttsOf } from "../lib/langs.js";
 import { ErrorBox } from "../ui/kit.jsx";
 
 /** Озвучка браузером (бесплатно, без сервера). Голос зависит от устройства. */
@@ -122,7 +123,7 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
             <ul className="grid gap-2 sm:grid-cols-2">
               {b.items.map((w) => (
                 <li key={w.word} className="flex items-center gap-2 rounded-2xl bg-cream px-3 py-2">
-                  <button type="button" onClick={() => speak(w.word.replace(/\s*\(.*\)$/, ""), unit.language === "zh" ? "zh-CN" : "en-US")} aria-label={`Произнести ${w.word}`} className="text-brand"><Volume2 size={16} /></button>
+                  <button type="button" onClick={() => speak(w.word.replace(/\s*\(.*\)$/, ""), ttsOf(unit.language))} aria-label={`Произнести ${w.word}`} className="text-brand"><Volume2 size={16} /></button>
                   <b>{w.word}</b>{w.translation && <span className="text-ink-mute">— {w.translation}</span>}
                 </li>
               ))}

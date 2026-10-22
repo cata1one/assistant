@@ -360,6 +360,9 @@ class Units:
         acc = self._owner(viewer)
         if not isinstance(body, dict):
             raise PortalError(400, "нужен JSON-объект")
+        from .billing import require_active
+
+        require_active(self.storage, acc["id"])
         if unit_id:
             u = self.accessible(viewer, unit_id)
             if u["owner_id"] != acc["id"] and acc["role"] != "school":

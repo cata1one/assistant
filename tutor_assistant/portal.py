@@ -237,8 +237,8 @@ class Portal:
     # -- кабинет ------------------------------------------------------------------
     def me(self, viewer: Viewer) -> dict[str, Any]:
         accesses = self.accesses(viewer)
-        chats = [a.to_dict(self.storage.get_classroom(a.chat_id), self.settings.bot_username or None)
-                 for a in accesses]
+        chats = [{**a.to_dict(self.storage.get_classroom(a.chat_id), self.settings.bot_username or None),
+                  "language": self.storage.chat_language(a.chat_id) or self.settings.target_language} for a in accesses]
         lessons = self.storage.lessons_for_chats([a.chat_id for a in accesses], limit=200)
         by_chat = {a.chat_id: a for a in accesses}
         items = []
@@ -343,6 +343,9 @@ class Portal:
         access = self._access(viewer, chat_id)
         if access.role not in (TUTOR, ADMIN):
             raise PortalError(403, "доску создаёт преподаватель")
+        from .billing import require_active
+
+        require_active(self.storage, viewer.user_id)
         clean = (title or "").strip()[:80] or "Доска"
         verdict = self.assistant.moderate(clean)
         if verdict.is_violation:
@@ -593,6 +596,14 @@ def _validate_obj(data: Any) -> dict[str, Any]:
         out["src"] = src
         title = data.get("title", "")
         out["title"] = title[:120] if isinstance(title, str) else ""
+        crop = data.get("crop")  # обрезка картинки: [x, y, ширина, высота] в долях исходника
+        if typ == "image" and crop is not None:
+            if not isinstance(crop, list) or len(crop) != 4 or not all(
+                    isinstance(c, (int, float)) and not isinstance(c, bool) and c == c for c in crop):
+                raise PortalError(400, "обрезка — четыре числа")
+            x, y = min(0.98, max(0.0, crop[0])), min(0.98, max(0.0, crop[1]))
+            w, h = min(1 - x, max(0.02, crop[2])), min(1 - y, max(0.02, crop[3]))
+            out["crop"] = [round(x, 4), round(y, 4), round(w, 4), round(h, 4)]
     elif typ in ("video", "link"):
         from .learning import video_embed
 

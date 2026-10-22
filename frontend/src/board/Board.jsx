@@ -1,10 +1,11 @@
 import {
-  ArrowUpRight, Circle, Eraser, FileText, Film, FolderOpen, Hand, Highlighter, ImagePlus, Link2, Maximize, Minus,
+  ArrowUpRight, Crop as CropIcon, Circle, Eraser, FileText, Film, FolderOpen, Hand, Highlighter, ImagePlus, Link2, Maximize, Minus,
   MousePointer2, Pencil, Plus, Smile, Square, StickyNote, Trash2, Type, Undo2,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getToken, request } from "../lib/api.js";
 import { Modal } from "../ui/kit.jsx";
+import CropDialog from "./Crop.jsx";
 import { PACKS, stickerById } from "./stickers.js";
 
 /*
@@ -80,6 +81,15 @@ const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, active
     );
   }
   if (o.type === "image") {
+    if (o.crop) { // обрезанная картинка: показываем только выбранную часть
+      const [cx, cy, cw, ch] = o.crop;
+      return (
+        <div data-oid={o.oid} className={`${cls} overflow-hidden rounded-lg`} style={style}>
+          <img alt={o.title || ""} draggable="false" src={o.src} className="pointer-events-none absolute max-w-none"
+            style={{ width: `${100 / cw}%`, height: `${100 / ch}%`, left: `${(-cx / cw) * 100}%`, top: `${(-cy / ch) * 100}%` }} />
+        </div>
+      );
+    }
     return <div data-oid={o.oid} className={cls} style={style}><img alt={o.title || ""} draggable="false" src={o.src} className="pointer-events-none h-full w-full rounded-lg object-contain" /></div>;
   }
   if (o.type === "video") {
@@ -121,7 +131,10 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   const [view, setView] = useState({ x: 80, y: 60, z: 1 });
   const viewRef = useRef(view);
   viewRef.current = view;
-  const [tool, setTool] = useState("select");
+  // На телефоне и планшете палец сразу рисует: иначе непонятно, почему доска только двигается
+  const [cropping, setCropping] = useState(null);
+  const picked = useRef(false); // инструмент выбран вручную
+  const [tool, setTool] = useState(() => (window.matchMedia?.("(pointer: coarse)").matches ? "pen" : "select"));
   const [color, setColor] = useState(COLORS[0]);
   const [noteColor, setNoteColor] = useState(NOTE_COLORS[0]);
   const [width, setWidth] = useState(4);
@@ -247,6 +260,14 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
     const p = toWorld(e);
     const hitEl = e.target.closest?.("[data-oid]");
     const hit = hitEl ? objsRef.current.get(hitEl.dataset.oid) : null;
+    // Палец на пустом месте, а инструмент ещё не выбирали — рисуем: так ожидают на телефоне
+    if (e.pointerType === "touch" && !picked.current && tool === "select" && !hit) {
+      picked.current = true;
+      setTool("pen");
+      gesture.current = { kind: "draw" };
+      setDraft({ type: "stroke", pts: [p], color, width, marker: false });
+      return;
+    }
     const pan = tool === "hand" || spaceDown.current || e.button === 1;
     if (pan) { gesture.current = { kind: "pan", sx: e.clientX, sy: e.clientY, v: viewRef.current }; return; }
     if (e.target.classList?.contains("board-handle") && selected) {
@@ -460,9 +481,9 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
       </div>
 
       {/* Инструменты — слева, как в Miro */}
-      <div className="glass absolute left-3 top-1/2 flex -translate-y-1/2 flex-col gap-1 rounded-2xl p-1.5" role="toolbar" aria-label="Инструменты доски">
+      <div className="glass absolute left-2 top-1/2 flex max-h-[calc(100%-1.5rem)] -translate-y-1/2 flex-col gap-1 overflow-y-auto rounded-2xl p-1.5 sm:left-3" style={{ touchAction: "pan-y" }} role="toolbar" aria-label="Инструменты доски">
         {TOOLS.map(([id, Icon, title]) => (
-          <button key={id} type="button" title={title} aria-label={title} aria-pressed={tool === id} onClick={() => setTool(id)}
+          <button key={id} type="button" title={title} aria-label={title} aria-pressed={tool === id} onClick={() => { picked.current = true; setTool(id); }}
             className={`grid h-9 w-9 place-items-center rounded-xl transition ${tool === id ? "bg-brand text-white" : "text-ink-soft hover:bg-white"}`}>
             <Icon size={18} />
           </button>
@@ -491,6 +512,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
         {sel && tool === "select" && (
           <>
             <span className="mx-1 h-5 w-px bg-line" />
+            {sel.type === "image" && <button type="button" className="btn-ghost btn-sm !px-2" title="Обрезать" aria-label="Обрезать картинку" onClick={() => setCropping(sel)}><CropIcon size={15} /></button>}
             <button type="button" className="btn-ghost btn-sm !px-2" title="Удалить" onClick={() => { remove(sel.oid); setSelected(null); }}><Trash2 size={15} /></button>
           </>
         )}
@@ -509,6 +531,16 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
       {panel === "stickers" && <StickerPanel onPick={addSticker} onClose={() => setPanel(null)} />}
       <MaterialsPicker open={panel === "materials"} onClose={() => setPanel(null)} onPick={addMaterial} />
       <VideoDialog open={panel === "video"} onClose={() => setPanel(null)} onAdd={(url, title) => { place({ type: "video", url, title, w: 480, h: 310 }); setPanel(null); }} />
+      {cropping && (
+        <CropDialog src={cropping.src} crop={cropping.crop} onClose={() => setCropping(null)} onApply={(crop) => {
+          const o = cropping;
+          const [, , ow, oh] = o.crop || [0, 0, 1, 1];
+          const [, , nw, nh] = crop || [0, 0, 1, 1];
+          // масштаб на доске сохраняется: тот же размер одного пикселя исходника
+          put({ ...o, crop: crop || undefined, w: Math.max(30, (o.w / ow) * nw), h: Math.max(24, (o.h / oh) * nh) });
+          setCropping(null);
+        }} />
+      )}
     </div>
   );
 }

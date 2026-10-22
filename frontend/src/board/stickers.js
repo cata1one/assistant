@@ -39,6 +39,42 @@ const DRAWN = {
   "sc-book": svg('<path d="M8 22q22-8 42 4v62q-20-12-42-4z" fill="#3D63F5"/><path d="M92 22q-22-8-42 4v62q20-12 42-4z" fill="#5B7CF7"/><path d="M50 26v62" stroke="#2A47C9" stroke-width="3"/>'),
   "sc-pencil": svg('<path d="M18 82l8-22 46-46 14 14-46 46z" fill="#FFC24B"/><path d="M72 14l14 14 6-6-14-14z" fill="#FF8A9A"/><path d="M18 82l8-22 14 14z" fill="#F5D7A4"/><path d="M18 82l3-8 5 5z" fill="#1E2235"/>'),
   "sc-globe": svg('<circle cx="50" cy="50" r="40" fill="#5BA8F0"/><path d="M30 26q12 6 8 18t10 12q8 8 2 20M62 16q-6 12 8 16t12 18" fill="none" stroke="#22B07D" stroke-width="9" stroke-linecap="round"/>'),
+  // Похвала на других языках
+  "pr-muybien": badge("¡Muy bien!", "#F2643D", "#D44A24", "#fff", 14),
+  "pr-tresbien": badge("Très bien !", "#3D63F5", "#2A47C9", "#fff", 14),
+  "pr-moltobene": badge("Molto bene!", "#22B07D", "#178a61", "#fff", 13),
+  "pr-muitobem": badge("Muito bem!", "#FFC24B", "#E0A22A", "#1E2235", 14),
+  "pr-bravo-sr": badge("Браво!", "#8B7CF6", "#6a5ad8", "#fff", 17),
+  "pr-bravo-gr": badge("Μπράβο!", "#5BA8F0", "#3a86d0", "#fff", 16),
+  "pr-shabash": badge("शाबाश!", "#FF8A2B", "#d96d14", "#fff", 18),
+  "pr-ahsant": badge("أحسنت!", "#2E9E5B", "#217a45", "#fff", 18),
+  "pr-super": badge("Super!", "#FF5C7A", "#d93d5c", "#fff", 17),
+  "pr-wow": badge("WOW!", "#1E2235", "#000", "#FFC24B", 19),
+  // Эмоции
+  "em-happy": svg('<circle cx="50" cy="50" r="42" fill="#FFC24B"/><circle cx="36" cy="42" r="5" fill="#1E2235"/><circle cx="64" cy="42" r="5" fill="#1E2235"/><path d="M30 58q20 22 40 0" stroke="#1E2235" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="26" cy="58" r="6" fill="#FF8A9A" opacity=".7"/><circle cx="74" cy="58" r="6" fill="#FF8A9A" opacity=".7"/>'),
+  "em-love": svg('<circle cx="50" cy="50" r="42" fill="#FFC24B"/><path d="M36 46s-10-6-10-12a5 5 0 0 1 10-1 5 5 0 0 1 10 1c0 6-10 12-10 12zM64 46s-10-6-10-12a5 5 0 0 1 10-1 5 5 0 0 1 10 1c0 6-10 12-10 12z" fill="#E53935"/><path d="M32 60q18 18 36 0" stroke="#1E2235" stroke-width="6" fill="none" stroke-linecap="round"/>'),
+  "em-think": svg('<circle cx="50" cy="50" r="42" fill="#FFC24B"/><circle cx="36" cy="42" r="5" fill="#1E2235"/><circle cx="64" cy="42" r="5" fill="#1E2235"/><path d="M28 32l14-4M58 28l14 4" stroke="#1E2235" stroke-width="4" stroke-linecap="round"/><path d="M38 66h24" stroke="#1E2235" stroke-width="6" stroke-linecap="round"/><path d="M70 78q10-4 8-14" stroke="#E0A22A" stroke-width="8" fill="none" stroke-linecap="round"/>'),
+  "em-cool": svg('<circle cx="50" cy="50" r="42" fill="#FFC24B"/><path d="M20 38h60v6q-2 14-16 14t-14-12h0q0 12-14 12T20 44z" fill="#1E2235"/><path d="M34 66q16 12 32 0" stroke="#1E2235" stroke-width="6" fill="none" stroke-linecap="round"/>'),
+  "em-wow": svg('<circle cx="50" cy="50" r="42" fill="#FFC24B"/><circle cx="36" cy="40" r="7" fill="#fff"/><circle cx="64" cy="40" r="7" fill="#fff"/><circle cx="36" cy="40" r="4" fill="#1E2235"/><circle cx="64" cy="40" r="4" fill="#1E2235"/><ellipse cx="50" cy="66" rx="9" ry="12" fill="#1E2235"/>'),
+  // Весна и лето
+  "sp-flower": svg('<g fill="#FF8AB3"><circle cx="50" cy="26" r="16"/><circle cx="74" cy="44" r="16"/><circle cx="65" cy="72" r="16"/><circle cx="35" cy="72" r="16"/><circle cx="26" cy="44" r="16"/></g><circle cx="50" cy="52" r="13" fill="#FFC24B"/>'),
+  "sp-tulip": svg('<path d="M50 92V50" stroke="#2E9E5B" stroke-width="6"/><path d="M50 74q-20-2-24-20 16 0 24 14zM50 80q18-4 22-20-14 2-22 14z" fill="#3F9E4B"/><path d="M30 20l10 12 10-16 10 16 10-12v18a20 20 0 0 1-40 0z" fill="#E53935"/>'),
+  "sp-butterfly": svg('<path d="M50 30q-30-26-38 2-4 20 38 18zM50 30q30-26 38 2 4 20-38 18zM50 52q-26 2-28 20 6 14 28-6zM50 52q26 2 28 20-6 14-28-6z" fill="#8B7CF6"/><circle cx="30" cy="34" r="6" fill="#FFC24B"/><circle cx="70" cy="34" r="6" fill="#FFC24B"/><rect x="47" y="24" width="6" height="56" rx="3" fill="#1E2235"/>'),
+  "su-icecream": svg('<path d="M32 50l18 44 18-44z" fill="#E0A96D"/><path d="M36 54l28 0M40 64h20" stroke="#b8834a" stroke-width="3"/><circle cx="40" cy="40" r="14" fill="#FF8AB3"/><circle cx="60" cy="40" r="14" fill="#BFE3FF"/><circle cx="50" cy="26" r="14" fill="#FFF1C2"/><circle cx="50" cy="12" r="5" fill="#E53935"/>'),
+  "su-watermelon": svg('<path d="M10 40a40 40 0 0 0 80 0z" fill="#2E9E5B"/><path d="M16 40a34 34 0 0 0 68 0z" fill="#FF5C7A"/><g fill="#1E2235"><ellipse cx="36" cy="54" rx="2.5" ry="4"/><ellipse cx="50" cy="60" rx="2.5" ry="4"/><ellipse cx="64" cy="54" rx="2.5" ry="4"/></g>'),
+  // Космос
+  "sx-rocket": svg('<path d="M50 6q24 20 18 58H32Q26 26 50 6z" fill="#EEF1F8" stroke="#C9CCE0" stroke-width="3"/><circle cx="50" cy="38" r="9" fill="#5BA8F0" stroke="#3D63F5" stroke-width="3"/><path d="M32 52l-14 18h16zM68 52l14 18H66z" fill="#E53935"/><path d="M40 66q10 34 20 0z" fill="#FF8A2B"/>'),
+  "sx-planet": svg('<circle cx="50" cy="50" r="28" fill="#8B7CF6"/><ellipse cx="50" cy="50" rx="46" ry="12" fill="none" stroke="#FFC24B" stroke-width="6" transform="rotate(-18 50 50)"/><circle cx="40" cy="40" r="6" fill="#fff" opacity=".35"/>'),
+  "sx-star": svg('<path d="M50 4l6 34 34 6-34 6-6 34-6-34-34-6 34-6z" fill="#FFC24B"/>'),
+  // Животные
+  "an-cat": svg('<path d="M20 40L24 10l20 18h12l20-18 4 30v20a30 28 0 0 1-60 0z" fill="#FF9F45"/><circle cx="38" cy="52" r="5" fill="#1E2235"/><circle cx="62" cy="52" r="5" fill="#1E2235"/><path d="M46 62h8l-4 5z" fill="#FF5C7A"/><path d="M14 62h18M14 70h18M68 62h18M68 70h18" stroke="#1E2235" stroke-width="2"/>'),
+  "an-fox": svg('<path d="M10 20l30 20h20l30-20-8 40-32 30-32-30z" fill="#FF8A2B"/><path d="M26 58l24 32 24-32-24 8z" fill="#fff"/><circle cx="36" cy="50" r="4" fill="#1E2235"/><circle cx="64" cy="50" r="4" fill="#1E2235"/><circle cx="50" cy="86" r="5" fill="#1E2235"/>'),
+  "an-panda": svg('<circle cx="24" cy="24" r="14" fill="#1E2235"/><circle cx="76" cy="24" r="14" fill="#1E2235"/><circle cx="50" cy="54" r="38" fill="#fff" stroke="#C9CCE0" stroke-width="3"/><ellipse cx="34" cy="50" rx="10" ry="13" fill="#1E2235"/><ellipse cx="66" cy="50" rx="10" ry="13" fill="#1E2235"/><circle cx="34" cy="48" r="3" fill="#fff"/><circle cx="66" cy="48" r="3" fill="#fff"/><ellipse cx="50" cy="68" rx="7" ry="5" fill="#1E2235"/>'),
+  // Еда и праздник
+  "fd-pizza": svg('<path d="M50 92L12 18q38-18 76 0z" fill="#FFC24B"/><path d="M12 18q38-18 76 0l-6 12q-32-14-64 0z" fill="#E0A96D"/><g fill="#E53935"><circle cx="44" cy="40" r="7"/><circle cx="60" cy="54" r="6"/><circle cx="48" cy="68" r="5"/></g>'),
+  "fd-cupcake": svg('<path d="M24 52h52l-8 40H32z" fill="#5BA8F0"/><path d="M30 52v40M42 52v40M58 52v40M70 52v40" stroke="#3D63F5" stroke-width="2"/><path d="M18 54q0-30 32-34 32 4 32 34z" fill="#FF8AB3"/><circle cx="50" cy="14" r="7" fill="#E53935"/>'),
+  "bd-cake": svg('<rect x="16" y="50" width="68" height="40" rx="6" fill="#FF8AB3"/><path d="M16 62q11 8 22 0t22 0 24 0" stroke="#fff" stroke-width="5" fill="none"/><rect x="24" y="38" width="52" height="14" rx="4" fill="#FFF1C2"/><g fill="#5BA8F0"><rect x="36" y="20" width="5" height="18"/><rect x="48" y="20" width="5" height="18"/><rect x="60" y="20" width="5" height="18"/></g><g fill="#FFC24B"><ellipse cx="38.5" cy="15" rx="3" ry="5"/><ellipse cx="50.5" cy="15" rx="3" ry="5"/><ellipse cx="62.5" cy="15" rx="3" ry="5"/></g>'),
+  "bd-balloon": svg('<ellipse cx="50" cy="38" rx="28" ry="32" fill="#E53935"/><path d="M46 70h8l-4 6z" fill="#B71C1C"/><path d="M50 76q-8 10 0 20" stroke="#6B7280" stroke-width="2" fill="none"/><ellipse cx="40" cy="26" rx="6" ry="10" fill="#fff" opacity=".4"/>'),
   // Погода
   "wx-sun": svg('<circle cx="50" cy="50" r="20" fill="#FFC24B"/><g stroke="#FFC24B" stroke-width="7" stroke-linecap="round"><path d="M50 8v12M50 80v12M8 50h12M80 50h12M20 20l9 9M71 71l9 9M80 20l-9 9M29 71l-9 9"/></g>'),
   "wx-cloud": svg('<path d="M28 76a18 18 0 0 1 0-36 24 24 0 0 1 46-2 19 19 0 0 1 0 38z" fill="#fff" stroke="#C9D6EA" stroke-width="3"/>'),
@@ -54,9 +90,17 @@ const EMOJI = {
   "Животные": ["🐶", "🐱", "🦊", "🐼", "🐸", "🦄", "🐰", "🐻", "🐧", "🦋"],
   "Путешествия": ["✈️", "🗽", "🗼", "🏯", "🗺️", "🧳", "🚂", "🏖️", "🎡", "🚀"],
   "Реакции": ["⭐", "❤️", "👍", "🔥", "💯", "🎉", "👏", "😊", "🤔", "✅"],
+  "Эмоции": ["😀", "😂", "🥰", "😎", "🤩", "😴", "😱", "🥳", "🤓", "😇"],
+  "Весна и лето": ["🌷", "🌸", "🌻", "🐝", "🍓", "🏝️", "🌈", "🍉", "🕶️", "⛱️"],
+  "Осень": ["🍂", "🍁", "🍄", "🌰", "☔", "🧣", "🍎", "🦔", "🎃", "☕"],
+  "Космос": ["🚀", "🪐", "🌙", "⭐", "☄️", "👽", "🛸", "🌍", "🔭", "🌌"],
+  "Спорт и хобби": ["⚽", "🏀", "🎾", "🏊", "🚴", "🎸", "🎹", "🎮", "📷", "🧩"],
+  "День рождения": ["🎂", "🎈", "🎁", "🥳", "🎉", "🕯️", "🍰", "🎊", "👑", "💝"],
+  "Языки и страны": ["🇬🇧", "🇺🇸", "🇨🇳", "🇪🇸", "🇫🇷", "🇮🇹", "🇵🇹", "🇧🇷", "🇷🇸", "🇬🇷", "🇮🇳", "🇸🇦", "🇦🇪", "🇲🇽"],
 };
 
-const PACK_OF = { hw: "Хэллоуин", ny: "Новый год", cny: "Китайский Новый год", pr: "Похвала", sc: "Школа", wx: "Погода" };
+const PACK_OF = { hw: "Хэллоуин", ny: "Новый год", cny: "Китайский Новый год", pr: "Похвала", sc: "Школа", wx: "Погода",
+  em: "Эмоции", sp: "Весна и лето", su: "Весна и лето", sx: "Космос", an: "Животные", fd: "Еда", bd: "День рождения" };
 
 export const PACKS = (() => {
   const packs = {};

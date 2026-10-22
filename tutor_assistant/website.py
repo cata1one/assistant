@@ -126,6 +126,11 @@ class Website:
         ("GET", re.compile(r"^/site/v1/students$"), "students", True),
         ("POST", re.compile(r"^/site/v1/students$"), "student_add", True),
         ("POST", re.compile(r"^/site/v1/students/(?P<id>[0-9a-f]+)/remove$"), "student_remove", True),
+        ("POST", re.compile(r"^/site/v1/students/(?P<id>[0-9a-f]+)/language$"), "student_language", True),
+        ("POST", re.compile(r"^/site/v1/admin/billing$"), "admin_billing", True),
+        ("POST", re.compile(r"^/site/v1/account/prefs$"), "account_prefs", True),
+        ("POST", re.compile(r"^/site/v1/feedback$"), "feedback", True),
+        ("GET", re.compile(r"^/site/v1/admin/feedback$"), "admin_feedback", True),
         ("GET", re.compile(r"^/site/v1/school$"), "school", True),
         ("POST", re.compile(r"^/site/v1/school$"), "school_update", True),
         # материалы, ДЗ, карточки
@@ -494,6 +499,21 @@ class Website:
 
     def unit_check(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
         return self.units_service.check(viewer, id, body)
+
+    def admin_billing(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.accounts.admin_extend(viewer, body)
+
+    def account_prefs(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.accounts.update_prefs(viewer, body)
+
+    def feedback(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.community.feedback(viewer, body)
+
+    def admin_feedback(self, viewer: Any, **_: Any) -> Any:
+        return self.community.feedback_list(viewer)
+
+    def student_language(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.accounts.set_language(viewer, id, body)
 
     def cards(self, viewer: Any, **_: Any) -> Any:
         return self.learning.cards(viewer)

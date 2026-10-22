@@ -86,7 +86,7 @@ def test_tutor_invites_student_and_parent(env):
     roles = {a.role for a in env["portal"].accesses(student)}
     assert roles == {"student"} and {a.role for a in env["portal"].accesses(parent)} == {"parent"}
     lst = env["acc"].students(tutor)
-    assert lst["students"][0]["joined"] and lst["students"][0]["parents"] == 1 and lst["limit"] == 3
+    assert lst["students"][0]["joined"] and lst["students"][0]["parents"] == 1 and lst["limit"] is None
     other, _ = reg(env, "student", "other@mail.ru")
     with pytest.raises(PortalError):
         env["acc"].join(other, added["invite"]["code"])  # приглашение одноразовое
@@ -96,13 +96,59 @@ def test_tutor_invites_student_and_parent(env):
         env["acc"].add_student(student, {"name": "Петя"})  # ученик не добавляет учеников
 
 
-def test_free_plan_limit(env):
-    tutor, _ = reg(env, "tutor", "t@mail.ru")
-    for i in range(3):
-        env["acc"].add_student(tutor, {"name": f"Ученик{i}"})
+def test_trial_payment_and_referral(env):
+    from tutor_assistant.portal import Viewer
+
+    acc, storage = env["acc"], env["a"].storage
+    tutor, res = reg(env, "tutor", "t@mail.ru")
+    b = res["account"]["billing"]
+    assert b["state"] == "trial" and b["plan"] == "teacher" and b["days_left"] >= 2
+    for i in range(5):  # в пробный период — все функции, без лимита учеников
+        acc.add_student(tutor, {"name": f"Ученик{i}"})
+    storage.update_account(tutor.user_id, trial_until="2020-01-01T00:00:00+00:00")
     with pytest.raises(PortalError) as e:
-        env["acc"].add_student(tutor, {"name": "Четвёртый"})
+        acc.add_student(tutor, {"name": "Шестой"})
     assert e.value.status == 402
+    # коллега регистрируется по реферальной ссылке
+    code = acc.public(tutor.user_id)["referral"]["code"]
+    friend, _ = reg(env, "tutor", "friend@mail.ru", ref=code)
+    assert acc.public(tutor.user_id)["referral"]["invited"] == 1
+    admin = Viewer("999", True)
+    with pytest.raises(PortalError):
+        acc.admin_extend(tutor, {"email": "friend@mail.ru", "months": 1})
+    acc.admin_extend(admin, {"email": "friend@mail.ru", "months": 1})
+    ref = acc.public(tutor.user_id)["referral"]
+    assert ref["paid"] == 1 and ref["discounts"] == 1
+    out = acc.admin_extend(admin, {"email": "t@mail.ru", "months": 12, "use_discount": True})
+    assert out["price"] == 1440 and out["discount_used"]  # 2 880 ₽ за год со скидкой 50%
+    assert acc.public(tutor.user_id)["billing"]["state"] == "active"
+    assert acc.public(tutor.user_id)["referral"]["discounts"] == 0
+    acc.add_student(tutor, {"name": "Шестой"})
+    # ученик и родитель не платят
+    student, _ = reg(env, "student", "s@mail.ru")
+    assert acc.public(student.user_id)["billing"]["state"] == "free"
+
+
+def test_school_pays_for_its_tutors(env):
+    acc, storage = env["acc"], env["a"].storage
+    school, _ = reg(env, "school", "o@school.ru", "Ирина", school_name="Lingua")
+    tutor, _ = reg(env, "tutor", "k@school.ru", "Катя", invite=acc.school(school)["tutor_invite"]["code"])
+    assert acc.public(tutor.user_id)["billing"]["by_school"]
+    storage.update_account(school.user_id, trial_until="2020-01-01T00:00:00+00:00")
+    with pytest.raises(PortalError) as e:
+        acc.add_student(tutor, {"name": "Петя"})
+    assert "школа" in e.value.message
+
+
+def test_feedback_and_prefs(env):
+    tutor, _ = reg(env, "tutor", "t@mail.ru")
+    assert env["c"].feedback(tutor, {"kind": "idea", "text": "Добавьте ещё стикеров!"})["id"]
+    with pytest.raises(PortalError):
+        env["c"].feedback(tutor, {"text": "a"})
+    student, _ = reg(env, "student", "s@mail.ru", "Миша")
+    me = env["acc"].update_prefs(student, {"theme": "space", "avatar": "sx-rocket", "stickers": ["em-happy"], "motto": "Учу испанский"})
+    assert me["account"]["prefs"] == {"theme": "space", "avatar": "sx-rocket", "stickers": ["em-happy"], "motto": "Учу испанский"}
+    assert env["acc"].update_prefs(student, {"theme": "hack"})["account"]["prefs"]["theme"] == "default"
 
 
 def test_private_tutor_is_not_filtered(env):
@@ -262,3 +308,28 @@ def test_cards_from_lesson_words(env):
         lrn.review(student, {"key": "nope", "grade": "good"})
     with pytest.raises(PortalError):
         lrn.cards(tutor)  # карточки — для учеников
+
+
+def test_student_language_drives_report(env):
+    acc, a = env["acc"], env["a"]
+    tutor, _ = reg(env, "tutor", "t@mail.ru")
+    added = acc.add_student(tutor, {"name": "Хуан", "language": "es"})
+    assert acc.students(tutor)["students"][0]["language"] == "es"
+    with pytest.raises(PortalError):
+        acc.set_language(tutor, added["pair_id"], {"language": "klingon"})
+    chat = f"pair:{added['pair_id']}"
+    lesson = a.start_lesson(chat_id=chat, tutor_id=tutor.user_id)
+    a.process_message(lesson["id"], tutor.user_id, "Анна", "Новые слова: la casa — дом, el perro — собака")
+    report = a.finish_lesson(lesson["id"], use_llm=False)
+    assert report.target_language == "es" and {"la casa", "el perro"} <= {w.word for w in report.vocabulary}
+    acc.set_language(tutor, added["pair_id"], {"language": "fr"})
+    assert acc.students(tutor)["students"][0]["language"] == "fr"
+
+
+def test_tutor_comments_homework(env):
+    tutor, student, parent, added = private_pair(env)
+    lrn = env["l"]
+    hw = lrn.assign(tutor, {"chat_id": f"pair:{added['pair_id']}", "text": "Упр. 3"})["id"]
+    lrn.update_homework(tutor, hw, {"comment": "Отлично, но повтори Past Simple"})
+    assert lrn.homework(student)["homework"][0]["comment"] == "Отлично, но повтори Past Simple"
+    assert lrn.homework(parent)["homework"][0]["comment"]

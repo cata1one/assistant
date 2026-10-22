@@ -13,7 +13,8 @@ import Room from "./Room.jsx";
 import { AdminPage, SchoolHome, SchoolLessonsPage, SignalsPage, TutorsPage } from "./school.jsx";
 import { HomeworkPage } from "./homework.jsx";
 import { CardsPage, ParentHome, StudentHome } from "./student.jsx";
-import { MaterialsPage, PlanPage, StudentsPage, TutorHome } from "./tutor.jsx";
+import { BillingStatus, MaterialsPage, PlanPage, StudentsPage, TutorHome } from "./tutor.jsx";
+import { THEMES } from "./decor.jsx";
 import { DoUnit, UnitEditor, UnitsPage } from "./units.jsx";
 import { WordsPage } from "./vocab.jsx";
 
@@ -57,6 +58,7 @@ const NAV = {
     ["lessons", "Уроки", BookOpen, SchoolLessonsPage],
     ["units", "Занятия", Layers, UnitsPage],
     ["materials", "База материалов", FileStack, MaterialsPage],
+    ["plan", "Тариф", CreditCard, PlanPage],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, true],
     ["profile", "Профиль", Settings, ProfilePage],
   ],
@@ -142,11 +144,12 @@ export default function AppShell({ route }) {
   let Page = items.find(([id]) => id === current)?.[3];
   if (!Page && area === "app") { current = "home"; Page = items[0][3]; }
   return (
-    <div className="flex min-h-screen bg-cream">
+    <div className="flex min-h-screen bg-cream" style={session.role === "student" ? { background: (THEMES[session.account?.prefs?.theme] || THEMES.default).bg } : undefined}>
       <Sidebar items={items} current={current} session={session} />
       <div className="min-w-0 flex-1">
         <MobileHeader items={items} current={current} brand={brandOf(session.role)} />
         <main className={`mx-auto px-4 pb-28 pt-6 md:px-8 lg:pb-10 ${area === "board" ? "max-w-none" : "max-w-6xl"}`}>
+          {["tutor", "school"].includes(session.role) && session.account?.billing?.state !== "active" && area === "app" && sub !== "plan" && <BillingStatus billing={session.account?.billing} compact />}
           {area === "lesson" && sub ? <Lesson id={sub} /> : area === "board" ? <BoardPage params={route.params} />
             : sub === "units" && third ? <UnitEditor id={third} /> : sub === "do" && third ? <DoUnit hwId={third} /> : <Page />}
         </main>

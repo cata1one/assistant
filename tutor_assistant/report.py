@@ -110,7 +110,7 @@ def build_report(
     llm_result: LLMLessonReport | None = None
     if llm is not None and llm.available and utterances:
         llm_result = llm.generate_lesson_report(
-            transcript=utterances_to_text(utterances),
+            transcript=utterances_to_text(utterances), target_language=settings.target_language,
             announced_words=[f"{v.word} — {v.translation}" if v.translation else v.word for v in announced],
             assigned_homework=[t.text for t in assigned],
             known_words=known,

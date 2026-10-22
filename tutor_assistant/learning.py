@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from . import billing
 from .models import HomeworkTask, VocabItem, word_key
 from .portal import PARENT, Portal, PortalError, Viewer, _field, _lines
 from .relay import STUDENT, TUTOR
@@ -204,6 +205,7 @@ class Learning:
         if not isinstance(body, dict):
             raise PortalError(400, "нужен JSON-объект")
         access = self._tutor_access(viewer, body.get("chat_id"))
+        billing.require_active(self.storage, viewer.user_id)
         unit = None
         if body.get("unit_id"):
             from .units import Units  # занятия используют этот модуль — импорт здесь, без цикла
@@ -246,7 +248,8 @@ class Learning:
             mats = [self._public_material(m) for m in (self.storage.get_material(x) for x in r["materials"]) if m]
             unit = self.storage.get_unit(r["unit_id"]) if r.get("unit_id") else None
             result = r.get("result")
-            out.append({**{k: r[k] for k in ("id", "chat_id", "text", "due", "status", "answer", "created_at", "done_at")},
+            out.append({**{k: r.get(k) for k in ("id", "chat_id", "text", "due", "status", "answer", "comment", "created_at",
+                                                     "done_at")},
                         "materials": mats, "role": a.role,
                         "attachments": [f for f in (self._public_file(x) for x in r["attachments"]) if f],
                         "unit": {"id": unit["id"], "title": unit["title"]} if unit else None,
@@ -278,10 +281,16 @@ class Learning:
                                      f"✅ {access.pair.student_alias} выполнил домашнее задание: {row['text'][:120]}")
         elif access.role == TUTOR and status == "delete":
             self.storage.delete_assignment(assignment_id)
-        elif access.role == TUTOR and (status in ("checked", "open") or "text" in body):
+        elif access.role == TUTOR and (status in ("checked", "open") or "text" in body or "comment" in body):
             fields: dict[str, Any] = {}
             if status:
                 fields["status"] = status
+            if "comment" in body:  # обратная связь ученику: что получилось, над чем поработать
+                fields["comment"] = _lines(body, "comment", 2000)
+                self._check_text(row["chat_id"], fields["comment"])
+                if fields["comment"]:
+                    self.portal.telegram(access.pair.student_user_id, f"💬 {access.pair.tutor_alias} оценил домашнее "
+                                         f"задание: {fields['comment'][:600]}")
             if "text" in body:  # преподаватель правит задание
                 fields["text"] = _lines(body, "text", 3000, required=True)
                 fields["due"] = _field(body, "due", 20)

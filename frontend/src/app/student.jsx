@@ -1,9 +1,12 @@
 import { BookOpen, Layers, NotebookPen, PartyPopper, Repeat, TriangleAlert, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { request } from "../lib/api.js";
+import { ttsOf } from "../lib/langs.js";
 import { useSession } from "../lib/session.js";
 import { Bullets, Empty, ErrorBox, Loading, PageTitle, Stat } from "../ui/kit.jsx";
 import { LessonList, LiveBanner, NotConnected, Panel, useApi } from "./common.jsx";
+import { DecorHeader } from "./decor.jsx";
+import { speak } from "./player.jsx";
 
 // == Ученик ===================================================================================
 export function StudentHome() {
@@ -18,6 +21,7 @@ export function StudentHome() {
     <>
       <PageTitle title={`Привет, ${(account?.name || "").split(" ")[0] || "друг"}!`}
         text={tutors.length ? `Ваш преподаватель: ${tutors.map((t) => t.title).join(", ")}` : null} />
+      <DecorHeader prefs={account?.prefs} name={account?.name} />
       {!tutors.length && <NotConnected />}
       <LiveBanner lessons={lessons} />
       {tutors.length > 0 && (
@@ -56,15 +60,19 @@ const GRADES = [
   ["easy", "Легко", "bg-study-soft text-study hover:brightness-95"],
 ];
 
-function speak(word) {
-  try {
-    const u = new SpeechSynthesisUtterance(word);
-    u.lang = /[一-鿿]/.test(word) ? "zh-CN" : "en-US";
-    window.speechSynthesis.speak(u);
-  } catch { /* озвучка недоступна */ }
+// Язык слова: язык ученика у этого преподавателя, иначе — по алфавиту слова
+function langOf(word, chatId, chats) {
+  const byChat = chats?.find((c) => c.chat_id === chatId)?.language;
+  if (byChat) return byChat;
+  if (/[\u4e00-\u9fff]/.test(word)) return "zh";
+  if (/[\u0600-\u06ff]/.test(word)) return "ar";
+  if (/[\u0900-\u097f]/.test(word)) return "hi";
+  if (/[\u0370-\u03ff]/.test(word)) return "el";
+  return "en";
 }
 
 export function CardsPage() {
+  const { me } = useSession();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [i, setI] = useState(0);
@@ -108,7 +116,7 @@ export function CardsPage() {
               </span>
             ) : <span className="mt-6 text-sm text-ink-mute">Вспомните перевод и нажмите, чтобы проверить (пробел)</span>}
           </button>
-          <div className="mt-3 flex justify-center"><button type="button" className="btn-ghost btn-sm" onClick={() => speak(card.word)}><Volume2 size={15} /> Произнести</button></div>
+          <div className="mt-3 flex justify-center"><button type="button" className="btn-ghost btn-sm" onClick={() => speak(card.word.replace(/\s*\(.*\)$/, ""), ttsOf(langOf(card.word, card.chat_id, me?.chats)))}><Volume2 size={15} /> Произнести</button></div>
           {shown && (
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {GRADES.map(([g, t, cls], n) => <button key={g} type="button" onClick={() => grade(g)} className={`rounded-2xl px-3 py-3 font-bold transition ${cls}`}>{t}<span className="block text-[10px] font-medium opacity-70">{n + 1}</span></button>)}

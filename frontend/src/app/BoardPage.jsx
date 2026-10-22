@@ -10,7 +10,7 @@ export default function BoardPage({ params }) {
   const { data, error } = useApi(id ? `/site/v1/boards/${id}/items?since=0` : null, [id]);
   const staff = data?.role === "tutor" || data?.role === "admin";
   return (
-    <div className="flex h-[calc(100dvh-2rem)] flex-col gap-3">
+    <div className="flex h-[calc(100dvh-12rem)] flex-col gap-3 lg:h-[calc(100dvh-2rem)]">
       <div className="flex flex-wrap items-center gap-3">
         <a href="#/app/boards" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-mute hover:text-ink"><ArrowLeft size={14} /> Доски</a>
         <h1 className="text-xl">{id ? data?.board.title || "Доска" : "Личная доска"}</h1>

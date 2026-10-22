@@ -79,6 +79,10 @@ function HomeworkItem({ h, reload }) {
   const [answer, setAnswer] = useState(h.answer || "");
   const [error, setError] = useState(null);
   const [edit, setEdit] = useState(false);
+  const [comment, setComment] = useState(h.comment || "");
+  const saveComment = async (status) => {
+    try { await request("POST", `/site/v1/homework/${h.id}`, { comment, ...(status ? { status } : {}) }); reload(); } catch (x) { setError(x); }
+  };
   const set = async (status) => {
     try { await request("POST", `/site/v1/homework/${h.id}`, { status, answer }); reload(); } catch (x) { setError(x); }
   };
@@ -123,7 +127,16 @@ function HomeworkItem({ h, reload }) {
         </div>
       )}
       {!student && h.answer && <p className="mt-3 whitespace-pre-wrap rounded-2xl bg-cream p-3 text-sm"><b>Ответ ученика:</b> {h.answer}</p>}
-      {h.role === "tutor" && h.status === "done" && <button type="button" className="btn-brand btn-sm mt-3" onClick={() => set("checked")}><Check size={14} /> Проверено</button>}
+      {h.comment && h.role !== "tutor" && <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-brand/30 bg-brand-tint p-3 text-sm"><b>💬 Комментарий преподавателя:</b> {h.comment}</p>}
+      {h.role === "tutor" && (h.status !== "open" || h.comment) && (
+        <div className="mt-3 grid gap-2">
+          <textarea className="field min-h-[60px] text-sm" maxLength={2000} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Комментарий ученику: что получилось, над чем поработать" aria-label="Комментарий ученику" />
+          <div className="flex flex-wrap gap-2">
+            {h.status === "done" && <button type="button" className="btn-brand btn-sm" onClick={() => saveComment("checked")}><Check size={14} /> Проверено{comment.trim() ? " и отправить комментарий" : ""}</button>}
+            {(h.status === "checked" || comment !== (h.comment || "")) && <button type="button" className="btn-light btn-sm" disabled={comment === (h.comment || "")} onClick={() => saveComment()}>Сохранить комментарий</button>}
+          </div>
+        </div>
+      )}
       <ErrorBox error={error} />
       {edit && <EditHomework h={h} onClose={() => setEdit(false)} reload={reload} />}
     </div>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Tabs } from "../ui/kit.jsx";
+import { LANGS, ttsOf } from "../lib/langs.js";
 import { useApi } from "./common.jsx";
 import UnitPlayer from "./player.jsx";
 
@@ -74,7 +75,8 @@ function BlockEditor({ b, onChange, audios }) {
             <>
               <div className="grid gap-2 sm:grid-cols-2">
                 <select className="field" value={b.lang || "en-US"} onChange={set("lang")} aria-label="Язык озвучки">
-                  <option value="en-US">Английский (американский)</option><option value="en-GB">Английский (британский)</option><option value="zh-CN">Китайский</option>
+                  <option value="en-GB">Английский (британский)</option>
+                  {LANGS.map((l) => <option key={l.id} value={l.tts}>{l.title}</option>)}
                 </select>
                 <select className="field" value={b.audio || ""} onChange={set("audio")} aria-label="Аудиофайл">
                   <option value="">Озвучка текста браузером</option>
@@ -143,7 +145,7 @@ function CreateModal({ ai, onClose }) {
       <div className="grid gap-3">
         <div className="grid gap-3 sm:grid-cols-[1fr_150px_120px]">
           <input className="field" value={f.topic} onChange={set("topic")} maxLength={200} placeholder="Тема: «Путешествия», «IELTS Speaking: работа», «HSK 2: еда»" aria-label="Тема" />
-          <select className="field" value={f.language} onChange={set("language")} aria-label="Язык"><option value="en">Английский</option><option value="zh">Китайский</option></select>
+          <select className="field" value={f.language} onChange={set("language")} aria-label="Язык">{LANGS.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}</select>
           <input className="field" value={f.level} onChange={set("level")} maxLength={20} placeholder="A2, B1, HSK 2" aria-label="Уровень" />
         </div>
         <label className="label">Слова (необязательно)<textarea className="field font-normal" rows={4} value={f.words} onChange={set("words")} placeholder={"luggage — багаж\nboarding pass — посадочный талон"} /></label>
@@ -300,7 +302,7 @@ export function UnitEditor({ id }) {
             <p className="mb-2 text-sm font-semibold">Добавить задание</p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(TYPES).map(([t, label]) => (
-                <button key={t} type="button" className="btn-light btn-sm" onClick={() => setUnit({ ...unit, blocks: [...unit.blocks, { type: t, title: label, lang: unit.language === "zh" ? "zh-CN" : "en-US" }] })}><Plus size={13} /> {label}</button>
+                <button key={t} type="button" className="btn-light btn-sm" onClick={() => setUnit({ ...unit, blocks: [...unit.blocks, { type: t, title: label, lang: ttsOf(unit.language) }] })}><Plus size={13} /> {label}</button>
               ))}
             </div>
           </div>

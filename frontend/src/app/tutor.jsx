@@ -1,14 +1,15 @@
 import {
-  Check, CheckCircle2, Clapperboard, Copy, File, FileStack, Link2, NotebookPen, PenTool, Plus, Search, Trash2, Upload,
+  Check, CheckCircle2, Clapperboard, Copy, File, FileStack, Gift, Link2, NotebookPen, PenTool, Plus, Search, Trash2, Upload,
   UserPlus, Users, Video,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { getToken, request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
-import { PLANS } from "../site/parts.jsx";
+import { PLANS, PricingCards } from "../site/parts.jsx";
 import { Avatar, copy, Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Stat } from "../ui/kit.jsx";
 import { LessonList, LiveBanner, Panel, shortDate, startLesson, useApi } from "./common.jsx";
 import { Vocab } from "./vocab.jsx";
+import { LANGS } from "../lib/langs.js";
 
 function CopyLink({ label, url }) {
   const [done, setDone] = useState(false);
@@ -81,10 +82,14 @@ export function StudentsPage() {
   const [name, setName] = useState("");
   const [added, setAdded] = useState(null);
   const [words, setWords] = useState(null);
+  const [lang, setLang] = useState("en");
+  const setStudentLang = async (s, language) => {
+    try { await request("POST", `/site/v1/students/${s.pair_id}/language`, { language }); reload(); } catch (x) { setErr(x); }
+  };
   const [err, setErr] = useState(null);
   const add = async (e) => {
     e.preventDefault(); setErr(null);
-    try { setAdded({ name, ...(await request("POST", "/site/v1/students", { name })) }); setName(""); reload(); } catch (x) { setErr(x); }
+    try { setAdded({ name, ...(await request("POST", "/site/v1/students", { name, language: lang })) }); setName(""); reload(); } catch (x) { setErr(x); }
   };
   const remove = async (s) => {
     if (!window.confirm(`Удалить ученика «${s.name}»? Уроки и конспекты сохранятся в архиве.`)) return;
@@ -96,7 +101,10 @@ export function StudentsPage() {
     <>
       <PageTitle title="Ученики" text="Ученик и родитель подключаются по ссылкам. Они видят только ваше имя." />
       <form onSubmit={add} className="card mb-4 flex flex-wrap items-end gap-3">
-        <label className="label min-w-[220px] flex-1">Имя ученика<input className="field" required maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Миша" /></label>
+        <label className="label min-w-[200px] flex-1">Имя ученика<input className="field" required maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Миша" /></label>
+        <label className="label">Язык
+          <select className="field" value={lang} onChange={(e) => setLang(e.target.value)}>{LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}</select>
+        </label>
         <button type="submit" className="btn-brand"><UserPlus size={16} /> Добавить</button>
         {data?.limit != null && <span className="w-full text-xs text-ink-mute">Учеников: {list.length} из {data.limit} на вашем тарифе. <a href="#/app/plan" className="link">Тарифы</a></span>}
         {err && <div className="w-full"><ErrorBox error={err} /></div>}
@@ -106,9 +114,12 @@ export function StudentsPage() {
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((s) => (
             <div key={s.pair_id} className="card !p-5">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Avatar name={s.name} />
                 <div className="min-w-0 flex-1"><p className="font-bold">{s.name}</p><p className="text-xs text-ink-mute">{s.joined ? "подключён" : "ещё не подключился"} · родителей: {s.parents}</p></div>
+                <select className="field order-last !w-auto !py-1.5 text-sm sm:order-none" value={s.language} onChange={(e) => setStudentLang(s, e.target.value)} aria-label={`Язык ученика ${s.name}`}>
+                  {LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}
+                </select>
                 <button type="button" className="btn-ghost !p-2" onClick={() => remove(s)} aria-label={`Удалить ${s.name}`}><Trash2 size={16} /></button>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -246,28 +257,62 @@ export function MaterialsPage() {
 }
 
 // == Тариф ======================================================================================
+const fmtUntil = (iso) => new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+
+export function BillingStatus({ billing, compact }) {
+  if (!billing || billing.state === "free") return null;
+  if (billing.state === "active") return compact ? null : <Notice tone="ok">Тариф оплачен до {fmtUntil(billing.until)}{billing.by_school ? " — оплачивает школа" : ""}.</Notice>;
+  if (billing.state === "trial") {
+    const left = billing.days_left >= 1 ? `${billing.days_left + 1} дн.` : `${Math.max(1, billing.hours_left)} ч.`;
+    return <Notice className={compact ? "mb-4" : ""}>Пробный период: осталось {left} Все функции открыты. {compact && <a href="#/app/plan" className="link">Тарифы</a>}</Notice>;
+  }
+  return (
+    <Notice tone="bad" className={compact ? "mb-4" : ""}>
+      {billing.by_school ? "Срок тарифа школы закончился — попросите школу продлить доступ." : "Пробный период закончился. Ученики и материалы сохранены — оформите тариф, чтобы проводить новые уроки."}
+      {compact && !billing.by_school && <> <a href="#/app/plan" className="link">Оформить</a></>}
+    </Notice>
+  );
+}
+
 export function PlanPage() {
-  const { account } = useSession();
-  const current = account?.plan || "free";
+  const session = useSession();
+  const { account } = session;
+  const [copied, setCopied] = useState(false);
+  const [sent, setSent] = useState(false);
+  const ref = account?.referral;
+  const ask = async (p) => {
+    await request("POST", "/site/v1/feedback", { kind: "other", text: `Хочу оплатить тариф «${p.title}». Почта: ${account?.email}` }).catch(() => {});
+    setSent(true);
+  };
   return (
     <>
-      <PageTitle title="Тариф" text={account?.org ? `Вы в школе «${account.org.name}» — тариф оплачивает школа.` : `Сейчас: «${account?.plan_info?.title || "Старт"}».`} />
-      <div className="grid gap-4 md:grid-cols-3">
-        {PLANS.filter((p) => p.id !== "school").map((p) => (
-          <div key={p.id} className={`card flex flex-col ${p.id === current ? "border-brand" : ""}`}>
-            <div className="flex items-center justify-between"><h3 className="text-xl">{p.title}</h3>{p.id === current && <span className="chip chip-brand">ваш тариф</span>}</div>
-            <p className="mt-1 text-sm text-ink-mute">{p.students}</p>
-            <p className="mt-3 num font-display text-3xl font-extrabold">{p.price} ₽ <span className="text-sm font-medium text-ink-mute">{p.note}</span></p>
-            <ul className="mt-4 grid flex-1 gap-1.5 text-sm">{p.features.map((x) => <li key={x} className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-mint" />{x}</li>)}</ul>
+      <PageTitle title="Тариф" text={account?.org && account.role === "tutor" ? `Вы преподаёте в школе «${account.org.name}» — доступ оплачивает школа.` : "Один тариф — все функции платформы."} />
+      <BillingStatus billing={account?.billing} />
+      {!(account?.org && account.role === "tutor") && (
+        <div className="mt-5"><PricingCards inApp /></div>
+      )}
+      <Notice className="mt-5">Онлайн-оплата подключается. Чтобы оформить тариф сейчас, нажмите кнопку — мы свяжемся с вами по почте {account?.email} и продлим доступ.
+        <span className="mt-3 flex flex-wrap gap-2">
+          {PLANS.filter((p) => (account?.role === "school" ? p.id === "school" : p.id === "teacher")).map((p) => (
+            <button key={p.id} type="button" className="btn-brand btn-sm" disabled={sent} onClick={() => ask(p)}>{sent ? "Заявка отправлена" : `Оформить «${p.title}»`}</button>
+          ))}
+        </span>
+      </Notice>
+      {ref && (
+        <div className="card mt-6 grid gap-4 md:grid-cols-[1.4fr_1fr] md:items-center">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl"><Gift size={20} className="text-brand" /> Скидка 50% за коллегу</h2>
+            <p className="mt-2 text-sm text-ink-soft">Отправьте ссылку коллеге. Когда он оформит тариф, ваше следующее продление будет за полцены. Скидки за разных коллег копятся.</p>
+            <div className="mt-3 flex gap-2"><input readOnly className="field text-sm" value={ref.link} onFocus={(e) => e.target.select()} aria-label="Ваша ссылка" />
+              <button type="button" className="btn-light" onClick={() => { copy(ref.link); setCopied(true); }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button></div>
           </div>
-        ))}
-      </div>
-      <Notice className="mt-6">Онлайн-оплата ещё подключается. Чтобы перейти на «Про» или «Безлимит» сейчас, напишите в поддержку — тариф включат вручную.</Notice>
-      <div className="mt-6 grid gap-3 md:grid-cols-3">
-        {[[PenTool, "Доска и стикеры", "на всех тарифах"], [Clapperboard, "Видео из VK", "на всех тарифах"], [NotebookPen, "Конспекты и отчёты", "на всех тарифах"]].map(([I, t, d]) => (
-          <div key={t} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3"><I size={18} className="text-brand" /><span className="font-semibold">{t}</span><span className="ml-auto text-xs text-ink-mute">{d}</span></div>
-        ))}
-      </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Stat value={ref.invited} label="пришли" />
+            <Stat value={ref.paid} label="оплатили" tone="mint" />
+            <Stat value={ref.discounts} label="скидок −50%" tone="sun" />
+          </div>
+        </div>
+      )}
     </>
   );
 }

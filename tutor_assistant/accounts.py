@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import re
 import secrets
 import threading
 import time
 from typing import Any
 
+from . import billing
+from .billing import PLANS
 from .portal import ADMIN, PARENT, Portal, PortalError, Viewer, _field
 from .relay import STUDENT, TUTOR, Pair, RelayService
 
@@ -25,14 +28,6 @@ ROLES = ("tutor", "student", "parent", "school")
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
 PBKDF2_ROUNDS = 200_000
 LOGIN_ATTEMPTS = 10  # за 15 минут с одного адреса и с одной почты
-FREE_STUDENTS = 3  # бесплатный тариф репетитора
-
-PLANS = {
-    "free": {"title": "Старт", "price": 0, "students": FREE_STUDENTS},
-    "pro": {"title": "Про", "price": 290, "students": 30},
-    "max": {"title": "Безлимит", "price": 490, "students": None},
-    "school": {"title": "Школа", "price": 250, "students": None, "per": "за преподавателя"},
-}
 
 
 def hash_password(password: str, salt: bytes | None = None) -> str:
@@ -102,6 +97,10 @@ class Accounts:
             self.storage.add_org(org_id, school, account_id)
         self.storage.add_account(id=account_id, email=email, password_hash=hash_password(password), name=name,
                                  role=role, org_id=org_id)
+        if role in ("tutor", "school"):  # 3 дня со всеми функциями и своя ссылка «пригласить коллегу»
+            ref = self.storage.account_by_ref(str(body.get("ref") or "")) if body.get("ref") else None
+            self.storage.update_account(account_id, trial_until=billing.trial_until(), ref_code=secrets.token_urlsafe(6),
+                                        referred_by=ref["id"] if ref and ref["role"] in ("tutor", "school") else None)
         joined = None
         if body.get("invite"):
             joined = self.join(Viewer(account_id, False), body.get("invite"))
@@ -129,12 +128,20 @@ class Accounts:
     def public(self, account_id: str) -> dict[str, Any]:
         row = self.storage.get_account(account_id) or {}
         org = self.storage.get_org(row.get("org_id"))
-        plan = PLANS.get(row.get("plan") or "free", PLANS["free"])
-        return {"id": row.get("id"), "name": row.get("name"), "email": row.get("email"), "role": row.get("role"),
+        data = {"id": row.get("id"), "name": row.get("name"), "email": row.get("email"), "role": row.get("role"),
                 "brand": "teach" if row.get("role") in ("tutor", "school") else "study",
                 "org": {"id": org["id"], "name": org["name"], "filter_contacts": bool(org["filter_contacts"]),
                         "owner": org["owner_id"] == row.get("id")} if org else None,
-                "telegram": bool(row.get("tg_user_id")), "plan": row.get("plan"), "plan_info": plan}
+                "telegram": bool(row.get("tg_user_id")), "billing": billing.plan_state(self.storage, row),
+                "prefs": _prefs(row)}
+        if row.get("role") in ("tutor", "school"):
+            if not row.get("ref_code"):
+                row["ref_code"] = secrets.token_urlsafe(6)
+                self.storage.update_account(row["id"], ref_code=row["ref_code"])
+            ref = billing.referrals(self.storage, row)
+            site = self.portal.settings.site_url or ""
+            data["referral"] = {**ref, "link": f"{site}/#/register?role=tutor&ref={ref['code']}"}
+        return data
 
     def me(self, viewer: Viewer) -> dict[str, Any]:
         self.account(viewer)
@@ -195,10 +202,9 @@ class Accounts:
                         "joined": bool(pair.student_user_id), "parents": len(parents),
                         "invite": self._links(invite["code"]) if invite and not pair.student_user_id else None,
                         "parent_invite": self._links(self._parent_code(pair)),
+                        "language": row.get("language") or self.portal.settings.target_language,
                         "active_lesson": active["id"] if active else None})
-        limit = PLANS.get(tutor.get("plan") or "free", PLANS["free"])["students"]
-        if tutor.get("org_id"):
-            limit = None  # ученики школы — по тарифу школы
+        limit = None  # на тарифе — без ограничения числа учеников
         return {"students": out, "limit": limit}
 
     def add_student(self, viewer: Viewer, body: Any) -> dict[str, Any]:
@@ -206,12 +212,10 @@ class Accounts:
         name = first_name(_field(body if isinstance(body, dict) else {}, "name", 40, required=True) or "")
         if self.assistant.moderate(name).is_violation:
             raise PortalError(422, "имя — без контактов")
-        limit = None if tutor.get("org_id") else PLANS.get(tutor.get("plan") or "free", PLANS["free"])["students"]
-        if limit is not None and len(self.storage.tutor_pairs(tutor["id"])) >= limit:
-            raise PortalError(402, f"на тарифе «{PLANS[tutor.get('plan') or 'free']['title']}» — до {limit} учеников. "
-                                   "Перейдите на «Про», чтобы добавить больше.")
+        billing.require_active(self.storage, tutor["id"])
         pair = self.relay.create_pair(first_name(tutor["name"]), name, created_by=tutor["id"])
         self.storage.bind_pair_user(pair.id, TUTOR, tutor["id"])
+        self.storage.set_pair_language(pair.id, _language(body))
         code = secrets.token_urlsafe(10)
         self.storage.add_invite(code, "student", pair.id, tutor["id"])
         pair = self.relay.get(pair.id)
@@ -223,6 +227,46 @@ class Accounts:
         if not pair or pair.tutor_user_id != tutor["id"]:
             raise PortalError(404, "ученик не найден")
         self.relay.deactivate(pair_id)
+        return {"ok": True}
+
+    def admin_extend(self, viewer: Viewer, body: Any) -> dict[str, Any]:
+        """Администратор платформы продлевает оплату (пока онлайн-оплата не подключена)."""
+        if not viewer.admin:
+            raise PortalError(403, "доступно администратору платформы")
+        body = body if isinstance(body, dict) else {}
+        acc = self.storage.account_by_email(str(body.get("email") or "").strip().lower())
+        if not acc or acc["role"] not in ("tutor", "school"):
+            raise PortalError(404, "преподаватель или школа с такой почтой не найдены")
+        months = body.get("months")
+        if months not in (1, 3, 12):
+            raise PortalError(400, "срок: 1, 3 или 12 месяцев")
+        teachers = len(self.storage.org_accounts(acc["org_id"], "tutor")) if acc["role"] == "school" and acc.get("org_id") else 1
+        use = bool(body.get("use_discount")) and billing.referrals(self.storage, acc)["discounts"] > 0
+        total = billing.price(acc, months, self.storage, teachers, use)
+        until = billing.extend(self.storage, acc, months)
+        if use:
+            self.storage.update_account(acc["id"], ref_used=str(int(acc.get("ref_used") or 0) + 1))
+        return {"email": acc["email"], "paid_until": until, "price": total, "discount_used": use, "teachers": teachers}
+
+    def update_prefs(self, viewer: Viewer, body: Any) -> dict[str, Any]:
+        """Оформление кабинета: фон, аватар-стикер, наклейки на главной."""
+        self.account(viewer)
+        body = body if isinstance(body, dict) else {}
+        prefs = {"theme": body.get("theme") if body.get("theme") in THEMES else "default",
+                 "avatar": str(body.get("avatar") or "")[:40] or None,
+                 "stickers": [str(x)[:40] for x in (body.get("stickers") or []) if isinstance(x, str)][:8],
+                 "motto": str(body.get("motto") or "").strip()[:80] or None}
+        if prefs["motto"] and self.assistant.moderate(prefs["motto"]).is_violation:
+            raise PortalError(422, "без контактов, пожалуйста")
+        self.storage.update_account(viewer.user_id, prefs=json.dumps(prefs, ensure_ascii=False))
+        return self.me(viewer)
+
+    def set_language(self, viewer: Viewer, pair_id: str, body: Any) -> dict[str, Any]:
+        tutor = self._tutor(viewer)
+        pair = self.relay.get(pair_id)
+        if not pair or pair.tutor_user_id != tutor["id"]:
+            raise PortalError(404, "ученик не найден")
+        self.storage.set_pair_language(pair_id, _language(body))
         return {"ok": True}
 
     def _parent_code(self, pair: Pair) -> str:
@@ -337,6 +381,28 @@ class Accounts:
 
     def strict(self, chat_id: str) -> bool:
         return self.portal.is_strict(chat_id)
+
+
+THEMES = ("default", "sunset", "ocean", "forest", "lavender", "candy", "space", "notebook")
+
+
+def _prefs(row: dict[str, Any]) -> dict[str, Any]:
+    try:
+        data = json.loads(row.get("prefs") or "{}")
+    except ValueError:
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+def _language(body: Any) -> str | None:
+    from .community import LANGUAGES
+
+    lang = body.get("language") if isinstance(body, dict) else None
+    if lang is None:
+        return None
+    if lang not in LANGUAGES:
+        raise PortalError(400, "язык: " + ", ".join(LANGUAGES))
+    return lang
 
 
 ROLE_ACCESS = {TUTOR: "tutor", STUDENT: "student", PARENT: "parent", ADMIN: "school"}

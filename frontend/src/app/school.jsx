@@ -138,7 +138,32 @@ export function SchoolLessonsPage() {
 }
 
 // == Администратор платформы ======================================================================
+function BillingAdmin() {
+  const [f, setF] = useState({ email: "", months: 1, use_discount: false });
+  const [res, setRes] = useState(null);
+  const [error, setError] = useState(null);
+  const submit = async (e) => {
+    e.preventDefault(); setError(null); setRes(null);
+    try { setRes(await request("POST", "/site/v1/admin/billing", { ...f, months: Number(f.months) })); } catch (x) { setError(x); }
+  };
+  return (
+    <Panel title="Продлить тариф" icon={CheckCircle2} className="lg:col-span-2">
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
+        <label className="label min-w-[220px] flex-1">Почта преподавателя или школы<input className="field" type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
+        <label className="label">Срок<select className="field" value={f.months} onChange={(e) => setF({ ...f, months: e.target.value })}><option value={1}>1 месяц</option><option value={3}>3 месяца</option><option value={12}>12 месяцев</option></select></label>
+        <label className="flex items-center gap-2 pb-3 text-sm"><input type="checkbox" checked={f.use_discount} onChange={(e) => setF({ ...f, use_discount: e.target.checked })} /> Скидка 50% за коллегу</label>
+        <button type="submit" className="btn-brand">Продлить</button>
+      </form>
+      {res && <Notice tone="ok" className="mt-3">Продлено до {fmtDate(res.paid_until)}. К оплате: {res.price.toLocaleString("ru-RU")} ₽{res.teachers > 1 ? ` (${res.teachers} преподавателей)` : ""}{res.discount_used ? ", скидка применена" : ""}.</Notice>}
+      <ErrorBox error={error} />
+    </Panel>
+  );
+}
+
+const FB = { idea: "💡 Идея", bug: "🐞 Ошибка", praise: "❤️ Спасибо", other: "✉️ Другое" };
+
 export function AdminPage() {
+  const feedback = useApi("/site/v1/admin/feedback");
   const reviews = useApi("/site/v1/admin/reviews");
   const teachers = useApi("/site/v1/admin/teachers");
   const market = useApi("/site/v1/admin/market");
@@ -149,6 +174,13 @@ export function AdminPage() {
     <>
       <PageTitle title="Администрирование" text="Модерация отзывов, анкет, заявок и биржи." />
       <div className="grid gap-4 lg:grid-cols-2">
+        <BillingAdmin />
+        <Panel title="Обратная связь" icon={Users} className="lg:col-span-2">
+          {!feedback.data ? <Loading /> : !feedback.data.feedback.length ? <p className="text-sm text-ink-mute">Сообщений пока нет.</p> : (
+            <ul className="grid max-h-96 gap-2 overflow-y-auto">{feedback.data.feedback.map((x) => (
+              <li key={x.id} className="rounded-2xl border border-line p-3 text-sm"><b>{FB[x.kind] || x.kind}</b> · {x.name || "—"} ({x.role || "—"}) · {fmtDate(x.created_at)}<p className="mt-1 whitespace-pre-wrap text-ink-soft">{x.text}</p></li>))}</ul>
+          )}
+        </Panel>
         <Panel title="Отзывы" icon={Star}>
           {!reviews.data ? <Loading /> : !reviews.data.reviews.length ? <p className="text-sm text-ink-mute">Отзывов нет.</p> : (
             <ul className="grid gap-2">{reviews.data.reviews.map((r) => (

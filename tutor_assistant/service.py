@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import secrets
@@ -192,7 +193,8 @@ class TutorAssistant:
         with self._lock:
             st = self._live.get(lesson_id)
             if st is None:
-                st = _LiveState(ConversationGuard(self.guard), VocabularyCollector(self.settings.target_language),
+                lang = self.lesson_language(self.storage.get_lesson(lesson_id) or {})
+                st = _LiveState(ConversationGuard(self.guard), VocabularyCollector(lang),
                                 HomeworkCollector())
                 # После перезапуска восстанавливаем уже собранные слова и ДЗ, чтобы не было дублей.
                 for w in self.storage.lesson_words_live(lesson_id):
@@ -278,12 +280,17 @@ class TutorAssistant:
             self.storage.add_lesson_item(lesson_id, "homework", h.model_dump())
         return MessageOutcome(lesson_id, result, stored, incident_id, new_words, new_hw)
 
+    def lesson_language(self, lesson: dict[str, Any]) -> str:
+        """Изучаемый язык урока: язык ученика из кабинета преподавателя, иначе — из настроек."""
+        return self.storage.chat_language(lesson.get("chat_id")) or self.settings.target_language
+
     def _build_report(self, lesson: dict[str, Any], use_llm: bool) -> LessonReport:
         lesson_id = lesson["id"]
+        settings = dataclasses.replace(self.settings, target_language=self.lesson_language(lesson))
         owner = self.owner_for(lesson)
         prev_lesson = self.storage.previous_finished_lesson(lesson)
         return build_report(
-            self.storage.lesson_utterances(lesson_id), self.settings, llm=self.llm if use_llm else None,
+            self.storage.lesson_utterances(lesson_id), settings, llm=self.llm if use_llm else None,
             known_words=self.storage.known_words(owner, exclude_lesson=lesson_id), title=lesson.get("title"),
             lesson_id=lesson_id, violations=self.storage.incident_count(lesson_id=lesson_id),
             announced=self.storage.lesson_words_live(lesson_id), assigned=self.storage.lesson_homework_live(lesson_id),

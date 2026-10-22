@@ -26,7 +26,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import render
+from . import billing, render
 from .models import LessonReport, Role
 from .portal import ADMIN, PARENT, Access, Portal, PortalError, Viewer, send_telegram_async
 from .relay import STUDENT, TUTOR
@@ -104,6 +104,7 @@ class Classroom:
         access = self.portal._access(viewer, chat_id)
         if access.role not in (TUTOR, ADMIN) or access.pair is None:
             raise PortalError(403, "урок в онлайн-классе начинает преподаватель")
+        billing.require_active(self.storage, viewer.user_id)
         pair = access.pair
         active = self.storage.active_lesson(chat_id)
         if active:

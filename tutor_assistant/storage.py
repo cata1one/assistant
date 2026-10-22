@@ -367,6 +367,17 @@ CREATE TABLE IF NOT EXISTS units (
 );
 CREATE INDEX IF NOT EXISTS idx_units_owner ON units(owner_id);
 
+-- Обратная связь команде платформы: идеи, ошибки, пожелания
+CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    name TEXT,
+    role TEXT,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 -- Интервальное повторение слов (карточки)
 CREATE TABLE IF NOT EXISTS srs_cards (
     owner TEXT NOT NULL,
@@ -418,8 +429,18 @@ class Storage:
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(messages)").fetchall()}
         if "source" not in cols:  # text — набрано в чате, speech — расшифровка речи
             self._conn.execute("ALTER TABLE messages ADD COLUMN source TEXT NOT NULL DEFAULT 'text'")
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(accounts)").fetchall()}
+        for col in ("trial_until", "paid_until", "ref_code", "referred_by", "ref_used", "prefs"):  # тарифы и приглашения
+            if col not in cols:
+                self._conn.execute(f"ALTER TABLE accounts ADD COLUMN {col} TEXT")
+                if col == "trial_until":  # уже зарегистрированным — те же 3 пробных дня с момента обновления
+                    until = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(timespec="seconds")
+                    self._conn.execute("UPDATE accounts SET trial_until=? WHERE role IN ('tutor','school')", (until,))
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(pairs)").fetchall()}
+        if "language" not in cols:  # изучаемый язык ученика: конспект, ИИ, озвучка
+            self._conn.execute("ALTER TABLE pairs ADD COLUMN language TEXT")
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(assignments)").fetchall()}
-        for col in ("attachments", "unit_id", "result"):  # фото выполненного ДЗ, занятие, проверка занятия
+        for col in ("attachments", "unit_id", "result", "comment"):  # фото выполненного ДЗ, занятие, проверка занятия
             if col not in cols:
                 self._conn.execute(f"ALTER TABLE assignments ADD COLUMN {col} TEXT")
 
@@ -633,6 +654,15 @@ class Storage:
 
     def get_pair(self, pair_id: str) -> dict[str, Any] | None:
         return self._one("SELECT * FROM pairs WHERE id=?", (pair_id,))
+
+    def set_pair_language(self, pair_id: str, language: str | None) -> None:
+        self._exec("UPDATE pairs SET language=? WHERE id=?", (language, pair_id))
+
+    def chat_language(self, chat_id: str | None) -> str | None:
+        if not chat_id or not chat_id.startswith("pair:"):
+            return None
+        row = self._one("SELECT language FROM pairs WHERE id=?", (chat_id.split(":", 1)[1],))
+        return row["language"] if row else None
 
     def pair_by_code(self, code: str) -> tuple[dict[str, Any], str] | None:
         row = self._one("SELECT * FROM pairs WHERE tutor_code=?", (code,))
@@ -963,6 +993,9 @@ class Storage:
     def get_account(self, account_id: str) -> dict[str, Any] | None:
         return self._one("SELECT * FROM accounts WHERE id=?", (account_id,))
 
+    def account_by_ref(self, code: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM accounts WHERE ref_code=?", (code,))
+
     def account_by_email(self, email: str) -> dict[str, Any] | None:
         return self._one("SELECT * FROM accounts WHERE email=?", (email,))
 
@@ -1068,6 +1101,14 @@ class Storage:
                   else v for k, v in fields.items()}
         sets = ", ".join(f"{k}=?" for k in fields)
         self._exec(f"UPDATE assignments SET {sets} WHERE id=?", (*fields.values(), assignment_id))
+
+    def add_feedback(self, user_id: str, name: str | None, role: str | None, kind: str, text: str) -> int:
+        cur = self._exec("INSERT INTO feedback(user_id, name, role, kind, text, created_at) VALUES (?,?,?,?,?,?)",
+                         (user_id, name, role, kind, text, utcnow()))
+        return int(cur.lastrowid)
+
+    def feedback_list(self, limit: int = 200) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM feedback ORDER BY id DESC LIMIT ?", (limit,))
 
     def delete_assignment(self, assignment_id: int) -> None:
         self._exec("DELETE FROM assignments WHERE id=?", (assignment_id,))

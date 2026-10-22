@@ -3,6 +3,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fmtDate, request } from "../lib/api.js";
+import { LANGS } from "../lib/langs.js";
 import { useSession } from "../lib/session.js";
 import { copy, Empty, ErrorBox, Loading, Notice, Tabs } from "../ui/kit.jsx";
 
@@ -93,7 +94,9 @@ function Board({ params, canRespond, tutor }) {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-3xl">Заявки учеников {data && <span className="num text-ink-mute">{data.open}</span>}</h2>
         <div className="flex flex-wrap gap-2">
-          <Tabs label="Язык" items={[{ id: "all", title: "Все" }, { id: "en", title: "Английский" }, { id: "zh", title: "Китайский" }]} value={lang} onChange={setLang} />
+          <select className="field !w-auto !rounded-full !py-2 text-sm" value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Язык">
+            <option value="all">Все языки</option>{LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}
+          </select>
           <Tabs label="Кто" items={[{ id: "all", title: "Все" }, { id: "adult", title: "Взрослые" }, { id: "kid", title: "Дети" }]} value={aud} onChange={setAud} />
         </div>
       </div>
