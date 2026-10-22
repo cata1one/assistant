@@ -31,3 +31,15 @@ export const fmtDate = (iso) => {
   try { return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }); }
   catch { return iso; }
 };
+
+/** Отправка файла как есть (тело запроса — сам файл). */
+export async function uploadRaw(path, file, extra = {}) {
+  const headers = { "Content-Type": file.type || "application/octet-stream", Accept: "application/json",
+    "X-File-Name": encodeURIComponent(file.name || "file"), ...extra };
+  const token = getToken();
+  if (token) headers["X-Access-Token"] = token;
+  const r = await fetch(path, { method: "POST", headers, body: file, credentials: "same-origin" });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(data.error || `ошибка ${r.status}`); e.status = r.status; throw e; }
+  return data;
+}

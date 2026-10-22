@@ -22,7 +22,7 @@ from .textnorm import has_cyrillic, has_latin
 ANNOUNCE_RE = re.compile(
     r"(?:нов(?:ые|ое|ых)\s+слов(?:а|о|ечки|ами)?|нов(?:ая|ую)\s+лексик[аи]|слова\s+(?:на\s+)?сегодня|сегодняшние\s+слова"
     r"|слова\s+(?:урока|дня)|запиши(?:те)?\s+(?:себе\s+)?(?:новые\s+)?слова|выпиши(?:те)?\s+(?:новые\s+)?слова"
-    r"|словарик|словарь\s+урока|лексика\s+урока|ключевые\s+слова|new\s+words|today'?s\s+words|word\s*list"
+    r"|выучи(?:ть|те)?\s+(?:новые\s+)?слова|словарик|словарь\s+урока|лексика\s+урока|ключевые\s+слова|new\s+words|today'?s\s+words|word\s*list"
     r"|vocabulary|key\s+words|words\s+of\s+the\s+day)"
     r"(?:\s+(?:на\s+)?(?:сегодня|урока|дня|today|for\s+today|of\s+the\s+lesson))?"
     r"\s*(?P<sep>[:\-—–]|\n)\s*(?P<list>.*)",

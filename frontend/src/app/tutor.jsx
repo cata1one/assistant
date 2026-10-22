@@ -8,6 +8,7 @@ import { useSession } from "../lib/session.js";
 import { PLANS } from "../site/parts.jsx";
 import { Avatar, copy, Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Stat } from "../ui/kit.jsx";
 import { LessonList, LiveBanner, Panel, shortDate, startLesson, useApi } from "./common.jsx";
+import { Vocab } from "./vocab.jsx";
 
 function CopyLink({ label, url }) {
   const [done, setDone] = useState(false);
@@ -79,6 +80,7 @@ export function StudentsPage() {
   const { data, error, reload } = useApi("/site/v1/students");
   const [name, setName] = useState("");
   const [added, setAdded] = useState(null);
+  const [words, setWords] = useState(null);
   const [err, setErr] = useState(null);
   const add = async (e) => {
     e.preventDefault(); setErr(null);
@@ -112,12 +114,16 @@ export function StudentsPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 {s.joined ? <StartButton chatId={s.chat_id} active={s.active_lesson} small /> : <CopyLink label="Ссылка для ученика" url={s.invite?.url} />}
                 <CopyLink label="Ссылка для родителя" url={s.parent_invite?.url} />
+                {s.joined && <button type="button" className="btn-ghost btn-sm" onClick={() => setWords(s)}>Слова</button>}
                 {s.joined && <a href="#/app/messages" className="btn-ghost btn-sm">Написать</a>}
               </div>
             </div>
           ))}
         </div>
       )}
+      <Modal open={!!words} onClose={() => setWords(null)} title={`Словарь: ${words?.name || ""}`} wide>
+        {words && <Vocab chatId={words.chat_id} tutorView />}
+      </Modal>
       <Modal open={!!added} onClose={() => setAdded(null)} title={`${added?.name || "Ученик"} добавлен`}>
         <p className="text-ink-soft">Отправьте ссылки ученику и родителю — в WhatsApp, Telegram, почтой. По ссылке они зарегистрируются и попадут к вам.</p>
         <div className="mt-4 grid gap-3">
@@ -235,100 +241,6 @@ export function MaterialsPage() {
             : preview?.mime === "application/pdf" ? <iframe title={preview.title} src={preview.url} className="h-[70vh] w-full rounded-2xl border border-line" />
               : preview && <a className="btn-brand" href={preview.url} target="_blank" rel="noopener">Открыть файл</a>}
       </Modal>
-    </>
-  );
-}
-
-// == Домашние задания (все роли) ================================================================
-const HW_STATUS = { open: ["задано", "chip"], done: ["выполнено", "chip !bg-mint-soft !text-[#146b4c]"], checked: ["проверено", "chip chip-brand"] };
-
-function HomeworkItem({ h, reload }) {
-  const [answer, setAnswer] = useState(h.answer || "");
-  const [error, setError] = useState(null);
-  const set = async (status) => {
-    try { await request("POST", `/site/v1/homework/${h.id}`, { status, answer }); reload(); } catch (x) { setError(x); }
-  };
-  const [label, cls] = HW_STATUS[h.status] || [h.status, "chip"];
-  return (
-    <div className="card !p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-ink-mute">{h.role === "tutor" ? h.student : h.role === "parent" ? `${h.student} · ${h.tutor}` : h.tutor} · {shortDate(h.created_at)}{h.due ? ` · до ${h.due}` : ""}</span>
-        <span className={cls}>{label}</span>
-      </div>
-      <p className="mt-3 whitespace-pre-wrap">{h.text}</p>
-      {h.materials.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">{h.materials.map((m) => <a key={m.id} href={m.url} target="_blank" rel="noopener" className="chip hover:border-brand"><File size={12} /> {m.title}</a>)}</div>
-      )}
-      {h.role === "student" && h.status !== "checked" && (
-        <div className="mt-4 grid gap-2">
-          <textarea className="field min-h-[70px]" maxLength={3000} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Ответ или комментарий для преподавателя" aria-label="Ответ" />
-          <div className="flex gap-2">
-            {h.status === "open" ? <button type="button" className="btn-brand btn-sm" onClick={() => set("done")}><CheckCircle2 size={14} /> Готово</button>
-              : <button type="button" className="btn-light btn-sm" onClick={() => set("open")}>Вернуть в работу</button>}
-          </div>
-        </div>
-      )}
-      {h.role !== "student" && h.answer && <p className="mt-3 rounded-2xl bg-cream p-3 text-sm"><b>Ответ ученика:</b> {h.answer}</p>}
-      {h.role === "tutor" && h.status === "done" && <button type="button" className="btn-brand btn-sm mt-3" onClick={() => set("checked")}><Check size={14} /> Проверено</button>}
-      <ErrorBox error={error} />
-    </div>
-  );
-}
-
-function AssignForm({ onDone }) {
-  const students = useApi("/site/v1/students").data?.students?.filter((s) => s.joined) || [];
-  const materials = useApi("/site/v1/materials").data?.materials || [];
-  const [f, setF] = useState({ chat_id: "", text: "", due: "", materials: [] });
-  const [error, setError] = useState(null);
-  const submit = async (e) => {
-    e.preventDefault(); setError(null);
-    try {
-      await request("POST", "/site/v1/homework", { ...f, chat_id: f.chat_id || students[0]?.chat_id, due: f.due || null });
-      setF({ ...f, text: "", materials: [] }); onDone();
-    } catch (x) { setError(x); }
-  };
-  if (!students.length) return <Notice>Задание можно выдать, когда ученик подключится по ссылке.</Notice>;
-  const toggle = (id) => setF({ ...f, materials: f.materials.includes(id) ? f.materials.filter((x) => x !== id) : [...f.materials, id].slice(0, 10) });
-  return (
-    <form onSubmit={submit} className="card grid gap-3">
-      <h2 className="text-lg">Новое задание</h2>
-      <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
-        <select className="field" value={f.chat_id} onChange={(e) => setF({ ...f, chat_id: e.target.value })} aria-label="Ученик">
-          {students.map((s) => <option key={s.chat_id} value={s.chat_id}>{s.name}</option>)}
-        </select>
-        <input className="field" type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} aria-label="Срок" />
-      </div>
-      <textarea className="field min-h-[100px]" required maxLength={3000} value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} placeholder="Что сделать: упражнения, слова, видео…" aria-label="Задание" />
-      {materials.length > 0 && (
-        <details className="rounded-2xl border border-line p-3"><summary className="cursor-pointer text-sm font-semibold">Приложить материалы ({f.materials.length})</summary>
-          <div className="mt-3 flex max-h-48 flex-wrap gap-2 overflow-y-auto">
-            {materials.map((m) => <button key={m.id} type="button" onClick={() => toggle(m.id)} aria-pressed={f.materials.includes(m.id)} className={`chip ${f.materials.includes(m.id) ? "chip-brand" : ""}`}>{m.title}</button>)}
-          </div>
-        </details>
-      )}
-      <ErrorBox error={error} />
-      <button type="submit" className="btn-brand w-fit"><NotebookPen size={16} /> Выдать задание</button>
-      <p className="text-xs text-ink-mute">Ученик и родители увидят задание на сайте и получат уведомление в Telegram, если он привязан.</p>
-    </form>
-  );
-}
-
-export function HomeworkPage() {
-  const { role } = useSession();
-  const { data, error, reload } = useApi("/site/v1/homework");
-  const list = data?.homework || [];
-  const open = list.filter((h) => h.status === "open");
-  return (
-    <>
-      <PageTitle title="Домашние задания" text={role === "parent" ? "Что задано и что уже сделано." : role === "student" ? `Открытых заданий: ${open.length}` : "Выдавайте задания с материалами и отмечайте проверенные."} />
-      <div className={role === "tutor" ? "grid items-start gap-4 lg:grid-cols-[1fr_1.2fr]" : ""}>
-        {role === "tutor" && <AssignForm onDone={reload} />}
-        <div className="grid gap-3">
-          <ErrorBox error={error} />
-          {!data ? <Loading /> : !list.length ? <Empty icon={NotebookPen} title="Заданий пока нет" text={role === "tutor" ? "Выдайте первое задание — слева." : "Когда преподаватель задаст ДЗ, оно появится здесь."} />
-            : list.map((h) => <HomeworkItem key={h.id} h={h} reload={reload} />)}
-        </div>
-      </div>
     </>
   );
 }

@@ -75,6 +75,13 @@ class Settings:
     llm_fallbacks: bool = True
     llm_timeout: float = 300.0
 
+    # ИИ для конструктора занятий: любой OpenAI-совместимый сервис, в том числе бесплатный —
+    # Ollama на своём сервере (http://127.0.0.1:11434/v1), OpenRouter (бесплатные модели), Groq и т. п.
+    ai_url: str = ""
+    ai_key: str = ""
+    ai_model: str = ""
+    ai_timeout: float = 120.0
+
     # Контроль контактов
     block_contacts: bool = True  # скрывать сообщения с контактами
     allowed_emails: tuple[str, ...] = ()  # официальные адреса школы
@@ -165,6 +172,10 @@ class Settings:
             demo_reviews=_env_bool("TUTOR_DEMO_REVIEWS", cls.demo_reviews),
             market_fee_percent=_env_int("TUTOR_MARKET_FEE", cls.market_fee_percent),
             ice_servers=_env("TUTOR_ICE_SERVERS"),
+            ai_url=_env("TUTOR_AI_URL").rstrip("/"),
+            ai_key=_env("TUTOR_AI_KEY"),
+            ai_model=_env("TUTOR_AI_MODEL"),
+            ai_timeout=float(_env_int("TUTOR_AI_TIMEOUT", int(cls.ai_timeout))),
         )
 
     @property

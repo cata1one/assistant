@@ -375,6 +375,13 @@ def test_http_accounts(server):
     for path in ("/site/v1/students", "/site/v1/materials", "/site/v1/homework", "/site/v1/chats", "/site/v1/boards"):
         assert fetch(server + path, headers=h)[0] == 200, path
     assert fetch(server + "/site/v1/cards", headers=h)[0] == 403  # карточки — для учеников
+    status, _, body = fetch(server + "/site/v1/units/library/lib-hsk1-greetings", "POST", {}, headers=h)
+    assert status == 200
+    uid = json.loads(body)["id"]
+    assert json.loads(fetch(server + "/site/v1/units", headers=h)[2])["units"][0]["id"] == uid
+    assert fetch(server + f"/site/v1/units/{uid}/check", "POST", {"answers": {}}, headers=h)[0] == 200
+    assert fetch(server + "/site/v1/units/generate", "POST", {"topic": "Еда", "words": "apple — яблоко\nbread — хлеб"},
+                 headers=h)[0] == 200
     assert fetch(server + "/site/v1/school", headers=h)[0] == 403
     status, _, body = fetch(server + "/site/v1/auth/login", "POST", {"email": "anna@http.ru", "password": "secret123"})
     assert status == 200 and json.loads(body)["account"]["role"] == "tutor"

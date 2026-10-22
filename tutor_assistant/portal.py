@@ -502,6 +502,22 @@ def _field(body: dict[str, Any], key: str, max_len: int, required: bool = False)
     return value
 
 
+def _lines(body: dict[str, Any], key: str, max_len: int, required: bool = False) -> str | None:
+    """Как _field, но сохраняет переносы строк (задания, списки слов)."""
+    value = body.get(key)
+    if value is not None and not isinstance(value, str):
+        raise PortalError(400, f"поле «{key}» должно быть строкой")
+    text = "\n".join(" ".join(ln.split()) for ln in (value or "").strip().splitlines()).strip()
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if not text:
+        if required:
+            raise PortalError(400, f"заполните поле «{key}»")
+        return None
+    if len(text) > max_len:
+        raise PortalError(400, f"поле «{key}» слишком длинное")
+    return text
+
+
 def _num(v: Any, lo: float, hi: float) -> float:
     if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v:  # NaN
         raise PortalError(400, "координаты и размеры — числа")

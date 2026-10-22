@@ -36,6 +36,7 @@ from .classroom import Classroom
 from .community import Community
 from .learning import Learning
 from .portal import Portal, PortalError
+from .units import Units, student_view
 
 WEB_DIR = Path(__file__).with_name("web")
 MAX_SITE_BODY = 1024 * 1024
@@ -135,10 +136,25 @@ class Website:
         ("GET", re.compile(r"^/site/v1/homework$"), "homework", True),
         ("POST", re.compile(r"^/site/v1/homework$"), "homework_assign", True),
         ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)$"), "homework_update", True),
+        ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)/attach$"), "homework_attach", True),
+        ("GET", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit$"), "homework_unit", True),
+        ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit$"), "homework_unit_submit", True),
+        ("GET", re.compile(r"^/site/v1/vocab$"), "vocab", True),
+        ("POST", re.compile(r"^/site/v1/vocab$"), "vocab_add", True),
+        ("POST", re.compile(r"^/site/v1/vocab/delete$"), "vocab_delete", True),
+        ("POST", re.compile(r"^/site/v1/lessons/(?P<id>[\w-]+)/report$"), "report_edit", True),
+        ("GET", re.compile(r"^/site/v1/units$"), "units", True),
+        ("POST", re.compile(r"^/site/v1/units$"), "unit_create", True),
+        ("POST", re.compile(r"^/site/v1/units/generate$"), "unit_generate", True),
+        ("POST", re.compile(r"^/site/v1/units/library/(?P<lib>[\w-]+)$"), "unit_copy", True),
+        ("GET", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)$"), "unit_get", True),
+        ("POST", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)$"), "unit_update", True),
+        ("POST", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)/delete$"), "unit_delete", True),
+        ("POST", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)/check$"), "unit_check", True),
         ("GET", re.compile(r"^/site/v1/cards$"), "cards", True),
         ("POST", re.compile(r"^/site/v1/cards/review$"), "cards_review", True),
     ]
-    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload)$")  # тело — файл, а не JSON
+    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload|homework/\d+/attach)$")  # тело — файл, а не JSON
     FILE_RE = re.compile(r"^/site/v1/files/(?P<id>[0-9a-f]{24})$")
 
     def __init__(self, portal: Portal, web_dir: Path = WEB_DIR, classroom: Classroom | None = None):
@@ -148,6 +164,7 @@ class Website:
         self.community = Community(portal)
         self.accounts = Accounts(portal)
         self.learning = Learning(portal)
+        self.units_service = Units(self.learning)
 
     @staticmethod
     def handles(path: str) -> bool:
@@ -429,6 +446,54 @@ class Website:
 
     def homework_update(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
         return self.learning.update_homework(viewer, int(id), body)
+
+    def homework_attach(self, viewer: Any, id: str, raw: bytes, headers: Any, **_: Any) -> Any:
+        return self.learning.attach(viewer, int(id), raw, headers)
+
+    def homework_unit(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.units_service.homework_unit(viewer, int(id))
+
+    def homework_unit_submit(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.units_service.submit(viewer, int(id), body)
+
+    def vocab(self, viewer: Any, query: dict[str, str], **_: Any) -> Any:
+        return self.learning.vocab(viewer, query.get("chat_id") or None)
+
+    def vocab_add(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.learning.add_words(viewer, body)
+
+    def vocab_delete(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.learning.delete_word(viewer, body)
+
+    def report_edit(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.learning.edit_report(viewer, id, body)
+
+    # -- занятия ---------------------------------------------------------------------------
+    def units(self, viewer: Any, **_: Any) -> Any:
+        return self.units_service.list(viewer)
+
+    def unit_create(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.units_service.save(viewer, body)
+
+    def unit_generate(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.units_service.generate(viewer, body)
+
+    def unit_copy(self, viewer: Any, lib: str, **_: Any) -> Any:
+        return self.units_service.copy_library(viewer, lib)
+
+    def unit_get(self, viewer: Any, id: str, query: dict[str, str], **_: Any) -> Any:
+        if query.get("view") == "student":  # предпросмотр глазами ученика
+            return {"unit": student_view(self.units_service.accessible(viewer, id))}
+        return self.units_service.get(viewer, id)
+
+    def unit_update(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.units_service.save(viewer, body, id)
+
+    def unit_delete(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.units_service.delete(viewer, id)
+
+    def unit_check(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.units_service.check(viewer, id, body)
 
     def cards(self, viewer: Any, **_: Any) -> Any:
         return self.learning.cards(viewer)

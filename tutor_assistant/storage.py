@@ -338,6 +338,35 @@ CREATE TABLE IF NOT EXISTS assignments (
 );
 CREATE INDEX IF NOT EXISTS idx_assignments_chat ON assignments(chat_id, id);
 
+-- Слова ученика вне уроков: добавил преподаватель (в ДЗ или вручную) или сам ученик;
+-- hidden=1 — ученик убрал слово (в том числе слово урока) из своих карточек
+CREATE TABLE IF NOT EXISTS student_words (
+    chat_id TEXT NOT NULL,
+    word_key TEXT NOT NULL,
+    word TEXT NOT NULL,
+    translation TEXT,
+    example TEXT,
+    source TEXT NOT NULL DEFAULT 'tutor',
+    hidden INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (chat_id, word_key)
+);
+
+-- Интерактивные занятия (как на ProgressMe): блоки текста, пропусков, пар, тестов, аудирования
+CREATE TABLE IF NOT EXISTS units (
+    id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    org_id TEXT,
+    title TEXT NOT NULL,
+    language TEXT,
+    level TEXT,
+    blocks TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'own',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_units_owner ON units(owner_id);
+
 -- Интервальное повторение слов (карточки)
 CREATE TABLE IF NOT EXISTS srs_cards (
     owner TEXT NOT NULL,
@@ -389,6 +418,10 @@ class Storage:
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(messages)").fetchall()}
         if "source" not in cols:  # text — набрано в чате, speech — расшифровка речи
             self._conn.execute("ALTER TABLE messages ADD COLUMN source TEXT NOT NULL DEFAULT 'text'")
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(assignments)").fetchall()}
+        for col in ("attachments", "unit_id", "result"):  # фото выполненного ДЗ, занятие, проверка занятия
+            if col not in cols:
+                self._conn.execute(f"ALTER TABLE assignments ADD COLUMN {col} TEXT")
 
     def close(self) -> None:
         with self._lock:
@@ -1005,10 +1038,18 @@ class Storage:
         self._exec("DELETE FROM materials WHERE id=?", (material_id,))
 
     # -- домашние задания --------------------------------------------------------------------
-    def add_assignment(self, chat_id: str, text: str, materials: list[str], due: str | None) -> int:
-        cur = self._exec("INSERT INTO assignments(chat_id, text, materials, due, created_at) VALUES (?,?,?,?,?)",
-                         (chat_id, text, json.dumps(materials), due, utcnow()))
+    def add_assignment(self, chat_id: str, text: str, materials: list[str], due: str | None,
+                       unit_id: str | None = None) -> int:
+        cur = self._exec("INSERT INTO assignments(chat_id, text, materials, due, unit_id, created_at) VALUES (?,?,?,?,?,?)",
+                         (chat_id, text, json.dumps(materials), due, unit_id, utcnow()))
         return int(cur.lastrowid)
+
+    @staticmethod
+    def _assignment_row(r: dict[str, Any]) -> dict[str, Any]:
+        r["materials"] = json.loads(r["materials"] or "[]")
+        r["attachments"] = json.loads(r.get("attachments") or "[]")
+        r["result"] = json.loads(r["result"]) if r.get("result") else None
+        return r
 
     def assignments(self, chat_ids: Iterable[str], limit: int = 200) -> list[dict[str, Any]]:
         ids = list(chat_ids)
@@ -1016,19 +1057,68 @@ class Storage:
             return []
         rows = self._all(f"SELECT * FROM assignments WHERE chat_id IN ({','.join('?' * len(ids))}) "
                          "ORDER BY id DESC LIMIT ?", (*ids, limit))
-        for r in rows:
-            r["materials"] = json.loads(r["materials"] or "[]")
-        return rows
+        return [self._assignment_row(r) for r in rows]
 
     def get_assignment(self, assignment_id: int) -> dict[str, Any] | None:
         row = self._one("SELECT * FROM assignments WHERE id=?", (assignment_id,))
-        if row:
-            row["materials"] = json.loads(row["materials"] or "[]")
-        return row
+        return self._assignment_row(row) if row else None
 
     def update_assignment(self, assignment_id: int, **fields: Any) -> None:
+        fields = {k: json.dumps(v, ensure_ascii=False) if k in ("attachments", "result", "materials") and v is not None
+                  else v for k, v in fields.items()}
         sets = ", ".join(f"{k}=?" for k in fields)
         self._exec(f"UPDATE assignments SET {sets} WHERE id=?", (*fields.values(), assignment_id))
+
+    def delete_assignment(self, assignment_id: int) -> None:
+        self._exec("DELETE FROM assignments WHERE id=?", (assignment_id,))
+
+    # -- слова ученика ----------------------------------------------------------------------------
+    def student_words(self, chat_ids: Iterable[str]) -> list[dict[str, Any]]:
+        ids = list(chat_ids)
+        if not ids:
+            return []
+        return self._all(f"SELECT * FROM student_words WHERE chat_id IN ({','.join('?' * len(ids))}) "
+                         "ORDER BY created_at", ids)
+
+    def save_student_word(self, chat_id: str, key: str, word: str, translation: str | None = None,
+                          example: str | None = None, source: str = "tutor") -> None:
+        self._exec("INSERT INTO student_words(chat_id, word_key, word, translation, example, source, hidden, created_at) "
+                   "VALUES (?,?,?,?,?,?,0,?) ON CONFLICT(chat_id, word_key) DO UPDATE SET word=excluded.word, "
+                   "translation=COALESCE(excluded.translation, student_words.translation), "
+                   "example=COALESCE(excluded.example, student_words.example), hidden=0",
+                   (chat_id, key, word, translation, example, source, utcnow()))
+
+    def hide_student_word(self, chat_id: str, key: str, word: str) -> None:
+        self._exec("INSERT INTO student_words(chat_id, word_key, word, source, hidden, created_at) VALUES (?,?,?,?,1,?) "
+                   "ON CONFLICT(chat_id, word_key) DO UPDATE SET hidden=1", (chat_id, key, word, "hidden", utcnow()))
+
+    # -- занятия ----------------------------------------------------------------------------------
+    def save_unit(self, unit_id: str, owner_id: str, org_id: str | None, title: str, language: str | None,
+                  level: str | None, blocks: list[dict[str, Any]], source: str = "own") -> dict[str, Any]:
+        now = utcnow()
+        self._exec("INSERT INTO units(id, owner_id, org_id, title, language, level, blocks, source, created_at, updated_at)"
+                   " VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, "
+                   "language=excluded.language, level=excluded.level, blocks=excluded.blocks, org_id=excluded.org_id, "
+                   "updated_at=excluded.updated_at",
+                   (unit_id, owner_id, org_id, title, language, level, json.dumps(blocks, ensure_ascii=False), source,
+                    now, now))
+        return self.get_unit(unit_id)  # type: ignore[return-value]
+
+    def get_unit(self, unit_id: str) -> dict[str, Any] | None:
+        row = self._one("SELECT * FROM units WHERE id=?", (unit_id,))
+        if row:
+            row["blocks"] = json.loads(row["blocks"])
+        return row
+
+    def units_for(self, owner_id: str, org_id: str | None) -> list[dict[str, Any]]:
+        rows = self._all("SELECT * FROM units WHERE owner_id=? OR (org_id IS NOT NULL AND org_id=?) "
+                         "ORDER BY updated_at DESC", (owner_id, org_id or ""))
+        for r in rows:
+            r["blocks"] = json.loads(r["blocks"])
+        return rows
+
+    def delete_unit(self, unit_id: str) -> None:
+        self._exec("DELETE FROM units WHERE id=?", (unit_id,))
 
     # -- карточки ---------------------------------------------------------------------------------
     def srs_cards(self, owner: str) -> dict[str, dict[str, Any]]:

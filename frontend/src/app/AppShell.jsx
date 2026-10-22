@@ -11,8 +11,11 @@ import { BoardsPage, LessonsPage, MessagesPage, ProfilePage } from "./common.jsx
 import Lesson from "./Lesson.jsx";
 import Room from "./Room.jsx";
 import { AdminPage, SchoolHome, SchoolLessonsPage, SignalsPage, TutorsPage } from "./school.jsx";
-import { CardsPage, ParentHome, StudentHome, WordsPage } from "./student.jsx";
-import { HomeworkPage, MaterialsPage, PlanPage, StudentsPage, TutorHome } from "./tutor.jsx";
+import { HomeworkPage } from "./homework.jsx";
+import { CardsPage, ParentHome, StudentHome } from "./student.jsx";
+import { MaterialsPage, PlanPage, StudentsPage, TutorHome } from "./tutor.jsx";
+import { DoUnit, UnitEditor, UnitsPage } from "./units.jsx";
+import { WordsPage } from "./vocab.jsx";
 
 // Разделы кабинета по ролям: [id, название, иконка, страница, показывать в нижней панели на телефоне]
 const NAV = {
@@ -21,6 +24,7 @@ const NAV = {
     ["students", "Ученики", Users, StudentsPage, true],
     ["lessons", "Уроки", BookOpen, LessonsPage],
     ["boards", "Доски", PenTool, BoardsPage, true],
+    ["units", "Занятия", Layers, UnitsPage],
     ["materials", "Материалы", FileStack, MaterialsPage],
     ["homework", "Домашка", NotebookPen, HomeworkPage],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, true],
@@ -51,6 +55,7 @@ const NAV = {
     ["tutors", "Преподаватели", Users, TutorsPage, true],
     ["signals", "Сигналы", ShieldAlert, SignalsPage, true],
     ["lessons", "Уроки", BookOpen, SchoolLessonsPage],
+    ["units", "Занятия", Layers, UnitsPage],
     ["materials", "База материалов", FileStack, MaterialsPage],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, true],
     ["profile", "Профиль", Settings, ProfilePage],
@@ -132,7 +137,8 @@ export default function AppShell({ route }) {
 
   if (area === "room" && sub) return <Room id={sub} />;
   const items = NAV[session.role] || NAV.student;
-  let current = area === "app" ? sub || "home" : area === "board" ? "boards" : "lessons";
+  const third = route.parts[2];
+  let current = area === "app" ? (sub === "do" ? "homework" : sub || "home") : area === "board" ? "boards" : "lessons";
   let Page = items.find(([id]) => id === current)?.[3];
   if (!Page && area === "app") { current = "home"; Page = items[0][3]; }
   return (
@@ -141,7 +147,8 @@ export default function AppShell({ route }) {
       <div className="min-w-0 flex-1">
         <MobileHeader items={items} current={current} brand={brandOf(session.role)} />
         <main className={`mx-auto px-4 pb-28 pt-6 md:px-8 lg:pb-10 ${area === "board" ? "max-w-none" : "max-w-6xl"}`}>
-          {area === "lesson" && sub ? <Lesson id={sub} /> : area === "board" ? <BoardPage params={route.params} /> : <Page />}
+          {area === "lesson" && sub ? <Lesson id={sub} /> : area === "board" ? <BoardPage params={route.params} />
+            : sub === "units" && third ? <UnitEditor id={third} /> : sub === "do" && third ? <DoUnit hwId={third} /> : <Page />}
         </main>
       </div>
       <TabBar items={items} current={current} />

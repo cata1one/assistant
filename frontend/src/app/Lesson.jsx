@@ -110,17 +110,85 @@ function Parent({ res }) {
   );
 }
 
+const joinLines = (a) => (a || []).join("\n");
+
+/** Преподаватель правит отчёт: то, что увидят ученик и родители. */
+function EditReport({ res, onSaved }) {
+  const r = res.report;
+  const [f, setF] = useState({
+    topic: r.topic || "", summary: r.summary || "", key_points: joinLines(r.key_points),
+    vocabulary: (r.vocabulary || []).map((w) => (w.translation ? `${w.word} — ${w.translation}` : w.word)).join("\n"),
+    homework: joinLines([...(r.homework_teacher || []), ...(r.homework_generated || [])].map((h) => h.text)),
+    review_items: joinLines(r.review_items),
+    p_summary: r.parent?.summary || "", achievements: joinLines(r.parent?.achievements), attention: joinLines(r.parent?.attention),
+    recommendations: joinLines(r.parent?.recommendations),
+  });
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const save = async (e) => {
+    e.preventDefault(); setBusy(true); setError(null);
+    try {
+      await request("POST", `/site/v1/lessons/${encodeURIComponent(res.id)}/report`, {
+        topic: f.topic, summary: f.summary, key_points: f.key_points, vocabulary: f.vocabulary, homework: f.homework,
+        review_items: f.review_items,
+        parent: { summary: f.p_summary, achievements: f.achievements, attention: f.attention, recommendations: f.recommendations },
+      });
+      onSaved();
+    } catch (x) { setError(x); }
+    setBusy(false);
+  };
+  const area = (k, label, hint, rows = 3) => (
+    <label className="label">{label}<textarea className="field font-normal" rows={rows} value={f[k]} onChange={set(k)} />{hint && <span className="text-xs font-normal text-ink-mute">{hint}</span>}</label>
+  );
+  return (
+    <form onSubmit={save} className="grid gap-4">
+      <Panel title="Для ученика" icon={BookOpen}>
+        <div className="grid gap-3">
+          <label className="label">Тема<input className="field" maxLength={200} value={f.topic} onChange={set("topic")} /></label>
+          {area("summary", "Главное", null, 3)}
+          {area("key_points", "Ключевые пункты", "по пункту в строке")}
+          {area("vocabulary", "Новые слова", "«слово — перевод», по слову в строке. Изменения сразу попадут в карточки ученика.", 5)}
+          {area("homework", "Домашнее задание", "по заданию в строке")}
+          {area("review_items", "Что повторить", "по пункту в строке")}
+        </div>
+      </Panel>
+      <Panel title="Для родителей" icon={Trophy}>
+        <div className="grid gap-3">
+          {area("p_summary", "Как прошёл урок")}
+          {area("achievements", "Успехи", "по пункту в строке")}
+          {area("attention", "На что обратить внимание", "по пункту в строке")}
+          {area("recommendations", "Как помочь дома", "по пункту в строке")}
+        </div>
+      </Panel>
+      <ErrorBox error={error} />
+      <div className="flex gap-2"><button type="submit" className="btn-brand" disabled={busy}>{busy ? "Сохраняем…" : "Сохранить отчёт"}</button><button type="button" className="btn-ghost" onClick={onSaved}>Отмена</button></div>
+    </form>
+  );
+}
+
 export default function Lesson({ id }) {
-  const { data: res, error } = useApi(`/site/v1/lessons/${encodeURIComponent(id)}`, [id]);
+  const { data: res, error, reload } = useApi(`/site/v1/lessons/${encodeURIComponent(id)}`, [id]);
+  const [editing, setEditing] = useState(false);
   if (error) return <><Back /><ErrorBox error={error} /></>;
   if (!res) return <Loading />;
   if (!res.report) return <><Back /><PageTitle title={res.title || "Урок"} /><Notice>Материалы появятся после урока.</Notice></>;
   if (res.role === "student") return <Student res={res} id={id} />;
   if (res.role === "parent") return <Parent res={res} />;
+  if (editing) {
+    return (
+      <>
+        <Back />
+        <PageTitle title="Редактирование отчёта" text="Ученик и родители увидят исправленную версию." />
+        <EditReport res={res} onSaved={() => { setEditing(false); reload(); }} />
+      </>
+    );
+  }
   return (
     <>
       <Back />
-      <PageTitle title={res.report.topic || res.title || "Урок"} text={`${fmtDate(res.started_at)} · ${res.with}`} />
+      <PageTitle title={res.report.topic || res.title || "Урок"} text={`${fmtDate(res.started_at)} · ${res.with}`}
+        actions={res.role === "tutor" && <button type="button" className="btn-brand" onClick={() => setEditing(true)}>Редактировать отчёт</button>} />
       <pre className="card whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-soft">{res.text}</pre>
     </>
   );

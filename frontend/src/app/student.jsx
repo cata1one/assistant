@@ -1,9 +1,9 @@
-import { BookOpen, Layers, NotebookPen, PartyPopper, Repeat, Search, Sparkles, TriangleAlert, Volume2 } from "lucide-react";
+import { BookOpen, Layers, NotebookPen, PartyPopper, Repeat, TriangleAlert, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Bullets, Empty, ErrorBox, Loading, PageTitle, Stat } from "../ui/kit.jsx";
-import { Flashcard, LessonList, LiveBanner, NotConnected, Panel, useApi } from "./common.jsx";
+import { LessonList, LiveBanner, NotConnected, Panel, useApi } from "./common.jsx";
 
 // == Ученик ===================================================================================
 export function StudentHome() {
@@ -90,9 +90,9 @@ export function CardsPage() {
   });
   return (
     <>
-      <PageTitle title="Карточки" text="Повторение по кривой забывания: трудные слова возвращаются чаще, лёгкие — реже." />
+      <PageTitle title="Карточки" text="Слова уроков, домашних заданий и занятий попадают сюда сами. Трудные слова возвращаются чаще, лёгкие — реже." />
       <ErrorBox error={error} />
-      {!data ? <Loading /> : !data.stats.total ? <Empty icon={Layers} title="Слов пока нет" text="Новые слова с уроков автоматически попадут в карточки." /> : !card ? (
+      {!data ? <Loading /> : !data.stats.total ? <Empty icon={Layers} title="Слов пока нет" text="Карточки пополняются сами: слова с уроков, из домашних заданий и занятий. Свои слова можно добавить в словаре." action={<a href="#/app/words" className="btn-light">Добавить слова</a>} /> : !card ? (
         <Empty icon={PartyPopper} title={done ? `Отлично! Повторено: ${done}` : "На сегодня всё"} text="Следующие карточки появятся, когда подойдёт время повторения." action={<a href="#/app/words" className="btn-light">Открыть словарь</a>} />
       ) : (
         <div className="mx-auto max-w-xl">
@@ -116,23 +116,6 @@ export function CardsPage() {
           )}
         </div>
       )}
-    </>
-  );
-}
-
-export function WordsPage() {
-  const { data, error } = useApi("/site/v1/words");
-  const [q, setQ] = useState("");
-  const needle = q.trim().toLowerCase();
-  const list = (data?.words || []).filter((w) => !needle || `${w.word} ${w.translation || ""}`.toLowerCase().includes(needle));
-  return (
-    <>
-      <PageTitle title="Словарь" text={data ? `Всего слов: ${data.count}. Нажмите на карточку, чтобы увидеть перевод.` : null}
-        actions={<a href="#/app/cards" className="btn-brand"><Repeat size={16} /> Учить карточками</a>} />
-      <label className="relative mb-5 block max-w-sm"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-mute" /><input className="field !pl-11" placeholder="Поиск по словарю" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Поиск" /></label>
-      <ErrorBox error={error} />
-      {!data ? <Loading /> : !list.length ? <Empty icon={Sparkles} title={needle ? "Ничего не нашлось" : "Слов пока нет"} text="Слова с уроков попадают сюда автоматически." />
-        : <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">{list.map((w) => <Flashcard key={w.word} w={w} />)}</div>}
     </>
   );
 }
