@@ -385,7 +385,7 @@ def test_board_v2_objects(env):
     assert [i["kind"] for i in items] == ["obj", "obj", "obj", "obj", "del"]
     assert items[2]["data"]["embed"].startswith("https://vk.com/video_ext.php")
     with pytest.raises(PortalError) as e:  # контакты в заметке (пара из бота — строгий режим)
-        portal.add_board_item(tutor, board["id"], obj("n2", "note", text="пиши в телеграм @anna_english", color="#fde68a"))
+        portal.add_board_item(tutor, board["id"], obj("note2", "note", text="пиши в телеграм @anna_english", color="#fde68a"))
     assert e.value.status == 422
 
 
