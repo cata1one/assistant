@@ -89,7 +89,7 @@ export default function Landing() {
             </ul>
           </div>
           <div className="text-center">
-            <p className="num font-display text-5xl font-extrabold">490 ₽</p>
+            <p className="num font-display text-5xl font-extrabold">250 ₽</p>
             <p className="text-sm text-ink-mute">за преподавателя в месяц</p>
             <a href="#/register?role=school" className="btn-brand mt-5">Подключить школу</a>
           </div>

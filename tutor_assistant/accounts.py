@@ -29,9 +29,9 @@ FREE_STUDENTS = 3  # бесплатный тариф репетитора
 
 PLANS = {
     "free": {"title": "Старт", "price": 0, "students": FREE_STUDENTS},
-    "pro": {"title": "Про", "price": 690, "students": 30},
-    "max": {"title": "Безлимит", "price": 990, "students": None},
-    "school": {"title": "Школа", "price": 490, "students": None, "per": "за преподавателя"},
+    "pro": {"title": "Про", "price": 290, "students": 30},
+    "max": {"title": "Безлимит", "price": 490, "students": None},
+    "school": {"title": "Школа", "price": 250, "students": None, "per": "за преподавателя"},
 }
 
 
