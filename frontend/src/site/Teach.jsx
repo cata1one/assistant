@@ -1,5 +1,5 @@
 import {
-  ArrowRight, Clapperboard, FileStack, Gift, Lock, NotebookPen, PenTool, Repeat, Search, Sparkles, Users, Video,
+  ArrowRight, FileStack, Gift, Lock, NotebookPen, PenTool, Repeat, Search, Sparkles, Users, Video,
 } from "lucide-react";
 import { useState } from "react";
 import { copy } from "../ui/kit.jsx";
@@ -27,12 +27,12 @@ export default function Teach() {
 
       <Section eyebrow="Почему удобно" title="Уроки, которые приятно готовить и вести">
         <FeatureGrid items={[
-          { icon: PenTool, title: "Доска лучше, чем просто доска", text: "Заметки, фигуры, рисование, свои картинки и наборы стикеров: Хэллоуин, Новый год, китайский Новый год, школа, еда, животные, похвала.", tone: "teach" },
-          { icon: Clapperboard, title: "Видео прямо на доске", text: "Вставьте ссылку из VK Видео, YouTube или Rutube — ученик видит плеер у себя. Без демонстрации экрана и зависаний.", tone: "lilac" },
+          { icon: PenTool, title: "Доска лучше, чем просто доска", text: "Заметки, фигуры, рисование, стикеры к праздникам и видео из VK, YouTube и Rutube прямо на доске — без демонстрации экрана.", tone: "teach" },
           { icon: FileStack, title: "Все материалы под рукой", text: "Загрузите учебники, карточки, аудио и презентации один раз — и кладите их на доску в два клика.", tone: "sun" },
           { icon: Video, title: "Урок в браузере", text: "Ученик заходит по кнопке из кабинета. Звонок и доску открываете только вы.", tone: "study" },
           { icon: NotebookPen, title: "Отчёты без рутины", text: "Конспект ученику, отчёт родителю, ДЗ и тест — автоматически по записи урока.", tone: "mint" },
-          { icon: Repeat, title: "Ученики учат слова сами", text: "Новые слова урока становятся карточками с интервальным повторением. Вы видите, что ученик действительно повторяет.", tone: "study" },
+          { icon: Repeat, title: "Ученики учат слова сами", text: "Слова с урока, из домашки и занятий сразу становятся карточками с интервальным повторением. Слова можно добавить и вручную.", tone: "study" },
+          { icon: Sparkles, title: "Интерактивные занятия", text: "Вставка слов в текст, пары, тесты и аудирование — ответы проверяются сами. Готовые занятия для IELTS и HSK или своё — за пару минут.", tone: "lilac" },
         ]} />
       </Section>
 
