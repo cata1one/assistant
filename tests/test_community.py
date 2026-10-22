@@ -53,7 +53,7 @@ def test_chat_blocks_contacts_and_split_numbers(env):
     bad = c.send(v[TUTOR], chat, {"text": "напиши мне в телеграм @anna_english"})
     assert bad["moderation"]["action"] == "block" and not bad["delivered_to_telegram"]
     assert "@anna_english" not in c.messages(v[STUDENT], chat)["messages"][-1]["text"]
-    assert any(ch == "-100" and "чат на сайте" in t for ch, t in sent)
+    assert any(ch == "-100" and "переписка на сайте" in t for ch, t in sent)
     c.send(v[TUTOR], chat, {"text": "8 916"})
     c.send(v[TUTOR], chat, {"text": "555"})
     assert c.send(v[TUTOR], chat, {"text": "12 34"})["moderation"]["action"] == "block"
@@ -66,7 +66,23 @@ def test_chat_access(env):
             c.messages(v[uid], chat)
     with pytest.raises(PortalError):
         c.send(v[STUDENT], chat, {"text": ""})
-    assert c.chats(v[PARENT])["chats"] == []
+    parent_chats = c.chats(v[PARENT])["chats"]
+    assert [x["kind"] for x in parent_chats] == ["parent"]  # только своя ветка с преподавателем
+
+
+def test_parent_writes_to_tutor(env):
+    c, v, pair, sent = env["c"], env["v"], env["pair"], env["sent"]
+    thread = f"pp:{pair.id}:{PARENT}"
+    out = c.send(v[PARENT], thread, {"text": "Добрый день! Как успехи у Миши?"})
+    assert out["moderation"]["action"] == "allow" and sent[-1][0] == TUTOR
+    tutor_threads = {x["chat_id"]: x for x in c.chats(v[TUTOR])["chats"]}
+    assert tutor_threads[thread]["unread"] == 1 and tutor_threads[thread]["title"] == "Родитель"
+    c.send(v[TUTOR], thread, {"text": "Отлично, выучил 6 новых слов"})
+    assert sent[-1][0] == PARENT
+    with pytest.raises(PortalError):
+        c.messages(v[STUDENT], thread)  # ученик не читает переписку родителя
+    # пара из бота школы — строгий режим: контакты в переписке с родителем тоже блокируются
+    assert c.send(v[PARENT], thread, {"text": "мой номер 8 916 555 12 34"})["moderation"]["action"] == "block"
 
 
 def test_chat_during_lesson_feeds_lesson(env):

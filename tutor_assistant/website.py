@@ -31,22 +31,26 @@ from pathlib import Path
 from typing import Any
 
 from . import catalog
+from .accounts import Accounts
 from .classroom import Classroom
 from .community import Community
+from .learning import Learning
 from .portal import Portal, PortalError
 
 WEB_DIR = Path(__file__).with_name("web")
 MAX_SITE_BODY = 1024 * 1024
-MAX_ROOM_AUDIO = 16 * 1024 * 1024  # фрагмент записи урока
+MAX_ROOM_AUDIO = 26 * 1024 * 1024  # фрагмент записи урока или файл материала
 STATIC_RE = re.compile(r"^/static/([\w.-]+)$")
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
-    "Content-Security-Policy": ("default-src 'self'; img-src 'self' data: blob:; style-src 'self'; "
-                                "script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
-                                "form-action 'self'"),
+    "Content-Security-Policy": ("default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; "
+                                "style-src 'self'; script-src 'self'; connect-src 'self'; "
+                                # Плееры видео для уроков и доски — без демонстрации экрана
+                                "frame-src https://vk.com https://vkvideo.ru https://www.youtube-nocookie.com "
+                                "https://rutube.ru; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
 }
 
 
@@ -87,8 +91,8 @@ class Website:
         ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/finish$"), "room_finish", True),
         # чат пары вне урока
         ("GET", re.compile(r"^/site/v1/chats$"), "chats", True),
-        ("GET", re.compile(r"^/site/v1/chats/(?P<chat>pair:[0-9a-f]+)/messages$"), "chat_messages", True),
-        ("POST", re.compile(r"^/site/v1/chats/(?P<chat>pair:[0-9a-f]+)/messages$"), "chat_send", True),
+        ("GET", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp):[0-9a-f]+(?::[\w-]+)?)/messages$"), "chat_messages", True),
+        ("POST", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp):[0-9a-f]+(?::[\w-]+)?)/messages$"), "chat_send", True),
         # отзывы
         ("GET", re.compile(r"^/site/v1/reviews$"), "reviews", False),
         ("POST", re.compile(r"^/site/v1/reviews$"), "review_submit", True),
@@ -110,14 +114,40 @@ class Website:
         ("GET", re.compile(r"^/site/v1/market-mine$"), "market_mine", True),
         ("GET", re.compile(r"^/site/v1/admin/market$"), "admin_market", True),
         ("GET", re.compile(r"^/site/v1/parent$"), "parent", True),
+        # аккаунты
+        ("POST", re.compile(r"^/site/v1/auth/register$"), "auth_register", False),
+        ("POST", re.compile(r"^/site/v1/auth/login$"), "auth_login", False),
+        ("GET", re.compile(r"^/site/v1/account$"), "account", True),
+        ("POST", re.compile(r"^/site/v1/account$"), "account_update", True),
+        ("POST", re.compile(r"^/site/v1/account/telegram$"), "account_telegram", True),
+        ("GET", re.compile(r"^/site/v1/invites/(?P<code>[\w-]+)$"), "invite_info", False),
+        ("POST", re.compile(r"^/site/v1/invites/(?P<code>[\w-]+)/join$"), "invite_join", True),
+        ("GET", re.compile(r"^/site/v1/students$"), "students", True),
+        ("POST", re.compile(r"^/site/v1/students$"), "student_add", True),
+        ("POST", re.compile(r"^/site/v1/students/(?P<id>[0-9a-f]+)/remove$"), "student_remove", True),
+        ("GET", re.compile(r"^/site/v1/school$"), "school", True),
+        ("POST", re.compile(r"^/site/v1/school$"), "school_update", True),
+        # материалы, ДЗ, карточки
+        ("GET", re.compile(r"^/site/v1/materials$"), "materials", True),
+        ("POST", re.compile(r"^/site/v1/materials$"), "material_link", True),
+        ("POST", re.compile(r"^/site/v1/materials/upload$"), "material_upload", True),
+        ("POST", re.compile(r"^/site/v1/materials/(?P<id>[0-9a-f]+)/delete$"), "material_delete", True),
+        ("GET", re.compile(r"^/site/v1/homework$"), "homework", True),
+        ("POST", re.compile(r"^/site/v1/homework$"), "homework_assign", True),
+        ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)$"), "homework_update", True),
+        ("GET", re.compile(r"^/site/v1/cards$"), "cards", True),
+        ("POST", re.compile(r"^/site/v1/cards/review$"), "cards_review", True),
     ]
-    RAW_BODY_RE = re.compile(r"^/site/v1/rooms/[\w-]+/audio$")  # тело — аудио, а не JSON
+    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload)$")  # тело — файл, а не JSON
+    FILE_RE = re.compile(r"^/site/v1/files/(?P<id>[0-9a-f]{24})$")
 
     def __init__(self, portal: Portal, web_dir: Path = WEB_DIR, classroom: Classroom | None = None):
         self.portal = portal
         self.web_dir = web_dir
         self.classroom = classroom or Classroom(portal)
         self.community = Community(portal)
+        self.accounts = Accounts(portal)
+        self.learning = Learning(portal)
 
     @staticmethod
     def handles(path: str) -> bool:
@@ -129,6 +159,14 @@ class Website:
             if method not in ("GET", "HEAD"):
                 return json_response(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "метод не поддерживается"})
             return self.static(path)
+        file_match = self.FILE_RE.match(path)
+        if file_match and method == "GET":  # файл материала: отдаём байты, а не JSON
+            try:
+                data, mime, disposition = self.learning.file(file_match.group("id"))
+            except PortalError as exc:
+                return json_response(exc.status, {"error": exc.message})
+            return Response(200, data, mime, {"Content-Disposition": disposition, "Cache-Control": "private, max-age=86400",
+                                              "Content-Security-Policy": "default-src 'none'; sandbox"})
         try:
             body: Any = {}
             if method == "POST" and raw and not self.RAW_BODY_RE.match(path):
@@ -148,6 +186,7 @@ class Website:
                 if private:
                     kwargs["viewer"] = self.portal.viewer(headers.get("X-Access-Token"))
                 kwargs["key"] = headers.get("X-Request-Key")  # секретный ключ заявки на бирже
+                kwargs["headers"] = headers
                 return json_response(HTTPStatus.OK, getattr(self, name)(**kwargs))
             if allowed:
                 raise PortalError(405, "метод не поддерживается")
@@ -333,3 +372,68 @@ def _int(value: str) -> int:
         return max(0, int(value))
     except ValueError:
         raise PortalError(400, "ожидалось число") from None
+
+    # -- аккаунты ------------------------------------------------------------------------
+    def auth_register(self, body: Any, ip: str | None, **_: Any) -> Any:
+        return self.accounts.register(body, ip)
+
+    def auth_login(self, body: Any, ip: str | None, **_: Any) -> Any:
+        return self.accounts.login(body, ip)
+
+    def account(self, viewer: Any, **_: Any) -> Any:
+        return self.accounts.me(viewer)
+
+    def account_update(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.accounts.update_profile(viewer, body)
+
+    def account_telegram(self, viewer: Any, **_: Any) -> Any:
+        return self.accounts.telegram_link(viewer)
+
+    def invite_info(self, code: str, **_: Any) -> Any:
+        return self.accounts.invite_info(code)
+
+    def invite_join(self, viewer: Any, code: str, **_: Any) -> Any:
+        return self.accounts.join(viewer, code)
+
+    def students(self, viewer: Any, **_: Any) -> Any:
+        return self.accounts.students(viewer)
+
+    def student_add(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.accounts.add_student(viewer, body)
+
+    def student_remove(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.accounts.remove_student(viewer, id)
+
+    def school(self, viewer: Any, **_: Any) -> Any:
+        return self.accounts.school(viewer)
+
+    def school_update(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.accounts.update_school(viewer, body)
+
+    # -- материалы, ДЗ, карточки ---------------------------------------------------------
+    def materials(self, viewer: Any, **_: Any) -> Any:
+        return self.learning.materials(viewer)
+
+    def material_link(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.learning.add_link(viewer, body)
+
+    def material_upload(self, viewer: Any, raw: bytes, headers: Any, **_: Any) -> Any:
+        return self.learning.upload(viewer, raw, headers)
+
+    def material_delete(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.learning.delete_material(viewer, id)
+
+    def homework(self, viewer: Any, **_: Any) -> Any:
+        return self.learning.homework(viewer)
+
+    def homework_assign(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.learning.assign(viewer, body)
+
+    def homework_update(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.learning.update_homework(viewer, int(id), body)
+
+    def cards(self, viewer: Any, **_: Any) -> Any:
+        return self.learning.cards(viewer)
+
+    def cards_review(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.learning.review(viewer, body)

@@ -26,6 +26,7 @@ import time
 from typing import Any
 
 from . import render
+from .accounts import Accounts
 from .commands import HELP_TEXT, detect_command
 from .config import Settings
 from .contact_guard import ModerationResult, Severity
@@ -729,6 +730,11 @@ class TutorBot:
                 await msg.reply_text(RELAY_HELP)
             else:
                 await self.cmd_help(update, context)
+            return
+        if context.args[0].startswith("a_"):  # привязка Telegram к аккаунту сайта
+            acc = Accounts(self.portal).link_telegram(context.args[0][2:], str(user.id))
+            await msg.reply_text(f"✅ Telegram привязан к аккаунту «{acc['name']}». Сюда будут приходить отчёты, "
+                                 "домашние задания и сообщения." if acc else "❌ Ссылка устарела — получите новую в профиле.")
             return
         if context.args[0].startswith("p_"):
             await self._parent_start(update, context, context.args[0][2:])

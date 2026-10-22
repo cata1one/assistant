@@ -62,6 +62,18 @@ class Classroom:
             telegram_send = lambda chat, text: send_telegram_async(token, chat, text)  # noqa: E731
         self.telegram_send = telegram_send
 
+    def _tg(self, chat_id: str | None, text: str) -> bool:
+        """В Telegram: id Telegram как есть, аккаунт сайта — если к нему привязан Telegram."""
+        if not chat_id or not self.telegram_send:
+            return False
+        if str(chat_id).startswith("a_"):
+            acc = self.storage.get_account(str(chat_id))
+            chat_id = acc.get("tg_user_id") if acc else None
+            if not chat_id:
+                return False
+        self.telegram_send(str(chat_id), text)
+        return True
+
     # -- доступ ---------------------------------------------------------------
     def _room_access(self, viewer: Viewer, lesson_id: str) -> tuple[dict[str, Any], Access, str]:
         lesson = self.storage.get_lesson(lesson_id)
@@ -105,8 +117,8 @@ class Classroom:
                                              title=title, require_recording=True)
         self._board_id(lesson, viewer.user_id)
         link = f"{self.settings.site_url}/#/room/{lesson['id']}" if self.settings.site_url else None
-        if pair.student_user_id and self.telegram_send:
-            self.telegram_send(pair.student_user_id,
+        if pair.student_user_id:
+            self._tg(pair.student_user_id,
                                f"▶️ «{pair.tutor_alias}» начал урок в онлайн-классе"
                                + (f": {title}" if title else "") + "."
                                + (f"\nВойти: {link}" if link else "\nВойдите через личный кабинет на сайте школы.")
@@ -183,7 +195,8 @@ class Classroom:
         if not isinstance(text, str) or not text.strip() or len(text) > MAX_CHAT_TEXT:
             raise PortalError(400, f"текст: от 1 до {MAX_CHAT_TEXT} символов")
         out = self.assistant.process_message(lesson_id, viewer.user_id, self._name(access, role), text.strip(),
-                                             role=Role.TUTOR if role == TUTOR else Role.STUDENT)
+                                             role=Role.TUTOR if role == TUTOR else Role.STUDENT,
+                                             moderate=self.portal.is_strict(lesson["chat_id"]))
         if out.moderation.is_violation:
             self._alert(access, role, out.moderation.summary, text, "чат онлайн-класса", out.incident_id)
         return {"stored": out.stored_text, "moderation": out.moderation.to_dict(),
@@ -198,7 +211,8 @@ class Classroom:
         if not raw:
             raise PortalError(400, "тело запроса — аудиофрагмент")
         out = self.assistant.process_audio(lesson_id, viewer.user_id, self._name(access, role), raw,
-                                           role=Role.TUTOR if role == TUTOR else Role.STUDENT, recording=True)
+                                           role=Role.TUTOR if role == TUTOR else Role.STUDENT, recording=True,
+                                           moderate=self.portal.is_strict(lesson["chat_id"]))
         if out.moderation is not None and out.moderation.is_violation:
             self._alert(access, role, out.moderation.summary, out.text, "речь на уроке", out.incident_id)
         return {"checked": out.checked, "error": out.error,
@@ -206,13 +220,16 @@ class Classroom:
                 "summary": out.moderation.summary if out.moderation and out.moderation.is_violation else None}
 
     def _alert(self, access: Access, role: str, summary: str, text: str, where: str, incident_id: int | None) -> None:
-        if not (self.telegram_send and self.settings.admin_chat_id):
-            return
         pair = access.pair
         who = f"{'преподаватель' if role == TUTOR else 'ученик'} «{pair.alias(role)}»" if pair else role
-        self.telegram_send(self.settings.admin_chat_id,
-                           f"🚨 Нарушение #{incident_id or '—'} ({where}): {summary}\n"
-                           f"Пара {pair.id if pair else '—'}, {who}\nТекст:\n{text[:1500]}")
+        message = (f"🚨 Нарушение #{incident_id or '—'} ({where}): {summary}\n"
+                   f"Пара {pair.id if pair else '—'}, {who}\nТекст:\n{text[:1500]}")
+        if self.telegram_send and self.settings.admin_chat_id:
+            self.telegram_send(self.settings.admin_chat_id, message)
+        tutor = self.storage.get_account(pair.tutor_user_id) if pair and pair.tutor_user_id else None
+        org = self.storage.get_org(tutor.get("org_id")) if tutor else None
+        if org:  # владельцу школы — тоже
+            self._tg(org["owner_id"], message)
 
     # -- завершение ------------------------------------------------------------------
     def finish(self, viewer: Viewer, lesson_id: str) -> dict[str, Any]:
@@ -236,7 +253,7 @@ class Classroom:
         """Отчёты в Telegram: ученику — конспект, родителям — отчёт об успехах, преподавателю — полный."""
         sent = {"student": 0, "parents": 0, "tutor": 0}
         pair = access.pair
-        if not (self.telegram_send and pair):
+        if not pair:
             return sent
         cabinet = f"\n\nКонспект, слова и тест — в личном кабинете: {self.settings.site_url}/#/cabinet" \
             if self.settings.site_url else ""
@@ -252,12 +269,19 @@ class Classroom:
             sent["parents"] += 1
         if pair.tutor_user_id:
             status = (f"📨 Отчёт отправлен родителям: {len(parents)}." if parents else
-                      "ℹ️ Родители ученика не подключены — ссылку для них выдаёт администратор школы (/parent_link).")
+                      "ℹ️ Родители ученика не подключены — отправьте им ссылку-приглашение из раздела «Ученики».")
             self._send_long(pair.tutor_user_id, "📋 Полный отчёт для преподавателя\n\n"
                             + render.render_report(report, with_answers=True) + "\n\n" + status)
             sent["tutor"] = 1
+            tutor = self.storage.get_account(pair.tutor_user_id)
+            org = self.storage.get_org(tutor.get("org_id")) if tutor else None
+            if org:  # школа видит полный отчёт на сайте; в Telegram — короткое уведомление
+                link = f"\n{self.settings.site_url}/#/lesson/{report.lesson_id}" if self.settings.site_url else ""
+                self._tg(org["owner_id"], f"📋 Урок завершён: {pair.tutor_alias} ↔ {pair.student_alias}"
+                                          f"{' — ' + report.topic if report.topic else ''}.{link}")
+                sent["school"] = 1
         return sent
 
-    def _send_long(self, chat_id: str, text: str) -> None:
-        for part in render.split_message(text):
-            self.telegram_send(str(chat_id), part)
+    def _send_long(self, chat_id: str, text: str) -> bool:
+        parts = render.split_message(text)
+        return all(self._tg(chat_id, part) for part in parts) if parts else False

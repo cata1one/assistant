@@ -221,7 +221,7 @@ class TutorAssistant:
     def process_message(self, lesson_id: str, speaker_id: str | None, speaker_name: str | None, text: str,
                         role: Role | str | None = None, ref: Hashable | None = None,
                         ts: float | None = None, context_text: str | None = None,
-                        source: str = "text") -> MessageOutcome:
+                        source: str = "text", moderate: bool = True) -> MessageOutcome:
         """Реплика урока: проверка, сохранение (без контактов), сбор слов и ДЗ.
 
         ``context_text`` — предыдущий фрагмент речи того же говорящего: номер,
@@ -233,9 +233,12 @@ class TutorAssistant:
             self.storage.update_lesson(lesson_id, student_id=str(speaker_id), student_name=speaker_name)
         st = self._state(lesson_id)
 
-        with self._lock:
-            result = st.guard.check(str(speaker_id or speaker_name or role_.value), text, ts=ts, ref=ref)
-        if context_text and not result.blocked and not self.guard.check(context_text).blocked:
+        if not moderate:  # частный репетитор: переписка с его учеником не фильтруется
+            result = self.guard.check("")
+        else:
+            with self._lock:
+                result = st.guard.check(str(speaker_id or speaker_name or role_.value), text, ts=ts, ref=ref)
+        if moderate and context_text and not result.blocked and not self.guard.check(context_text).blocked:
             joined = self.guard.check(f"{context_text} {text}")
             if joined.blocked:
                 result = joined
@@ -356,7 +359,7 @@ class TutorAssistant:
 
     def process_audio(self, lesson_id: str, speaker_id: str | None, speaker_name: str | None, audio: AudioInput,
                       role: Role | str | None = None, ref: Hashable | None = None, ts: float | None = None,
-                      recording: bool = False) -> AudioOutcome:
+                      recording: bool = False, moderate: bool = True) -> AudioOutcome:
         """Фрагмент речи урока: распознать → проверить → сохранить в расшифровку урока.
 
         ``recording=True`` — фрагмент непрерывной записи урока (отмечается для контроля перерывов).
@@ -374,7 +377,7 @@ class TutorAssistant:
         with self._lock:
             tail = st.speech_tail.get(tail_key)
         outcome = self.process_message(lesson_id, speaker_id, speaker_name, transcription.text, role=role, ref=ref,
-                                       ts=ts, context_text=tail, source="speech")
+                                       ts=ts, context_text=tail, source="speech", moderate=moderate)
         with self._lock:
             st.speech_tail[tail_key] = "" if outcome.moderation.blocked else transcription.text[-SPEECH_TAIL_CHARS:]
         return AudioOutcome(checked=True, transcription=transcription, outcome=outcome, moderation=outcome.moderation,

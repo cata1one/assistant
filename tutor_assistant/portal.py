@@ -116,6 +116,11 @@ class Portal:
         """Сообщение в Telegram без запущенного бота. False — некуда или нечем отправить."""
         if not chat_id:
             return False
+        if str(chat_id).startswith("a_"):  # аккаунт сайта: в Telegram — только если он привязан
+            acc = self.storage.get_account(str(chat_id))
+            chat_id = acc.get("tg_user_id") if acc else None
+            if not chat_id:
+                return False
         if self.telegram_send is not None:
             self.telegram_send(str(chat_id), text)
             return True
@@ -126,6 +131,15 @@ class Portal:
 
     def notify_admin(self, text: str) -> None:
         self.telegram(self.settings.admin_chat_id or None, text)
+
+    def notify_violation(self, chat_id: str, text: str) -> None:
+        """Нарушение в паре: администратору платформы и владельцу школы, если репетитор работает в школе."""
+        self.notify_admin(text)
+        pair = self._pair_of(chat_id)
+        tutor = self.storage.get_account(pair.tutor_user_id) if pair and pair.tutor_user_id else None
+        org = self.storage.get_org(tutor.get("org_id")) if tutor else None
+        if org:
+            self.telegram(org["owner_id"], text)
 
     # -- доступ -----------------------------------------------------------------
     def issue_token(self, user_id: str, admin: bool = False) -> str:
@@ -168,12 +182,31 @@ class Portal:
                 continue
             title = pair.student_alias if pair else (self._student_name(chat_id) or "Ученик")
             out[chat_id] = Access(chat_id, PARENT, title, pair)
+        acc = self.storage.get_account(viewer.user_id) if viewer.user_id.startswith("a_") else None
+        if acc and acc["role"] == "school" and acc.get("org_id"):
+            tutors = [t["id"] for t in self.storage.org_accounts(acc["org_id"], "tutor")]
+            for row in self.storage.pairs_of_tutors(tutors):
+                pair = Pair.from_row(row)
+                out.setdefault(pair.chat_id, Access(pair.chat_id, ADMIN, f"{pair.tutor_alias} ↔ {pair.student_alias}",
+                                                    pair))
         if viewer.admin:
             for row in self.storage.list_pairs(limit=500):
                 pair = Pair.from_row(row)
                 out.setdefault(pair.chat_id, Access(pair.chat_id, ADMIN, f"{pair.tutor_alias} ↔ {pair.student_alias}",
                                                     pair))
         return list(out.values())
+
+    def is_strict(self, chat_id: str) -> bool:
+        """Фильтровать ли контакты: частный репетитор — нет, репетитор школы — по настройке школы,
+        пары школы из Telegram-бота — всегда."""
+        pair = self._pair_of(chat_id)
+        if not pair or not pair.tutor_user_id:
+            return True
+        tutor = self.storage.get_account(pair.tutor_user_id) if pair.tutor_user_id.startswith("a_") else None
+        if not tutor:
+            return True
+        org = self.storage.get_org(tutor.get("org_id"))
+        return bool(org and org["filter_contacts"])
 
     def _pair_of(self, chat_id: str) -> Pair | None:
         if not chat_id.startswith("pair:"):
@@ -297,8 +330,8 @@ class Portal:
 
     def create_board(self, viewer: Viewer, chat_id: str, title: str | None) -> dict[str, Any]:
         access = self._access(viewer, chat_id)
-        if access.role == PARENT:
-            raise PortalError(403, "доска доступна преподавателю и ученику")
+        if access.role not in (TUTOR, ADMIN):
+            raise PortalError(403, "доску создаёт преподаватель")
         clean = (title or "").strip()[:80] or "Доска"
         verdict = self.assistant.moderate(clean)
         if verdict.is_violation:

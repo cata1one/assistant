@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import logging
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from . import catalog
 from .models import Role
-from .portal import PARENT, Portal, PortalError, Viewer, _field, hash_token
+from .portal import ADMIN, PARENT, Portal, PortalError, Viewer, _field, hash_token
 from .relay import STUDENT, TUTOR, RelayService
 
 log = logging.getLogger(__name__)
@@ -53,6 +54,17 @@ DEMO_REVIEWS: list[dict[str, Any]] = [
      "rating": 5, "text": "Так будет выглядеть отзыв о подготовке к экзамену: с какого уровня начали и какой "
                          "результат получили."},
 ]
+
+
+@dataclass(frozen=True)
+class Thread:
+    chat_id: str
+    role: str  # моя роль в переписке
+    title: str  # с кем
+    pair: Any
+    alias: str  # как меня видит собеседник
+    other_user: str | None
+    can_write: bool
 
 
 class Community:
@@ -92,59 +104,104 @@ class Community:
             raise PortalError(422, f"{what}: без телефонов, ников и ссылок — общение идёт через платформу школы")
         return text
 
-    # == чат пары вне урока =============================================================
+    # == переписка вне урока =============================================================
+    # Ветки: «pair:<id>» — преподаватель и ученик; «pp:<id>:<родитель>» — преподаватель и родитель.
+    # Школа читает переписки своих преподавателей, но не пишет в них.
+    def _parent_name(self, user_id: str) -> str:
+        acc = self.storage.get_account(user_id) if user_id.startswith("a_") else None
+        return f"{acc['name'].split()[0]} (родитель)" if acc else "Родитель"
+
+    def _thread(self, viewer: Viewer, chat_id: str) -> Thread:
+        if chat_id.startswith("pp:"):
+            try:
+                _, pair_id, parent_id = chat_id.split(":", 2)
+            except ValueError:
+                raise PortalError(404, "переписка не найдена") from None
+            access = self.portal._access(viewer, f"pair:{pair_id}")
+            pair = access.pair
+            if not pair or parent_id not in self.storage.parents_for(pair.chat_id):
+                raise PortalError(404, "переписка не найдена")
+            if access.role == PARENT and viewer.user_id == parent_id:
+                return Thread(chat_id, "parent", pair.tutor_alias, pair, self._parent_name(parent_id),
+                              pair.tutor_user_id, True)
+            if access.role == TUTOR:
+                return Thread(chat_id, TUTOR, self._parent_name(parent_id), pair, pair.tutor_alias, parent_id, True)
+            if access.role == ADMIN:
+                return Thread(chat_id, ADMIN, f"{pair.tutor_alias} ↔ {self._parent_name(parent_id)}", pair, "", None,
+                              False)
+            raise PortalError(403, "нет доступа к переписке")
+        access = self.portal._access(viewer, chat_id)
+        if not access.pair:
+            raise PortalError(403, "переписка доступна участникам пары")
+        pair = access.pair
+        if access.role in (TUTOR, STUDENT):
+            return Thread(chat_id, access.role, access.title, pair, pair.alias(access.role),
+                          pair.other_user(access.role), True)
+        if access.role == ADMIN:
+            return Thread(chat_id, ADMIN, access.title, pair, "", None, False)
+        raise PortalError(403, "переписка доступна преподавателю и ученику пары")
+
     def chats(self, viewer: Viewer) -> dict[str, Any]:
         out = []
-        for a in self.portal.accesses(viewer):
-            if a.role not in (TUTOR, STUDENT) or not a.pair:
-                continue
-            last = self.storage.pair_messages(a.chat_id, limit=1)
-            out.append({"chat_id": a.chat_id, "title": a.title, "role": a.role,
+
+        def add(t: Thread) -> None:
+            last = self.storage.pair_messages(t.chat_id, limit=1)
+            out.append({"chat_id": t.chat_id, "title": t.title, "role": t.role, "can_write": t.can_write,
+                        "kind": "parent" if t.chat_id.startswith("pp:") else "student",
                         "last": last[-1] if last else None,
-                        "unread": self.storage.unread_count(a.chat_id, viewer.user_id, a.role)})
+                        "unread": self.storage.unread_count(t.chat_id, viewer.user_id, t.role) if t.can_write else 0})
+
+        for a in self.portal.accesses(viewer):
+            if not a.pair:
+                continue
+            if a.role in (TUTOR, STUDENT, ADMIN):
+                add(self._thread(viewer, a.chat_id))
+            if a.role == TUTOR:
+                for parent in self.storage.parents_for(a.chat_id):
+                    add(self._thread(viewer, f"pp:{a.pair.id}:{parent}"))
+            if a.role == PARENT:
+                add(self._thread(viewer, f"pp:{a.pair.id}:{viewer.user_id}"))
         return {"chats": out}
 
-    def _chat_access(self, viewer: Viewer, chat_id: str):
-        access = self.portal._access(viewer, chat_id)
-        if access.role not in (TUTOR, STUDENT) or not access.pair:
-            raise PortalError(403, "переписка доступна преподавателю и ученику пары")
-        return access
-
     def messages(self, viewer: Viewer, chat_id: str, since: int = 0) -> dict[str, Any]:
-        access = self._chat_access(viewer, chat_id)
+        t = self._thread(viewer, chat_id)
         rows = self.storage.pair_messages(chat_id, since=since)
-        if rows:
+        if rows and t.can_write:
             self.storage.mark_read(chat_id, viewer.user_id, rows[-1]["id"])
-        return {"chat_id": chat_id, "role": access.role, "with": access.title,
+        return {"chat_id": chat_id, "role": t.role, "with": t.title, "can_write": t.can_write,
                 "messages": [{k: r[k] for k in ("id", "role", "author", "text", "source", "blocked", "created_at")}
                              for r in rows]}
 
     def send(self, viewer: Viewer, chat_id: str, body: Any) -> dict[str, Any]:
-        access = self._chat_access(viewer, chat_id)
+        t = self._thread(viewer, chat_id)
+        if not t.can_write:
+            raise PortalError(403, "школа читает переписку, но не пишет в неё")
         text = body.get("text") if isinstance(body, dict) else None
         if not isinstance(text, str) or not text.strip() or len(text) > MAX_CHAT_TEXT:
             raise PortalError(400, f"текст: от 1 до {MAX_CHAT_TEXT} символов")
         text = text.strip()
-        pair, role = access.pair, access.role
-        alias = pair.alias(role)
-        lesson = self.storage.active_lesson(chat_id)
-        if lesson:  # во время урока сообщение — часть урока: слова, ДЗ, конспект
+        pair, role, alias = t.pair, t.role, t.alias
+        lesson = self.storage.active_lesson(pair.chat_id) if chat_id == pair.chat_id else None
+        strict = self.portal.is_strict(pair.chat_id)
+        if lesson:  # во время урока сообщение ученику — часть урока: слова, ДЗ, конспект
             out = self.assistant.process_message(lesson["id"], viewer.user_id, alias, text,
-                                                 role=Role.TUTOR if role == TUTOR else Role.STUDENT)
+                                                 role=Role.TUTOR if role == TUTOR else Role.STUDENT, moderate=strict)
             result, incident_id = out.moderation, out.incident_id
-        else:  # та же проверка, что и для Telegram-моста этой пары
-            result, incident_id = self.assistant.moderate_chat_message(chat_id, viewer.user_id, alias, text, role=role)
+        elif strict:  # та же проверка, что и для Telegram-моста этой пары
+            result, incident_id = self.assistant.moderate_chat_message(chat_id, viewer.user_id, alias, text,
+                                                                       role=role if role in (TUTOR, STUDENT) else None)
+        else:  # частный репетитор: переписка с его учениками и родителями не фильтруется
+            result, incident_id = self.assistant.guard.check(""), None
         stored = result.redacted_text if result.blocked else text
         msg_id = self.storage.add_pair_message(chat_id, role, alias, stored, source="site", blocked=result.blocked)
+        who = {"tutor": "преподаватель", "student": "ученик", "parent": "родитель"}.get(role, role)
         if result.is_violation:
-            self.portal.notify_admin(f"🚨 Нарушение #{incident_id or '—'} (чат на сайте, пара {pair.id}): "
-                                     f"{result.summary}\nКто: {'преподаватель' if role == TUTOR else 'ученик'} "
-                                     f"«{alias}»\nТекст:\n{text[:1500]}")
+            self.portal.notify_violation(pair.chat_id, f"🚨 Нарушение #{incident_id or '—'} (переписка на сайте, "
+                                         f"пара {pair.id}): {result.summary}\nКто: {who} «{alias}»\nТекст:\n{text[:1500]}")
         delivered = False
         if not result.blocked:
-            other = pair.other_user(role)
-            link = f"\n\nОтветить: {self.settings.site_url}/#/cabinet?tab=messages" if self.settings.site_url else ""
-            delivered = self.portal.telegram(other, f"{alias}: {text}{link}")
+            link = f"\n\nОтветить: {self.settings.site_url}/#/app/messages" if self.settings.site_url else ""
+            delivered = self.portal.telegram(t.other_user, f"{alias}: {text}{link}")
         return {"id": msg_id, "stored": stored, "moderation": result.to_dict(), "delivered_to_telegram": delivered}
 
     # == отзывы =========================================================================

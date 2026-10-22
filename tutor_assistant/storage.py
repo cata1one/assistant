@@ -275,6 +275,82 @@ CREATE TABLE IF NOT EXISTS market_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_market_status ON market_requests(status, created_at);
 
+-- Аккаунты сайта (вход по почте и паролю; Telegram — по желанию)
+CREATE TABLE IF NOT EXISTS accounts (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    org_id TEXT,
+    tg_user_id TEXT,
+    plan TEXT NOT NULL DEFAULT 'free',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_accounts_org ON accounts(org_id);
+
+CREATE TABLE IF NOT EXISTS orgs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    filter_contacts INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
+-- Приглашения: ученик к репетитору, преподаватель в школу, привязка Telegram
+CREATE TABLE IF NOT EXISTS invites (
+    code TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    target TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    uses INTEGER NOT NULL DEFAULT 0,
+    max_uses INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
+-- Материалы: файлы, ссылки и видео (свои у репетитора, общие у школы)
+CREATE TABLE IF NOT EXISTS materials (
+    id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    org_id TEXT,
+    title TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    mime TEXT,
+    size INTEGER,
+    url TEXT,
+    folder TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_materials_owner ON materials(owner_id);
+CREATE INDEX IF NOT EXISTS idx_materials_org ON materials(org_id);
+
+-- Домашние задания от преподавателя
+CREATE TABLE IF NOT EXISTS assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    materials TEXT,
+    due TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    answer TEXT,
+    created_at TEXT NOT NULL,
+    done_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_assignments_chat ON assignments(chat_id, id);
+
+-- Интервальное повторение слов (карточки)
+CREATE TABLE IF NOT EXISTS srs_cards (
+    owner TEXT NOT NULL,
+    word_key TEXT NOT NULL,
+    ease REAL NOT NULL DEFAULT 2.5,
+    interval_days REAL NOT NULL DEFAULT 0,
+    reps INTEGER NOT NULL DEFAULT 0,
+    lapses INTEGER NOT NULL DEFAULT 0,
+    due TEXT NOT NULL,
+    last_review TEXT,
+    PRIMARY KEY (owner, word_key)
+);
+
 CREATE TABLE IF NOT EXISTS market_proposals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     request_id TEXT NOT NULL REFERENCES market_requests(id),
@@ -843,6 +919,127 @@ class Storage:
 
     def set_proposal_status(self, proposal_id: int, status: str) -> None:
         self._exec("UPDATE market_proposals SET status=? WHERE id=?", (status, proposal_id))
+
+
+    # -- аккаунты и школы -------------------------------------------------------------
+    def add_account(self, **f: Any) -> dict[str, Any]:
+        self._exec("INSERT INTO accounts(id, email, password_hash, name, role, org_id, created_at) VALUES (?,?,?,?,?,?,?)",
+                   (f["id"], f["email"], f["password_hash"], f["name"], f["role"], f.get("org_id"), utcnow()))
+        return self.get_account(f["id"])  # type: ignore[return-value]
+
+    def get_account(self, account_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM accounts WHERE id=?", (account_id,))
+
+    def account_by_email(self, email: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM accounts WHERE email=?", (email,))
+
+    def account_by_tg(self, tg_user_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM accounts WHERE tg_user_id=?", (tg_user_id,))
+
+    def update_account(self, account_id: str, **fields: Any) -> None:
+        sets = ", ".join(f"{k}=?" for k in fields)
+        self._exec(f"UPDATE accounts SET {sets} WHERE id=?", (*fields.values(), account_id))
+
+    def org_accounts(self, org_id: str, role: str | None = None) -> list[dict[str, Any]]:
+        if role:
+            return self._all("SELECT * FROM accounts WHERE org_id=? AND role=? ORDER BY created_at", (org_id, role))
+        return self._all("SELECT * FROM accounts WHERE org_id=? ORDER BY created_at", (org_id,))
+
+    def add_org(self, org_id: str, name: str, owner_id: str) -> None:
+        self._exec("INSERT INTO orgs(id, name, owner_id, created_at) VALUES (?,?,?,?)", (org_id, name, owner_id, utcnow()))
+
+    def get_org(self, org_id: str | None) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM orgs WHERE id=?", (org_id,)) if org_id else None
+
+    def update_org(self, org_id: str, **fields: Any) -> None:
+        sets = ", ".join(f"{k}=?" for k in fields)
+        self._exec(f"UPDATE orgs SET {sets} WHERE id=?", (*fields.values(), org_id))
+
+    def add_invite(self, code: str, kind: str, target: str, created_by: str, max_uses: int = 1) -> None:
+        self._exec("INSERT INTO invites(code, kind, target, created_by, max_uses, created_at) VALUES (?,?,?,?,?,?)",
+                   (code, kind, target, created_by, max_uses, utcnow()))
+
+    def get_invite(self, code: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM invites WHERE code=?", (code,))
+
+    def use_invite(self, code: str) -> bool:
+        return bool(self._exec("UPDATE invites SET uses=uses+1 WHERE code=? AND uses<max_uses", (code,)).rowcount)
+
+    def invites_for(self, target: str, kind: str) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM invites WHERE target=? AND kind=? ORDER BY created_at", (target, kind))
+
+    def tutor_pairs(self, tutor_id: str) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM pairs WHERE active=1 AND tutor_user_id=? ORDER BY created_at, rowid", (tutor_id,))
+
+    def pairs_of_tutors(self, tutor_ids: Iterable[str]) -> list[dict[str, Any]]:
+        ids = list(tutor_ids)
+        if not ids:
+            return []
+        return self._all(f"SELECT * FROM pairs WHERE active=1 AND tutor_user_id IN ({','.join('?' * len(ids))}) "
+                         "ORDER BY created_at", ids)
+
+    def org_incidents(self, chat_ids: Iterable[str], limit: int = 200) -> list[dict[str, Any]]:
+        ids = list(chat_ids)
+        if not ids:
+            return []
+        return self._all(f"SELECT * FROM incidents WHERE chat_id IN ({','.join('?' * len(ids))}) "
+                         "ORDER BY id DESC LIMIT ?", (*ids, limit))
+
+    # -- материалы -------------------------------------------------------------------------
+    def add_material(self, **f: Any) -> dict[str, Any]:
+        self._exec("INSERT INTO materials(id, owner_id, org_id, title, kind, mime, size, url, folder, created_at) "
+                   "VALUES (?,?,?,?,?,?,?,?,?,?)", (f["id"], f["owner_id"], f.get("org_id"), f["title"], f["kind"],
+                                                  f.get("mime"), f.get("size"), f.get("url"), f.get("folder"), utcnow()))
+        return self.get_material(f["id"])  # type: ignore[return-value]
+
+    def get_material(self, material_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM materials WHERE id=?", (material_id,))
+
+    def materials_for(self, owner_id: str, org_id: str | None) -> list[dict[str, Any]]:
+        if org_id:
+            return self._all("SELECT * FROM materials WHERE owner_id=? OR org_id=? ORDER BY created_at DESC",
+                             (owner_id, org_id))
+        return self._all("SELECT * FROM materials WHERE owner_id=? ORDER BY created_at DESC", (owner_id,))
+
+    def delete_material(self, material_id: str) -> None:
+        self._exec("DELETE FROM materials WHERE id=?", (material_id,))
+
+    # -- домашние задания --------------------------------------------------------------------
+    def add_assignment(self, chat_id: str, text: str, materials: list[str], due: str | None) -> int:
+        cur = self._exec("INSERT INTO assignments(chat_id, text, materials, due, created_at) VALUES (?,?,?,?,?)",
+                         (chat_id, text, json.dumps(materials), due, utcnow()))
+        return int(cur.lastrowid)
+
+    def assignments(self, chat_ids: Iterable[str], limit: int = 200) -> list[dict[str, Any]]:
+        ids = list(chat_ids)
+        if not ids:
+            return []
+        rows = self._all(f"SELECT * FROM assignments WHERE chat_id IN ({','.join('?' * len(ids))}) "
+                         "ORDER BY id DESC LIMIT ?", (*ids, limit))
+        for r in rows:
+            r["materials"] = json.loads(r["materials"] or "[]")
+        return rows
+
+    def get_assignment(self, assignment_id: int) -> dict[str, Any] | None:
+        row = self._one("SELECT * FROM assignments WHERE id=?", (assignment_id,))
+        if row:
+            row["materials"] = json.loads(row["materials"] or "[]")
+        return row
+
+    def update_assignment(self, assignment_id: int, **fields: Any) -> None:
+        sets = ", ".join(f"{k}=?" for k in fields)
+        self._exec(f"UPDATE assignments SET {sets} WHERE id=?", (*fields.values(), assignment_id))
+
+    # -- карточки ---------------------------------------------------------------------------------
+    def srs_cards(self, owner: str) -> dict[str, dict[str, Any]]:
+        return {r["word_key"]: r for r in self._all("SELECT * FROM srs_cards WHERE owner=?", (owner,))}
+
+    def save_srs_card(self, owner: str, key: str, **f: Any) -> None:
+        self._exec("INSERT INTO srs_cards(owner, word_key, ease, interval_days, reps, lapses, due, last_review) "
+                   "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(owner, word_key) DO UPDATE SET ease=excluded.ease, "
+                   "interval_days=excluded.interval_days, reps=excluded.reps, lapses=excluded.lapses, due=excluded.due, "
+                   "last_review=excluded.last_review",
+                   (owner, key, f["ease"], f["interval_days"], f["reps"], f["lapses"], f["due"], f.get("last_review")))
 
 
 def _iso(at: datetime | None) -> str:
