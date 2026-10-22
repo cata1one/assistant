@@ -12,6 +12,7 @@ export default defineConfig({
     emptyOutDir: true,
     assetsDir: "",
     cssCodeSplit: false,
+    assetsInlineLimit: 0, // шрифты — файлами: CSP сайта не разрешает data:-шрифты
     rollupOptions: {
       output: {
         entryFileNames: "app.js",

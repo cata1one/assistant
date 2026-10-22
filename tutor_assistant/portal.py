@@ -140,11 +140,16 @@ class Portal:
     def notify_violation(self, chat_id: str, text: str) -> None:
         """Нарушение в паре: администратору платформы и владельцу школы, если репетитор работает в школе."""
         self.notify_admin(text)
-        pair = self._pair_of(chat_id)
-        tutor = self.storage.get_account(pair.tutor_user_id) if pair and pair.tutor_user_id else None
-        org = self.storage.get_org(tutor.get("org_id")) if tutor else None
+        org = self.org_of(self._pair_of(chat_id))
         if org:
             self.telegram(org["owner_id"], text)
+
+    def org_of(self, pair: Pair | None) -> dict[str, Any] | None:
+        """Школа, в которой работает преподаватель пары (None — частный репетитор или пара из бота)."""
+        if not pair or not pair.tutor_user_id or not pair.tutor_user_id.startswith("a_"):
+            return None
+        tutor = self.storage.get_account(pair.tutor_user_id)
+        return self.storage.get_org(tutor.get("org_id")) if tutor else None
 
     # -- доступ -----------------------------------------------------------------
     def issue_token(self, user_id: str, admin: bool = False) -> str:
@@ -549,6 +554,10 @@ def _validate_obj(data: Any) -> dict[str, Any]:
         out["shape"] = data["shape"]
         out["width"] = _num(data.get("width", 3), 1, 80)
         out["fill"] = _color(data["fill"]) if data.get("fill") else None
+        pts = data.get("points")
+        if data["shape"] in ("line", "arrow") and isinstance(pts, list) and len(pts) == 2:
+            out["points"] = [[_num(p[0], -40000, 40000), _num(p[1], -40000, 40000)] for p in pts
+                             if isinstance(p, (list, tuple)) and len(p) == 2]
     elif typ in ("text", "note"):
         text = data.get("text", "")
         if not isinstance(text, str) or len(text) > 1000:

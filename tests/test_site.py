@@ -336,7 +336,7 @@ def fetch(url, method="GET", body=None, headers=None):
 def test_http_site(env, server):
     status, headers, body = fetch(server + "/")
     assert status == 200 and b"<!doctype html>" in body and "default-src 'self'" in headers["Content-Security-Policy"]
-    for name in ("app.js", "board.js", "app.css", "favicon.svg"):
+    for name in ("app.js", "app.css", "favicon.svg"):
         assert fetch(server + "/static/" + name)[0] == 200
     for bad in ("/static/../api.py", "/static/%2e%2e/api.py", "/static/nope.js", "/static/"):
         assert fetch(server + bad)[0] == 404
@@ -359,6 +359,25 @@ def test_http_site(env, server):
     assert fetch(server + "/site/v1/nope")[0] == 404
     status, _, body = fetch(server + "/site/v1/applications", "POST", None)
     assert status == 400
+
+
+def test_http_accounts(server):
+    """Маршруты аккаунтов, учеников, материалов, ДЗ и карточек отвечают по HTTP."""
+    reg = {"role": "tutor", "name": "Анна", "email": "anna@http.ru", "password": "secret123", "consent": True}
+    status, _, body = fetch(server + "/site/v1/auth/register", "POST", reg)
+    assert status == 200
+    h = {"X-Access-Token": json.loads(body)["token"]}
+    assert json.loads(fetch(server + "/site/v1/account", headers=h)[2])["account"]["brand"] == "teach"
+    status, _, body = fetch(server + "/site/v1/students", "POST", {"name": "Миша"}, headers=h)
+    assert status == 200
+    code = json.loads(body)["invite"]["code"]
+    assert json.loads(fetch(server + f"/site/v1/invites/{code}")[2])["tutor"] == "Анна"
+    for path in ("/site/v1/students", "/site/v1/materials", "/site/v1/homework", "/site/v1/chats", "/site/v1/boards"):
+        assert fetch(server + path, headers=h)[0] == 200, path
+    assert fetch(server + "/site/v1/cards", headers=h)[0] == 403  # карточки — для учеников
+    assert fetch(server + "/site/v1/school", headers=h)[0] == 403
+    status, _, body = fetch(server + "/site/v1/auth/login", "POST", {"email": "anna@http.ru", "password": "secret123"})
+    assert status == 200 and json.loads(body)["account"]["role"] == "tutor"
 
 
 def test_website_handles():

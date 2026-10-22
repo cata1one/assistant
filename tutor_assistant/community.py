@@ -83,6 +83,9 @@ class Community:
             return "rejected"
         if any(a.role == TUTOR for a in self.portal.accesses(viewer)) or viewer.admin:
             return "approved"
+        acc = self.storage.get_account(viewer.user_id) if viewer.user_id.startswith("a_") else None
+        if acc and acc["role"] == "tutor":  # репетитор с аккаунтом сам отвечает за своих учеников
+            return "approved"
         return row["status"] if row else None
 
     def _require_teacher(self, viewer: Viewer) -> None:
@@ -105,13 +108,31 @@ class Community:
         return text
 
     # == переписка вне урока =============================================================
-    # Ветки: «pair:<id>» — преподаватель и ученик; «pp:<id>:<родитель>» — преподаватель и родитель.
-    # Школа читает переписки своих преподавателей, но не пишет в них.
+    # Ветки: «pair:<id>» — преподаватель и ученик; «pp:<id>:<родитель>» — преподаватель и родитель;
+    # «ps:<id>:<родитель>» — родитель и школа. Школа читает переписки своих преподавателей, но не пишет в них.
     def _parent_name(self, user_id: str) -> str:
         acc = self.storage.get_account(user_id) if user_id.startswith("a_") else None
         return f"{acc['name'].split()[0]} (родитель)" if acc else "Родитель"
 
     def _thread(self, viewer: Viewer, chat_id: str) -> Thread:
+        if chat_id.startswith("ps:"):
+            try:
+                _, pair_id, parent_id = chat_id.split(":", 2)
+            except ValueError:
+                raise PortalError(404, "переписка не найдена") from None
+            access = self.portal._access(viewer, f"pair:{pair_id}")
+            pair = access.pair
+            org = self.portal.org_of(pair)
+            if not pair or not org or parent_id not in self.storage.parents_for(pair.chat_id):
+                raise PortalError(404, "переписка не найдена")
+            school = f"Школа «{org['name']}»"
+            if access.role == PARENT and viewer.user_id == parent_id:
+                return Thread(chat_id, "parent", school, pair, self._parent_name(parent_id), org["owner_id"], True)
+            if access.role == ADMIN:
+                owner = viewer.user_id == org["owner_id"]
+                return Thread(chat_id, "school", f"{self._parent_name(parent_id)} · {pair.student_alias}", pair, school,
+                              parent_id if owner else None, owner)
+            raise PortalError(403, "нет доступа к переписке")
         if chat_id.startswith("pp:"):
             try:
                 _, pair_id, parent_id = chat_id.split(":", 2)
@@ -147,20 +168,26 @@ class Community:
         def add(t: Thread) -> None:
             last = self.storage.pair_messages(t.chat_id, limit=1)
             out.append({"chat_id": t.chat_id, "title": t.title, "role": t.role, "can_write": t.can_write,
-                        "kind": "parent" if t.chat_id.startswith("pp:") else "student",
+                        "kind": {"pp": "parent", "ps": "school"}.get(t.chat_id.split(":", 1)[0], "student"),
                         "last": last[-1] if last else None,
                         "unread": self.storage.unread_count(t.chat_id, viewer.user_id, t.role) if t.can_write else 0})
 
         for a in self.portal.accesses(viewer):
             if not a.pair:
                 continue
+            org = self.portal.org_of(a.pair)
             if a.role in (TUTOR, STUDENT, ADMIN):
                 add(self._thread(viewer, a.chat_id))
             if a.role == TUTOR:
                 for parent in self.storage.parents_for(a.chat_id):
                     add(self._thread(viewer, f"pp:{a.pair.id}:{parent}"))
+            if a.role == ADMIN and org and org["owner_id"] == viewer.user_id:
+                for parent in self.storage.parents_for(a.chat_id):
+                    add(self._thread(viewer, f"ps:{a.pair.id}:{parent}"))
             if a.role == PARENT:
                 add(self._thread(viewer, f"pp:{a.pair.id}:{viewer.user_id}"))
+                if org:
+                    add(self._thread(viewer, f"ps:{a.pair.id}:{viewer.user_id}"))
         return {"chats": out}
 
     def messages(self, viewer: Viewer, chat_id: str, since: int = 0) -> dict[str, Any]:
@@ -182,7 +209,7 @@ class Community:
         text = text.strip()
         pair, role, alias = t.pair, t.role, t.alias
         lesson = self.storage.active_lesson(pair.chat_id) if chat_id == pair.chat_id else None
-        strict = self.portal.is_strict(pair.chat_id)
+        strict = self.portal.is_strict(pair.chat_id) and not chat_id.startswith("ps:")  # со школой можно делиться
         if lesson:  # во время урока сообщение ученику — часть урока: слова, ДЗ, конспект
             out = self.assistant.process_message(lesson["id"], viewer.user_id, alias, text,
                                                  role=Role.TUTOR if role == TUTOR else Role.STUDENT, moderate=strict)
@@ -445,16 +472,26 @@ class Community:
         return {"status": "matched", "links": self._pair_links(pair.id, r["audience"])}
 
     def _pair_links(self, pair_id: str, audience: str) -> dict[str, str | None]:
+        """Ссылки ученику и родителю: на сайт (Telegram есть не у всех) и, если настроен бот, в Telegram."""
         pair = self.relay.get(pair_id)
-        if not pair or not self.settings.bot_username:
-            return {"student": None, "parent": None}
-        _, s_payload = self.relay.invite_payloads(pair)
-        base = f"https://t.me/{self.settings.bot_username}?start="
-        parent = None
-        if audience == "kid":
-            code = self._parent_code(pair)
-            parent = base + "p_" + code
-        return {"student": base + s_payload, "parent": parent}
+        if not pair:
+            return {"student": None, "parent": None, "site_student": None, "site_parent": None}
+        site = self.settings.site_url or ""
+        invite = next(iter(self.storage.invites_for(pair.id, "student")), None)
+        if not invite:
+            self.storage.add_invite(secrets.token_urlsafe(10), "student", pair.id, pair.tutor_user_id or "market")
+            invite = self.storage.invites_for(pair.id, "student")[0]
+        kid = audience == "kid"
+        parent_code = self._parent_code(pair) if kid else None
+        links = {"site_student": f"{site}/#/join?code={invite['code']}",
+                 "site_parent": f"{site}/#/join?code={parent_code}" if kid else None,
+                 "student": None, "parent": None}
+        if self.settings.bot_username:
+            _, s_payload = self.relay.invite_payloads(pair)
+            base = f"https://t.me/{self.settings.bot_username}?start="
+            links["student"] = base + s_payload
+            links["parent"] = base + "p_" + parent_code if kid else None
+        return links
 
     def _parent_code(self, pair) -> str:
         row = self.storage._one("SELECT code FROM parent_invites WHERE chat_id=? ORDER BY rowid LIMIT 1", (pair.chat_id,))

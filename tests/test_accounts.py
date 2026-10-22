@@ -135,6 +135,27 @@ def test_school_controls_its_tutors(env):
         env["acc"].school(tutor)
 
 
+def test_parent_writes_to_school(env):
+    school, _ = reg(env, "school", "owner@school.ru", "Ирина", school_name="Lingua")
+    tutor, _ = reg(env, "tutor", "t@school.ru", "Анна", invite=env["acc"].school(school)["tutor_invite"]["code"])
+    added = env["acc"].add_student(tutor, {"name": "Миша"})
+    parent, _ = reg(env, "parent", "mama@mail.ru", "Ольга Сергеевна", invite=added["parent_invite"]["code"])
+    thread = f"ps:{added['pair_id']}:{parent.user_id}"
+    mine = {x["chat_id"]: x for x in env["c"].chats(parent)["chats"]}
+    assert mine[thread]["title"] == "Школа «Lingua»" and mine[thread]["kind"] == "school"
+    env["c"].send(parent, thread, {"text": "Хотим перейти на два урока в неделю, мой номер 8 916 555 12 34"})
+    school_threads = {x["chat_id"]: x for x in env["c"].chats(school)["chats"]}
+    assert school_threads[thread]["unread"] == 1 and school_threads[thread]["can_write"]
+    assert "555" in env["c"].messages(school, thread)["messages"][0]["text"]  # школе контакты передавать можно
+    env["c"].send(school, thread, {"text": "Конечно, подберём время"})
+    with pytest.raises(PortalError):
+        env["c"].messages(tutor, thread)  # преподаватель не читает переписку родителя со школой
+    private_tutor, _ = reg(env, "tutor", "p@mail.ru")
+    other = env["acc"].add_student(private_tutor, {"name": "Петя"})
+    p2, _ = reg(env, "parent", "p2@mail.ru", invite=other["parent_invite"]["code"])
+    assert all(x["kind"] != "school" for x in env["c"].chats(p2)["chats"])  # у частного репетитора школы нет
+
+
 def test_telegram_link(env):
     tutor, _ = reg(env, "tutor", "t@mail.ru")
     link = env["acc"].telegram_link(tutor)

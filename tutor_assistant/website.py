@@ -91,8 +91,8 @@ class Website:
         ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/finish$"), "room_finish", True),
         # чат пары вне урока
         ("GET", re.compile(r"^/site/v1/chats$"), "chats", True),
-        ("GET", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp):[0-9a-f]+(?::[\w-]+)?)/messages$"), "chat_messages", True),
-        ("POST", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp):[0-9a-f]+(?::[\w-]+)?)/messages$"), "chat_send", True),
+        ("GET", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp|ps):[0-9a-f]+(?::[\w-]+)?)/messages$"), "chat_messages", True),
+        ("POST", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp|ps):[0-9a-f]+(?::[\w-]+)?)/messages$"), "chat_send", True),
         # отзывы
         ("GET", re.compile(r"^/site/v1/reviews$"), "reviews", False),
         ("POST", re.compile(r"^/site/v1/reviews$"), "review_submit", True),
@@ -364,14 +364,12 @@ class Website:
         return self.community.admin_requests(viewer)
 
     def parent(self, viewer: Any, **_: Any) -> Any:
-        return self.community.parent_overview(viewer)
+        data = self.community.parent_overview(viewer)
+        stats = {x["chat_id"]: x for x in self.learning.child_stats(viewer)}
+        for child in data["children"]:
+            child["cards"] = stats.get(child["chat_id"])  # сколько слов ребёнок выучил по карточкам
+        return data
 
-
-def _int(value: str) -> int:
-    try:
-        return max(0, int(value))
-    except ValueError:
-        raise PortalError(400, "ожидалось число") from None
 
     # -- аккаунты ------------------------------------------------------------------------
     def auth_register(self, body: Any, ip: str | None, **_: Any) -> Any:
@@ -437,3 +435,10 @@ def _int(value: str) -> int:
 
     def cards_review(self, viewer: Any, body: Any, **_: Any) -> Any:
         return self.learning.review(viewer, body)
+
+
+def _int(value: str) -> int:
+    try:
+        return max(0, int(value))
+    except ValueError:
+        raise PortalError(400, "ожидалось число") from None

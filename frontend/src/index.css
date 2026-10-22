@@ -1,6 +1,4 @@
-@import "@fontsource/playfair-display/600.css";
-@import "@fontsource/playfair-display/700.css";
-@import "@fontsource/playfair-display/700-italic.css";
+@import "@fontsource-variable/manrope";
 @import "@fontsource-variable/inter";
 
 @tailwind base;
@@ -8,99 +6,65 @@
 @tailwind utilities;
 
 @layer base {
-  html { background: #050505; color-scheme: dark; }
-  html.lenis, html.lenis body { height: auto; }
-  .lenis.lenis-smooth { scroll-behavior: auto !important; }
-  body {
-    @apply bg-obsidian font-sans text-mist antialiased;
-    line-height: 1.6;
-    font-feature-settings: "cv11", "ss01";
+  :root, [data-brand="study"] {
+    --brand: 61 99 245; --brand-deep: 42 71 201; --brand-soft: 227 233 255; --brand-tint: 241 244 255;
   }
-  h1, h2, h3 { @apply font-display text-white; letter-spacing: -0.02em; line-height: 1.05; }
-  /* У Playfair по умолчанию «старинные» цифры, которые висят ниже строки — включаем ровные (lining) */
-  h1, h2, h3, .font-display { font-variant-numeric: lining-nums proportional-nums; font-feature-settings: "lnum" 1, "pnum" 1; }
-  .num { @apply font-sans; font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1; }
-  ::selection { background: rgba(124, 58, 237, .45); color: #fff; }
-  :focus-visible { outline: 2px solid #A78BFA; outline-offset: 3px; border-radius: 10px; }
+  [data-brand="teach"] {
+    --brand: 242 100 61; --brand-deep: 212 74 36; --brand-soft: 255 228 218; --brand-tint: 255 244 239;
+  }
+  html { background: #FAF7F2; color-scheme: light; scroll-behavior: smooth; }
+  body { @apply bg-cream font-sans text-ink antialiased; line-height: 1.6; }
+  h1, h2, h3, h4 { @apply font-display font-extrabold text-ink; letter-spacing: -0.025em; line-height: 1.1; }
+  ::selection { background: rgb(var(--brand) / .2); }
+  :focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 2px; border-radius: 10px; }
+  .num { font-variant-numeric: tabular-nums lining-nums; }
 }
 
 @layer components {
-  /* Стекло: полупрозрачный фон, сильное размытие подложки и тонкая светлая рамка */
+  /* Жидкое стекло: светлое, полупрозрачное, с мягкой рамкой и бликом сверху */
   .glass {
-    @apply border border-white/10 bg-white/5 backdrop-blur-2xl;
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, .06);
+    @apply border border-white/80 bg-white/60 shadow-soft backdrop-blur-xl;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 2px rgba(30,34,53,.04), 0 10px 30px -14px rgba(30,34,53,.18);
   }
-  .glass-strong { @apply border border-white/10 bg-white/[.08] backdrop-blur-2xl; }
-  .card { @apply glass rounded-[28px] p-6 transition-all duration-300 ease-out md:p-8; }
-  .card-hover { @apply hover:border-white/20 hover:bg-white/[.07]; }
+  .card { @apply rounded-3xl border border-line bg-white p-6 shadow-soft; }
+  .card-hover { @apply transition duration-200 hover:-translate-y-0.5 hover:shadow-lift; }
 
-  /* Текст с градиентом авроры */
-  .text-aurora {
-    background: linear-gradient(100deg, #C4B5FD 0%, #7C3AED 35%, #10B981 75%, #6EE7B7 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
+  .btn { @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200 disabled:cursor-default disabled:opacity-50; }
+  .btn-brand { @apply btn bg-brand text-white hover:bg-brand-deep; box-shadow: 0 10px 24px -12px rgb(var(--brand) / .7); }
+  .btn-dark { @apply btn bg-ink text-white hover:bg-ink-soft; }
+  .btn-light { @apply btn border border-line bg-white text-ink hover:border-ink/20 hover:bg-cream; }
+  .btn-ghost { @apply btn text-ink-soft hover:bg-ink/5 hover:text-ink; }
+  .btn-sm { @apply px-3.5 py-1.5 text-xs; }
+  .btn-lg { @apply px-7 py-3.5 text-base; }
 
-  .chip { @apply inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300; }
-  .chip-accent { @apply border-violet/40 bg-violet/15 text-violet-soft; }
-
-  .btn {
-    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold text-white transition-all duration-300 ease-out;
-  }
-  .btn-primary { @apply btn bg-white text-obsidian hover:shadow-glow-violet; }
-  .btn-ghost { @apply btn glass hover:bg-white/10; }
-  .btn-sm { @apply px-4 py-2 text-xs; }
-
-  .field {
-    @apply w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-500 backdrop-blur-xl transition-all duration-300 ease-out focus:border-violet/60 focus:bg-white/[.08] focus:outline-none;
-  }
-  .label { @apply grid gap-2 text-sm font-medium text-zinc-200; }
-
-  .eyebrow { @apply text-xs font-semibold uppercase tracking-[.22em] text-emerald-soft; }
-  /* Цифра в круге — строго по центру: Inter, табличные цифры, без межстрочного смещения */
-  .num-badge {
-    @apply num grid shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet to-emerald font-bold leading-none text-white;
-  }
-  .stat-num { @apply num font-semibold leading-none tracking-tight text-white; }
-  .link { @apply text-violet-soft underline-offset-4 transition-all duration-300 hover:text-white hover:underline; }
+  .field { @apply w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-ink placeholder:text-ink-mute transition focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10; }
+  .label { @apply grid gap-1.5 text-sm font-semibold text-ink-soft; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink-soft; }
+  .chip-brand { @apply border-transparent bg-brand-soft text-brand-deep; }
+  .eyebrow { @apply text-xs font-bold uppercase tracking-[.18em] text-brand; }
+  .link { @apply font-semibold text-brand underline-offset-4 hover:underline; }
+  .muted { @apply text-ink-mute; }
 }
 
-/* Шум поверх всего сайта — для тактильности (SVG feTurbulence, без внешних файлов) */
-.noise {
-  position: fixed; inset: -50%; z-index: 60; pointer-events: none; opacity: .07;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+/* Мягкий статичный фон: пастельные пятна без анимации — быстро даже на слабых телефонах */
+.bg-mesh {
+  background:
+    radial-gradient(40rem 26rem at 8% -6%, rgba(255, 196, 160, .45), transparent 70%),
+    radial-gradient(36rem 24rem at 96% 0%, rgba(170, 190, 255, .45), transparent 70%),
+    radial-gradient(40rem 30rem at 50% 110%, rgba(190, 235, 215, .35), transparent 70%),
+    #FAF7F2;
 }
 
-/* Бегущая строка фраз */
-@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.marquee { animation: marquee 48s linear infinite; }
-.marquee:hover { animation-play-state: paused; }
-
-/* --- Доска (board.js рисует свою разметку с этими классами) ------------------------- */
-.board-shell { display: grid; gap: 12px; }
-.toolbar {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px;
-  border-radius: 20px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05);
-  backdrop-filter: blur(40px); position: sticky; top: 88px; z-index: 5;
-}
-.toolbar button {
-  font: inherit; font-size: 13px; color: #e4e4e7; min-width: 36px; padding: 7px 11px; cursor: pointer;
-  border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
-  transition: all .3s ease-out;
-}
-.toolbar button:hover { background: rgba(255,255,255,.1); }
-.toolbar button.active { background: #7C3AED; border-color: #7C3AED; color: #fff; box-shadow: 0 8px 30px -8px rgba(124,58,237,.8); }
-.toolbar .sep { width: 1px; height: 24px; background: rgba(255,255,255,.12); margin: 0 4px; }
-.toolbar input[type=color] { width: 36px; height: 32px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: transparent; padding: 2px; cursor: pointer; }
-.toolbar input[type=range] { width: 90px; accent-color: #7C3AED; }
-.swatch { width: 24px !important; height: 24px; min-width: 0 !important; padding: 0 !important; border-radius: 999px !important; border: 2px solid rgba(255,255,255,.25) !important; }
-.swatch.active { outline: 2px solid #A78BFA; outline-offset: 2px; }
-.canvas-wrap { position: relative; overflow: hidden; aspect-ratio: 16 / 10; touch-action: none; border-radius: 24px; background: #fff;
-  box-shadow: 0 30px 120px -40px rgba(124,58,237,.6); }
-.canvas-wrap canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
-.canvas-wrap.grid-on { background-image: linear-gradient(#e9ecf5 1px, transparent 1px), linear-gradient(90deg, #e9ecf5 1px, transparent 1px); background-size: 4% 6.4%; }
-.text-input { position: absolute; z-index: 3; min-width: 160px; padding: 4px 6px; border: 2px solid #7C3AED; border-radius: 8px; background: #fff; color: #111; font: 18px system-ui, sans-serif; }
-.board-status { font-size: 14px; color: #A1A1AA; min-height: 1.4em; }
+/* --- Доска -------------------------------------------------------------------------------- */
+.board-viewport { position: relative; overflow: hidden; touch-action: none; user-select: none;
+  background-color: #FFFDF9; background-image: radial-gradient(#E4DED3 1.1px, transparent 1.1px); }
+.board-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.board-obj { position: absolute; }
+.board-obj.selected { outline: 2px solid rgb(var(--brand)); outline-offset: 4px; border-radius: 10px; }
+.board-note { box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 10px 20px -12px rgba(0,0,0,.25); border-radius: 6px 6px 18px 6px; }
+.board-handle { position: absolute; width: 14px; height: 14px; right: -10px; bottom: -10px; border-radius: 999px;
+  background: #fff; border: 2px solid rgb(var(--brand)); cursor: nwse-resize; }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
