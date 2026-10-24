@@ -5,7 +5,7 @@
 #   bash enable-ai.sh qwen2.5:7b # своя модель
 #   bash enable-ai.sh --off      # выключить ИИ (Ollama остаётся, сайт перестаёт к ней обращаться)
 #
-# ИИ необязателен: без него конспект собирается офлайн-алгоритмом, а занятия — из слов преподавателя.
+# ИИ необязателен: без него конспект собирается офлайн-алгоритмом, а занятия – из слов преподавателя.
 set -euo pipefail
 ENV=/opt/better-study/.env
 [ "$(id -u)" = 0 ] || { echo "Запустите от root: sudo bash enable-ai.sh"; exit 1; }
@@ -22,8 +22,8 @@ if [ -z "$MODEL" ]; then
   # Qwen 2.5 хорошо понимает русский, английский и китайский
   if [ "$MEM_GB" -ge 14 ]; then MODEL=qwen2.5:14b
   elif [ "$MEM_GB" -ge 7 ]; then MODEL=qwen2.5:7b
-  elif [ "$MEM_GB" -ge 4 ]; then MODEL=qwen2.5:3b; echo "⚠️  Памяти ${MEM_GB} ГБ — ставлю небольшую модель, конспекты будут проще. Для 7b нужно от 8 ГБ."
-  else echo "❌ Памяти ${MEM_GB} ГБ — мало для ИИ на сервере. Нужно от 4 ГБ (лучше 8), или подключите OpenRouter (см. README)."; exit 1
+  elif [ "$MEM_GB" -ge 4 ]; then MODEL=qwen2.5:3b; echo "⚠️  Памяти ${MEM_GB} ГБ – ставлю небольшую модель, конспекты будут проще. Для 7b нужно от 8 ГБ."
+  else echo "❌ Памяти ${MEM_GB} ГБ – мало для ИИ на сервере. Нужно от 4 ГБ (лучше 8), или подключите OpenRouter (см. README)."; exit 1
   fi
 fi
 
@@ -31,7 +31,7 @@ if ! command -v ollama >/dev/null; then
   echo "▶ Устанавливаю Ollama"
   curl -fsSL https://ollama.com/install.sh | sh
 fi
-# Окно 16K токенов — чтобы влезала расшифровка урока; слушать только локально
+# Окно 16K токенов – чтобы влезала расшифровка урока; слушать только локально
 mkdir -p /etc/systemd/system/ollama.service.d
 cat > /etc/systemd/system/ollama.service.d/better.conf <<'EOF'
 [Service]

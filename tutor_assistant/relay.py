@@ -10,7 +10,7 @@
   («Анна Петровна», «Миша»), и перед пересылкой проверяет каждое сообщение.
 
 Ни имя аккаунта, ни @ник, ни аватар, ни id собеседника не передаются.
-Модуль не зависит от Telegram — здесь только правила и данные.
+Модуль не зависит от Telegram – здесь только правила и данные.
 """
 
 from __future__ import annotations
@@ -173,7 +173,7 @@ class RelayService:
         return (pair, role, counterpart) if role else None
 
     def delivered_copies(self, src_chat: str, src_msgs: list[int]) -> list[tuple[str, int]]:
-        """Где лежат копии этих сообщений у собеседника — чтобы удалить части номера, отправленного по кусочкам."""
+        """Где лежат копии этих сообщений у собеседника – чтобы удалить части номера, отправленного по кусочкам."""
         out = []
         for msg_id in src_msgs:
             out += [(r["dst_chat"], r["dst_msg"]) for r in self.storage.relay_by_src(src_chat, msg_id)]

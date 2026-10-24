@@ -3,11 +3,13 @@ import { setToken } from "./lib/api.js";
 import { useRoute } from "./lib/router.js";
 import { brandOf, SessionContext, useSessionState } from "./lib/session.js";
 import Footer from "./site/Footer.jsx";
+import Help from "./site/Help.jsx";
+import StickyCta from "./site/StickyCta.jsx";
 import Navbar from "./site/Navbar.jsx";
 import Landing from "./site/Landing.jsx";
 import { Loading } from "./ui/kit.jsx";
 
-// Остальное грузится по требованию — главная открывается быстро даже на слабом телефоне
+// Остальное грузится по требованию – главная открывается быстро даже на слабом телефоне
 const Teach = lazy(() => import("./site/Teach.jsx"));
 const Study = lazy(() => import("./site/Study.jsx"));
 const Pricing = lazy(() => import("./site/Pricing.jsx"));
@@ -17,7 +19,7 @@ const Market = lazy(() => import("./site/Market.jsx"));
 const AppShell = lazy(() => import("./app/AppShell.jsx"));
 
 const PUBLIC = { "": Landing, teach: Teach, study: Study, pricing: Pricing, reviews: ReviewsPage, market: Market,
-  login: Auth, register: Auth, join: Auth };
+  login: Auth, register: Auth, join: Auth, forgot: Auth, reset: Auth };
 
 export default function App() {
   const route = useRoute();
@@ -36,7 +38,7 @@ export default function App() {
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inApp = ["app", "room", "lesson", "board"].includes(name);
-  const brand = inApp ? brandOf(session.role) : name === "teach" || (name === "register" && route.params.get("role") === "tutor") ? "teach" : "study";
+  const brand = inApp ? brandOf(session.role) : name === "teach" || (name === "register" && ["tutor", "school"].includes(route.params.get("role"))) ? "teach" : "study";
   useEffect(() => { document.documentElement.dataset.brand = brand; }, [brand]);
   useEffect(() => { window.scrollTo(0, 0); }, [name, route.parts[1]]);
 
@@ -56,6 +58,8 @@ export default function App() {
             </Suspense>
           </main>
           <Footer />
+          <StickyCta name={name} />
+          <Help />
         </div>
       )}
     </SessionContext.Provider>

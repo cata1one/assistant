@@ -42,7 +42,7 @@ export default function Reviews({ limit, tabs = true }) {
         <div className="card flex flex-col items-center py-12 text-center">
           <MessageSquareHeart size={32} className="text-brand" />
           <h3 className="mt-3 text-xl">Здесь будут отзывы</h3>
-          <p className="mt-2 max-w-md text-sm text-ink-mute">Публикуем только настоящие отзывы преподавателей, учеников и родителей — после проверки. Оставить отзыв можно в кабинете.</p>
+          <p className="mt-2 max-w-md text-sm text-ink-mute">Публикуем только настоящие отзывы преподавателей, учеников и родителей – после проверки. Оставить отзыв можно в кабинете.</p>
         </div>
       )}
     </div>

@@ -91,7 +91,7 @@ def extract_rules(utterances: Iterable[Utterance], limit: int = 10) -> list[Rule
             if key in seen:
                 continue
             seen.add(key)
-            # Следующие предложения на изучаемом языке — примеры к правилу.
+            # Следующие предложения на изучаемом языке – примеры к правилу.
             examples = [x for x in sents[i + 1:i + 4] if has_latin(x) and not re.search(r"[а-яё]", x, re.I)][:3]
             title = re.sub(r"^(?:запомни(?:те)?|обрати(?:те)?\s+внимание|важно|итак|смотри(?:те)?)\s*[:,!—–-]?\s*", "",
                            s, flags=re.I)
@@ -135,7 +135,7 @@ def _parse_ts(ts: str | None) -> int | None:
         parts = [int(p) for p in ts.split(":")]
     except ValueError:
         return None
-    if len(parts) == 2:  # «10:05» — время на часах
+    if len(parts) == 2:  # «10:05» – время на часах
         return parts[0] * 3600 + parts[1] * 60
     if len(parts) == 3:
         return parts[0] * 3600 + parts[1] * 60 + parts[2]

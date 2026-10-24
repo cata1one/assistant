@@ -1,6 +1,6 @@
 """ИИ для конструктора занятий.
 
-Порядок: OpenAI-совместимый сервис из настроек (бесплатно — Ollama на своём сервере,
+Порядок: OpenAI-совместимый сервис из настроек (бесплатно – Ollama на своём сервере,
 бесплатные модели OpenRouter, Groq) → Claude, если задан ключ Anthropic → нет ИИ
 (тогда занятие собирается из слов и текста преподавателя без ИИ).
 """
@@ -38,7 +38,7 @@ class AIClient:
         return None
 
     def complete(self, system: str, user: str, timeout: float | None = None) -> str | None:
-        """Ответ модели текстом или None (ошибка — в last_error)."""
+        """Ответ модели текстом или None (ошибка – в last_error)."""
         self.last_error = None
         self._timeout = timeout or self.settings.ai_timeout
         try:
@@ -60,7 +60,7 @@ class AIClient:
             headers["Authorization"] = f"Bearer {s.ai_key}"
         req = urllib.request.Request(f"{s.ai_url}/chat/completions", data=body.encode(), headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as r:  # noqa: S310 — адрес задаёт администратор
+            with urllib.request.urlopen(req, timeout=self._timeout) as r:  # noqa: S310 – адрес задаёт администратор
                 data = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             raise RuntimeError(f"сервис ИИ ответил {exc.code}: {exc.read()[:200].decode('utf-8', 'replace')}") from None

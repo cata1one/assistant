@@ -166,7 +166,7 @@ def run_recording(chunks: Iterator[bytes], upload: Callable[[bytes], dict[str, A
     state = {"violations": 0, "sent": 0}
 
     def flush() -> bool:
-        """Отправить очередь. False — нет связи (фрагменты остаются в очереди)."""
+        """Отправить очередь. False – нет связи (фрагменты остаются в очереди)."""
         while pending:
             result = None
             for delay in (0, *retry_delays):
@@ -189,7 +189,7 @@ def run_recording(chunks: Iterator[bytes], upload: Callable[[bytes], dict[str, A
             pending.append(chunk)
             if len(pending) > MAX_PENDING:
                 pending.pop(0)
-                report("⚠️ Нет связи с сервером слишком долго — самый старый фрагмент записи отброшен.")
+                report("⚠️ Нет связи с сервером слишком долго – самый старый фрагмент записи отброшен.")
             if not flush():
                 report(f"⚠️ Нет связи с сервером, фрагментов в очереди: {len(pending)}. Запись продолжается.")
         if pending and not flush():
@@ -212,5 +212,5 @@ def _report_result(result: dict[str, Any], n: int, report: Callable[[str], None]
         report(f"⚠️ Фрагмент {n}: {moderation.get('summary')}. {moderation.get('warning') or ''}".strip())
         return 1
     words = ", ".join(w["word"] for w in result.get("new_words") or [])
-    report(f"🔴 Фрагмент {n}: ок" + (f" — записаны слова: {words}" if words else ""))
+    report(f"🔴 Фрагмент {n}: ок" + (f" – записаны слова: {words}" if words else ""))
     return 0

@@ -30,7 +30,7 @@ done
 say() { printf '\n\033[1;35m▶ %s\033[0m\n' "$*"; }
 IP="$(curl -4 -s -m 10 https://ifconfig.me || hostname -I | awk '{print $1}')"
 
-grep -qi ubuntu /etc/os-release || echo "⚠️  Скрипт рассчитан на Ubuntu — продолжаю, но возможны отличия."
+grep -qi ubuntu /etc/os-release || echo "⚠️  Скрипт рассчитан на Ubuntu – продолжаю, но возможны отличия."
 say "1/8 Системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
@@ -65,7 +65,7 @@ fi
 say "4/8 Настройки (.env)"
 ENV="$APP_DIR/.env"
 [ -f "$ENV" ] || cp "$APP_DIR/.env.example" "$ENV"
-setenv() {  # setenv KEY VALUE — заменить или дописать строку в .env
+setenv() {  # setenv KEY VALUE – заменить или дописать строку в .env
   if grep -q "^$1=" "$ENV"; then sed -i "s|^$1=.*|$1=$2|" "$ENV"; else echo "$1=$2" >> "$ENV"; fi
 }
 getenv() { grep "^$1=" "$ENV" | head -1 | cut -d= -f2-; }
@@ -73,6 +73,12 @@ SITE="http://$IP"; [ -n "$DOMAIN" ] && SITE="https://$DOMAIN"
 setenv TUTOR_SITE_URL "$SITE"
 setenv TUTOR_DB_PATH "$DATA_DIR/tutor_assistant.sqlite3"
 setenv TUTOR_STT_MODEL_DIR "$DATA_DIR/models"
+# Модель расшифровки подбираем по мощности сервера: точнее модель, дольше расшифровка каждого фрагмента
+CORES="$(nproc)"; MEM_GB=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1024 / 1024 ))
+if [ -z "$(getenv TUTOR_STT_MODEL)" ]; then
+  if [ "$CORES" -ge 8 ] && [ "$MEM_GB" -ge 14 ]; then setenv TUTOR_STT_MODEL medium
+  else setenv TUTOR_STT_MODEL small; fi
+fi
 setenv TUTOR_API_HOST 127.0.0.1
 setenv TUTOR_API_PORT 8080
 setenv TUTOR_TRUST_PROXY 1
@@ -174,7 +180,7 @@ chmod +x /etc/cron.daily/better-study-backup
 
 say "Проверка связи с Telegram"
 if curl -s -m 10 -o /dev/null https://api.telegram.org; then
-  echo "✅ Telegram доступен напрямую — прокси не нужен."
+  echo "✅ Telegram доступен напрямую – прокси не нужен."
 else
   echo "⚠️  api.telegram.org недоступен с этого сервера. Впишите прокси в $ENV: TELEGRAM_PROXY=http://адрес:порт"
 fi
@@ -189,5 +195,5 @@ else
   echo "   systemctl restart better-study"
   echo "   Сайт: $SITE"
 fi
-[ "$SPEECH_OK" = 1 ] || echo "ℹ️  Расшифровка речи выключена (TUTOR_STT=off). Напишите разработчику — подберём вариант."
+[ "$SPEECH_OK" = 1 ] || echo "ℹ️  Расшифровка речи выключена (TUTOR_STT=off). Напишите разработчику – подберём вариант."
 echo "Журнал: journalctl -u better-study -f    Обновление: bash $APP_DIR/deploy/update.sh"

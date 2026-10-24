@@ -1,7 +1,7 @@
 """Хранилище на SQLite: уроки, реплики, словарь ученика, отчёты, нарушения.
 
 Реплики сохраняются только в «очищенном» виде (без контактов). Исходный текст
-нарушения хранится отдельно в журнале — как доказательство для администратора.
+нарушения хранится отдельно в журнале – как доказательство для администратора.
 """
 
 from __future__ import annotations
@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS market_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_market_status ON market_requests(status, created_at);
 
--- Аккаунты сайта (вход по почте и паролю; Telegram — по желанию)
+-- Аккаунты сайта (вход по почте и паролю; Telegram – по желанию)
 CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
@@ -339,7 +339,7 @@ CREATE TABLE IF NOT EXISTS assignments (
 CREATE INDEX IF NOT EXISTS idx_assignments_chat ON assignments(chat_id, id);
 
 -- Слова ученика вне уроков: добавил преподаватель (в ДЗ или вручную) или сам ученик;
--- hidden=1 — ученик убрал слово (в том числе слово урока) из своих карточек
+-- hidden=1 – ученик убрал слово (в том числе слово урока) из своих карточек
 CREATE TABLE IF NOT EXISTS student_words (
     chat_id TEXT NOT NULL,
     word_key TEXT NOT NULL,
@@ -376,6 +376,42 @@ CREATE TABLE IF NOT EXISTS feedback (
     kind TEXT NOT NULL,
     text TEXT NOT NULL,
     created_at TEXT NOT NULL
+);
+
+-- Оплата тарифа платформы (ЮKassa)
+CREATE TABLE IF NOT EXISTS payments (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    provider_id TEXT,
+    months INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    paid_at TEXT,
+    reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_payments_account ON payments(account_id);
+
+-- Оплата занятий учеником преподавателю: заявка «я оплатил», подтверждает преподаватель
+CREATE TABLE IF NOT EXISTS lesson_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pair_id TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    note TEXT,
+    created_at TEXT NOT NULL,
+    decided_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_lesson_payments_pair ON lesson_payments(pair_id, status);
+
+-- Настроение ученика («социальная батарейка»): одна отметка в день, видна только если ученик сам её поставил
+CREATE TABLE IF NOT EXISTS mood (
+    account_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    level INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (account_id, day)
 );
 
 -- Интервальное повторение слов (карточки)
@@ -427,18 +463,26 @@ class Storage:
     def _migrate(self) -> None:
         """Новые столбцы для баз, созданных прошлыми версиями."""
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(messages)").fetchall()}
-        if "source" not in cols:  # text — набрано в чате, speech — расшифровка речи
+        if "source" not in cols:  # text – набрано в чате, speech – расшифровка речи
             self._conn.execute("ALTER TABLE messages ADD COLUMN source TEXT NOT NULL DEFAULT 'text'")
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(accounts)").fetchall()}
-        for col in ("trial_until", "paid_until", "ref_code", "referred_by", "ref_used", "prefs"):  # тарифы и приглашения
+        for col in ("trial_until", "paid_until", "ref_code", "referred_by", "ref_used", "prefs", "pay_cfg"):  # тарифы, приглашения, оплата занятий
             if col not in cols:
                 self._conn.execute(f"ALTER TABLE accounts ADD COLUMN {col} TEXT")
-                if col == "trial_until":  # уже зарегистрированным — те же 3 пробных дня с момента обновления
+                if col == "trial_until":  # уже зарегистрированным – те же 3 пробных дня с момента обновления
                     until = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(timespec="seconds")
                     self._conn.execute("UPDATE accounts SET trial_until=? WHERE role IN ('tutor','school')", (until,))
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(pairs)").fetchall()}
         if "language" not in cols:  # изучаемый язык ученика: конспект, ИИ, озвучка
             self._conn.execute("ALTER TABLE pairs ADD COLUMN language TEXT")
+        if "balance" not in cols:  # оплаченные и ещё не проведённые занятия
+            self._conn.execute("ALTER TABLE pairs ADD COLUMN balance INTEGER NOT NULL DEFAULT 0")
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(feedback)").fetchall()}
+        if "contact" not in cols:  # почта для ответа, если человек не вошёл на сайт
+            self._conn.execute("ALTER TABLE feedback ADD COLUMN contact TEXT")
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(reports)").fetchall()}
+        if "published" not in cols:  # конспект виден ученику только после отправки (если преподаватель так выбрал)
+            self._conn.execute("ALTER TABLE reports ADD COLUMN published INTEGER NOT NULL DEFAULT 1")
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(assignments)").fetchall()}
         for col in ("attachments", "unit_id", "result", "comment"):  # фото выполненного ДЗ, занятие, проверка занятия
             if col not in cols:
@@ -523,7 +567,7 @@ class Storage:
                 for r in rows]
 
     def messages_since(self, lesson_id: str, since: int = 0, limit: int = 300) -> list[dict[str, Any]]:
-        """Реплики урока (уже без контактов) — для чата и живой расшифровки в онлайн-классе."""
+        """Реплики урока (уже без контактов) – для чата и живой расшифровки в онлайн-классе."""
         return self._all("SELECT id, speaker_name, role, text, created_at, source FROM messages "
                          "WHERE lesson_id=? AND id>? ORDER BY id LIMIT ?", (lesson_id, since, limit))
 
@@ -580,6 +624,10 @@ class Storage:
                           part_of_speech=r["part_of_speech"], example=r["example"], source=r["source"] or "auto")
                 for r in self._all(sql, params)]
 
+    def word_lessons(self, owner: str) -> dict[str, str | None]:
+        """Слово → урок, на котором оно появилось."""
+        return {r["key"]: r["lesson_id"] for r in self._all("SELECT key, lesson_id FROM vocabulary WHERE owner=?", (owner,))}
+
     def words_between(self, owner: str, start: datetime, end: datetime) -> list[VocabItem]:
         return self._vocab_rows(
             "SELECT * FROM vocabulary WHERE owner=? AND created_at>=? AND created_at<? ORDER BY id",
@@ -598,6 +646,13 @@ class Storage:
         return self._vocab_rows("SELECT * FROM vocabulary WHERE owner=? ORDER BY id", (owner,))
 
     # -- отчёты -------------------------------------------------------------------
+    def report_published(self, lesson_id: str) -> bool:
+        row = self._one("SELECT published FROM reports WHERE lesson_id=?", (lesson_id,))
+        return bool(row["published"]) if row else False
+
+    def set_report_published(self, lesson_id: str, published: bool) -> None:
+        self._exec("UPDATE reports SET published=? WHERE lesson_id=?", (1 if published else 0, lesson_id))
+
     def save_report(self, lesson_id: str, report: LessonReport) -> None:
         self._exec("INSERT INTO reports(lesson_id, payload, created_at) VALUES (?,?,?)"
                    " ON CONFLICT(lesson_id) DO UPDATE SET payload=excluded.payload, created_at=excluded.created_at",
@@ -727,7 +782,7 @@ class Storage:
                          " JOIN lessons l ON l.id = r.lesson_id WHERE l.status='active'")
 
     def claim_gap_alert(self, lesson_id: str, reference: str, at: datetime | None = None) -> bool:
-        """Отметить, что о перерыве уже сообщили (атомарно — без дублей, даже если работают и бот, и API)."""
+        """Отметить, что о перерыве уже сообщили (атомарно – без дублей, даже если работают и бот, и API)."""
         cur = self._exec("UPDATE recordings SET gap_alerted_at=? WHERE lesson_id=?"
                          " AND (gap_alerted_at IS NULL OR gap_alerted_at < ?)", (_iso(at), lesson_id, reference))
         return cur.rowcount == 1
@@ -763,7 +818,7 @@ class Storage:
                    " VALUES (?,?,?,?,?,?)", (code, chat_id, student_name, created_by, utcnow(), max_uses))
 
     def use_parent_invite(self, code: str, user_id: str) -> dict[str, Any] | None:
-        """Подписать родителя по коду. None — код неизвестен или исчерпан."""
+        """Подписать родителя по коду. None – код неизвестен или исчерпан."""
         with self._lock:
             row = self._conn.execute("SELECT * FROM parent_invites WHERE code=?", (code,)).fetchone()
             if not row:
@@ -1102,10 +1157,75 @@ class Storage:
         sets = ", ".join(f"{k}=?" for k in fields)
         self._exec(f"UPDATE assignments SET {sets} WHERE id=?", (*fields.values(), assignment_id))
 
-    def add_feedback(self, user_id: str, name: str | None, role: str | None, kind: str, text: str) -> int:
-        cur = self._exec("INSERT INTO feedback(user_id, name, role, kind, text, created_at) VALUES (?,?,?,?,?,?)",
-                         (user_id, name, role, kind, text, utcnow()))
+    def add_feedback(self, user_id: str, name: str | None, role: str | None, kind: str, text: str,
+                     contact: str | None = None) -> int:
+        cur = self._exec("INSERT INTO feedback(user_id, name, role, kind, text, created_at, contact) VALUES (?,?,?,?,?,?,?)",
+                         (user_id, name, role, kind, text, utcnow(), contact))
         return int(cur.lastrowid)
+
+    # -- оплата тарифа ------------------------------------------------------------------------
+    def add_payment(self, payment_id: str, account_id: str, months: int, amount: int, reason: str | None = None) -> None:
+        self._exec("INSERT INTO payments(id, account_id, months, amount, created_at, reason) VALUES (?,?,?,?,?,?)",
+                   (payment_id, account_id, months, amount, utcnow(), reason))
+
+    def get_payment(self, payment_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM payments WHERE id=? OR provider_id=?", (payment_id, payment_id))
+
+    def update_payment(self, payment_id: str, **fields: Any) -> None:
+        sets = ", ".join(f"{k}=?" for k in fields)
+        self._exec(f"UPDATE payments SET {sets} WHERE id=?", (*fields.values(), payment_id))
+
+    def settle_payment(self, payment_id: str) -> bool:
+        """Атомарно помечает платёж оплаченным: True только для первого вызова (повторные уведомления не продлевают срок)."""
+        cur = self._exec("UPDATE payments SET status='succeeded', paid_at=? WHERE id=? AND status!='succeeded'",
+                         (utcnow(), payment_id))
+        return cur.rowcount > 0
+
+    def payments_for(self, account_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM payments WHERE account_id=? ORDER BY created_at DESC LIMIT ?", (account_id, limit))
+
+    def has_paid(self, account_id: str) -> bool:
+        return self._one("SELECT 1 AS x FROM payments WHERE account_id=? AND status='succeeded'", (account_id,)) is not None
+
+    # -- оплата занятий -------------------------------------------------------------------------
+    def pair_balance(self, pair_id: str) -> int:
+        row = self._one("SELECT balance FROM pairs WHERE id=?", (pair_id,))
+        return int(row["balance"]) if row else 0
+
+    def add_balance(self, pair_id: str, delta: int) -> int:
+        self._exec("UPDATE pairs SET balance = balance + ? WHERE id=?", (delta, pair_id))
+        return self.pair_balance(pair_id)
+
+    def add_lesson_payment(self, pair_id: str, count: int, amount: int) -> int:
+        cur = self._exec("INSERT INTO lesson_payments(pair_id, count, amount, created_at) VALUES (?,?,?,?)",
+                         (pair_id, count, amount, utcnow()))
+        return int(cur.lastrowid)
+
+    def get_lesson_payment(self, payment_id: int) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM lesson_payments WHERE id=?", (payment_id,))
+
+    def lesson_payments_for(self, pair_ids: list[str], status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        if not pair_ids:
+            return []
+        marks = ",".join("?" * len(pair_ids))
+        sql = f"SELECT * FROM lesson_payments WHERE pair_id IN ({marks})" + (" AND status=?" if status else "")
+        return self._all(sql + " ORDER BY id DESC LIMIT ?", (*pair_ids, *([status] if status else []), limit))
+
+    def decide_lesson_payment(self, payment_id: int, status: str, note: str | None = None) -> bool:
+        cur = self._exec("UPDATE lesson_payments SET status=?, note=?, decided_at=? WHERE id=? AND status='pending'",
+                         (status, note, utcnow(), payment_id))
+        return cur.rowcount > 0
+
+    # -- настроение -------------------------------------------------------------------------------
+    def set_mood(self, account_id: str, day: str, level: int) -> None:
+        self._exec("INSERT INTO mood(account_id, day, level, created_at) VALUES (?,?,?,?)"
+                   " ON CONFLICT(account_id, day) DO UPDATE SET level=excluded.level", (account_id, day, level, utcnow()))
+
+    def clear_mood(self, account_id: str, day: str) -> None:
+        self._exec("DELETE FROM mood WHERE account_id=? AND day=?", (account_id, day))
+
+    def moods(self, account_id: str, days: int = 14) -> list[dict[str, Any]]:
+        return self._all("SELECT day, level FROM mood WHERE account_id=? ORDER BY day DESC LIMIT ?", (account_id, days))
 
     def feedback_list(self, limit: int = 200) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM feedback ORDER BY id DESC LIMIT ?", (limit,))

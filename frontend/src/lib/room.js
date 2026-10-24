@@ -169,7 +169,7 @@ export class RoomClient {
         this.uploads.shift();
         this.h.onRecording?.({ ok: r.ok && data.checked !== false, ...data });
       } catch (e) {
-        this.h.onRecording?.({ ok: false, error: `нет связи — фрагмент отправится позже (${e.message})` });
+        this.h.onRecording?.({ ok: false, error: `нет связи – фрагмент отправится позже (${e.message})` });
         await new Promise((res) => setTimeout(res, 3000));
         if (this.uploads.length > 40) this.uploads.shift(); // не копить бесконечно
       }

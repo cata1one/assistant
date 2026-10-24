@@ -21,14 +21,14 @@ export default function Navbar({ brand, active }) {
     return () => window.removeEventListener("scroll", on);
   }, []);
   useEffect(() => setOpen(false), [active]);
-  // Преподаватель ищет учеников, ученик — преподавателя
+  // Преподаватель ищет учеников, ученик – преподавателя
   const links = session?.role === "tutor" ? LINKS.map((l) => (l[0] === "market" ? ["market", "#/market?tab=students", "Найти ученика"] : l)) : LINKS;
-  const startHref = brand === "teach" ? "#/register?role=tutor" : "#/register?role=student";
+  const startHref = brand === "teach" ? "#/register?role=tutor&start=trial" : "#/register?role=student";
   return (
     <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3">
       <nav aria-label="Разделы" className={`mx-auto flex max-w-6xl items-center gap-3 rounded-full px-3 py-2 transition-all duration-300 md:px-4 ${
         scrolled ? "glass" : "border border-transparent"}`}>
-        <a href="#/" aria-label="На главную"><Logo brand={brand} /></a>
+        <a href="#/" aria-label="Bright, на главную"><Logo school={session?.role === "school"} /></a>
         <ul className="mx-auto hidden items-center gap-0.5 lg:flex">
           {links.map(([id, href, label]) => (
             <li key={id}>
@@ -41,7 +41,7 @@ export default function Navbar({ brand, active }) {
           {session?.role ? <a href="#/app" className="btn-brand">Кабинет</a> : (
             <>
               <a href="#/login" className="btn-ghost hidden sm:inline-flex">Войти</a>
-              <a href={startHref} className="btn-brand">Начать бесплатно</a>
+              <a href={startHref} className="btn-brand">{brand === "teach" ? "Попробовать бесплатно" : "Начать"}</a>
             </>
           )}
           <button type="button" className="btn-light !p-2.5 lg:hidden" aria-label="Меню" aria-expanded={open} onClick={() => setOpen(!open)}>

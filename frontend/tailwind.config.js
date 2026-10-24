@@ -1,11 +1,11 @@
-/** Дизайн-система Better: светлая, тёплая, «жидкое стекло». Study — синий, Teach — коралловый. */
+/** Дизайн-система Bright: светлая, тёплая, «жидкое стекло». Study — синий, Teach — коралловый. */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
         cream: "#FAF7F2",
-        // Цвет текущего продукта: BetterStudy (синий) или BetterTeach (коралловый) — через data-brand на <html>
+        // Цвет текущего продукта: для учеников (синий) или преподавателей (коралловый) — через data-brand на <html>
         brand: {
           DEFAULT: "rgb(var(--brand) / <alpha-value>)",
           deep: "rgb(var(--brand-deep) / <alpha-value>)",

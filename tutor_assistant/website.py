@@ -6,19 +6,19 @@
     GET  /site/v1/catalog                   направления и курсы
     POST /site/v1/applications              заявка на пробный урок
 
-Личный кабинет (заголовок ``X-Access-Token`` — токен из ссылки, которую выдаёт бот по /cabinet):
+Личный кабинет (заголовок ``X-Access-Token`` – токен из ссылки, которую выдаёт бот по /cabinet):
     GET  /site/v1/me                        пары, уроки, роль в каждой паре
     POST /site/v1/logout                    отозвать все ссылки этого человека
     GET  /site/v1/lessons/{id}              материалы урока в вашей роли
-    POST /site/v1/lessons/{id}/test         {"answers": [...]} — проверка теста
-    GET  /site/v1/words                     ?chat_id= — словарь
+    POST /site/v1/lessons/{id}/test         {"answers": [...]} – проверка теста
+    GET  /site/v1/words                     ?chat_id= – словарь
     GET  /site/v1/boards                    доски ваших пар
     POST /site/v1/boards                    {"chat_id", "title"}
-    GET  /site/v1/boards/{id}/items         ?since=<id> — новые элементы (опрос раз в 1–2 секунды)
-    POST /site/v1/boards/{id}/items         {"kind", "data"} — текст на доске проверяется на контакты
+    GET  /site/v1/boards/{id}/items         ?since=<id> – новые элементы (опрос раз в 1–2 секунды)
+    POST /site/v1/boards/{id}/items         {"kind", "data"} – текст на доске проверяется на контакты
     GET  /site/v1/admin/applications        ?status= (администраторы)
     POST /site/v1/admin/applications/{id}   {"status"}
-    POST /site/v1/admin/classroom           {"chat_id", "url"} — ссылка на класс ProgressMe
+    POST /site/v1/admin/classroom           {"chat_id", "url"} – ссылка на класс ProgressMe
 """
 
 from __future__ import annotations
@@ -35,8 +35,10 @@ from .accounts import Accounts
 from .classroom import Classroom
 from .community import Community
 from .learning import Learning
+from .lesson_pay import LessonPay
 from .portal import Portal, PortalError
 from .units import Units, student_view
+from .yookassa import PlanPayments
 
 WEB_DIR = Path(__file__).with_name("web")
 MAX_SITE_BODY = 1024 * 1024
@@ -49,7 +51,7 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Content-Security-Policy": ("default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; "
                                 "style-src 'self'; script-src 'self'; connect-src 'self'; "
-                                # Плееры видео для уроков и доски — без демонстрации экрана
+                                # Плееры видео для уроков и доски – без демонстрации экрана
                                 "frame-src https://vk.com https://vkvideo.ru https://www.youtube-nocookie.com "
                                 "https://rutube.ru; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
 }
@@ -70,6 +72,7 @@ def json_response(status: HTTPStatus | int, payload: Any) -> Response:
 
 class Website:
     ROUTES = [
+        ("GET", re.compile(r"^/site/v1/config$"), "public_config", False),
         ("GET", re.compile(r"^/site/v1/catalog$"), "catalog", False),
         ("POST", re.compile(r"^/site/v1/applications$"), "apply", False),
         ("GET", re.compile(r"^/site/v1/me$"), "me", True),
@@ -118,6 +121,8 @@ class Website:
         # аккаунты
         ("POST", re.compile(r"^/site/v1/auth/register$"), "auth_register", False),
         ("POST", re.compile(r"^/site/v1/auth/login$"), "auth_login", False),
+        ("POST", re.compile(r"^/site/v1/auth/forgot$"), "auth_forgot", False),
+        ("POST", re.compile(r"^/site/v1/auth/reset$"), "auth_reset", False),
         ("GET", re.compile(r"^/site/v1/account$"), "account", True),
         ("POST", re.compile(r"^/site/v1/account$"), "account_update", True),
         ("POST", re.compile(r"^/site/v1/account/telegram$"), "account_telegram", True),
@@ -130,6 +135,24 @@ class Website:
         ("POST", re.compile(r"^/site/v1/admin/billing$"), "admin_billing", True),
         ("POST", re.compile(r"^/site/v1/account/prefs$"), "account_prefs", True),
         ("POST", re.compile(r"^/site/v1/feedback$"), "feedback", True),
+        ("POST", re.compile(r"^/site/v1/support$"), "support", False),
+        # оплата тарифа (ЮKassa)
+        ("GET", re.compile(r"^/site/v1/billing$"), "billing_options", True),
+        ("POST", re.compile(r"^/site/v1/billing/pay$"), "billing_pay", True),
+        ("POST", re.compile(r"^/site/v1/billing/check$"), "billing_check", True),
+        ("POST", re.compile(r"^/site/v1/pay/yookassa$"), "yookassa_webhook", False),
+        # оплата занятий учеником
+        ("GET", re.compile(r"^/site/v1/lesson-pay$"), "lesson_pay_overview", True),
+        ("GET", re.compile(r"^/site/v1/lesson-pay/config$"), "lesson_pay_config", True),
+        ("POST", re.compile(r"^/site/v1/lesson-pay/config$"), "lesson_pay_config_save", True),
+        ("POST", re.compile(r"^/site/v1/lesson-pay/declare$"), "lesson_pay_declare", True),
+        ("POST", re.compile(r"^/site/v1/lesson-pay/decide$"), "lesson_pay_decide", True),
+        ("POST", re.compile(r"^/site/v1/lesson-pay/adjust$"), "lesson_pay_adjust", True),
+        # настроение, своя картинка, публикация конспекта, занятие из урока
+        ("POST", re.compile(r"^/site/v1/account/mood$"), "mood", True),
+        ("POST", re.compile(r"^/site/v1/account/photo$"), "photo", True),
+        ("POST", re.compile(r"^/site/v1/lessons/(?P<id>[\w-]+)/publish$"), "report_publish", True),
+        ("POST", re.compile(r"^/site/v1/lessons/(?P<id>[\w-]+)/exercises$"), "lesson_exercises", True),
         ("GET", re.compile(r"^/site/v1/admin/feedback$"), "admin_feedback", True),
         ("GET", re.compile(r"^/site/v1/school$"), "school", True),
         ("POST", re.compile(r"^/site/v1/school$"), "school_update", True),
@@ -159,7 +182,7 @@ class Website:
         ("GET", re.compile(r"^/site/v1/cards$"), "cards", True),
         ("POST", re.compile(r"^/site/v1/cards/review$"), "cards_review", True),
     ]
-    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload|homework/\d+/attach)$")  # тело — файл, а не JSON
+    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload|account/photo|homework/\d+/attach)$")  # тело – файл, а не JSON
     FILE_RE = re.compile(r"^/site/v1/files/(?P<id>[0-9a-f]{24})$")
 
     def __init__(self, portal: Portal, web_dir: Path = WEB_DIR, classroom: Classroom | None = None):
@@ -170,6 +193,9 @@ class Website:
         self.accounts = Accounts(portal)
         self.learning = Learning(portal)
         self.units_service = Units(self.learning)
+        self.plan_pay = PlanPayments(portal)
+        self.lesson_pay = LessonPay(portal)
+        self.classroom.pay = self.lesson_pay
 
     @staticmethod
     def handles(path: str) -> bool:
@@ -306,7 +332,7 @@ class Website:
         try:
             since_s, since_m = int(query.get("since_signal", "0")), int(query.get("since_message", "0"))
         except ValueError:
-            raise PortalError(400, "since_signal и since_message — числа") from None
+            raise PortalError(400, "since_signal и since_message – числа") from None
         return self.classroom.state(viewer, id, since_s, since_m)
 
     def room_signal(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
@@ -508,6 +534,67 @@ class Website:
 
     def feedback(self, viewer: Any, body: Any, **_: Any) -> Any:
         return self.community.feedback(viewer, body)
+
+    def auth_forgot(self, body: Any, ip: str | None, **_: Any) -> Any:
+        return self.accounts.forgot_password(body, ip)
+
+    def auth_reset(self, body: Any, ip: str | None, **_: Any) -> Any:
+        return self.accounts.reset_password(body, ip)
+
+    def public_config(self, **_: Any) -> Any:
+        st = self.portal.settings
+        return {"name": st.school_name, "support_email": st.support_email, "bot": st.bot_username or None,
+                "online_payments": self.plan_pay.enabled}
+
+    def support(self, body: Any, ip: str | None, headers: Any, **_: Any) -> Any:
+        try:
+            viewer = self.portal.viewer(headers.get("X-Access-Token")) if headers.get("X-Access-Token") else None
+        except PortalError:
+            viewer = None  # просроченная ссылка не мешает написать в поддержку
+        return self.community.support(body, viewer, ip)
+
+    def billing_options(self, viewer: Any, **_: Any) -> Any:
+        return self.plan_pay.options(viewer)
+
+    def billing_pay(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.plan_pay.pay(viewer, body)
+
+    def billing_check(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.plan_pay.check(viewer, body)
+
+    def yookassa_webhook(self, body: Any, **_: Any) -> Any:
+        return self.plan_pay.webhook(body)
+
+    def lesson_pay_overview(self, viewer: Any, **_: Any) -> Any:
+        return self.lesson_pay.overview(viewer)
+
+    def lesson_pay_config(self, viewer: Any, **_: Any) -> Any:
+        return self.lesson_pay.get_config(viewer)
+
+    def lesson_pay_config_save(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.lesson_pay.save_config(viewer, body)
+
+    def lesson_pay_declare(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.lesson_pay.declare(viewer, body)
+
+    def lesson_pay_decide(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.lesson_pay.decide(viewer, body)
+
+    def lesson_pay_adjust(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.lesson_pay.adjust(viewer, body)
+
+    def mood(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.accounts.set_mood(viewer, body)
+
+    def photo(self, viewer: Any, raw: bytes, headers: Any, **_: Any) -> Any:
+        res = self.learning.upload_photo(viewer, raw, headers)
+        return {**res, "account": self.accounts.public(viewer.user_id)}
+
+    def report_publish(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.classroom.publish(viewer, id)
+
+    def lesson_exercises(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.units_service.from_lesson(viewer, id, body)
 
     def admin_feedback(self, viewer: Any, **_: Any) -> Any:
         return self.community.feedback_list(viewer)

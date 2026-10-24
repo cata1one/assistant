@@ -1,19 +1,20 @@
 """Сообщество школы на сайте: чат пары вне урока, отзывы, преподаватели и биржа учеников.
 
-Главный принцип — школа остаётся посредником, а контакты не раскрываются:
+Главный принцип – школа остаётся посредником, а контакты не раскрываются:
 
-* **чат** — тот же анонимный мост, что и в Telegram: одна история и одна проверка на контакты
+* **чат** – тот же анонимный мост, что и в Telegram: одна история и одна проверка на контакты
   (номер, разбитый между сайтом и Telegram, тоже склеивается);
-* **отзывы** публикуются только после одобрения администратором; демо-отзывы — только
+* **отзывы** публикуются только после одобрения администратором; демо-отзывы – только
   с пометкой «пример» и только если школа их включила (``TUTOR_DEMO_REVIEWS``);
-* **биржа**: ученик бесплатно описывает задачу и бюджет — без контактов в публичной части.
-  Проверенные преподаватели школы откликаются со своей ценой. Ученик выбирает — и система
+* **биржа**: ученик бесплатно описывает задачу и бюджет – без контактов в публичной части.
+  Проверенные преподаватели школы откликаются со своей ценой. Ученик выбирает – и система
   сама создаёт анонимную пару в боте. Контакт ученика видит только администратор.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -39,7 +40,7 @@ MAX_CHAT_TEXT = 4000
 TEACHER_STATUSES = ("pending", "approved", "rejected")
 REVIEW_STATUSES = ("pending", "approved", "rejected")
 
-# Примеры отзывов — ТОЛЬКО для демонстрации вида блока. Помечаются «пример» и не показываются,
+# Примеры отзывов – ТОЛЬКО для демонстрации вида блока. Помечаются «пример» и не показываются,
 # пока школа явно не включит TUTOR_DEMO_REVIEWS. Заменяются настоящими отзывами из кабинета.
 DEMO_REVIEWS: list[dict[str, Any]] = [
     {"author_name": "Пример: взрослый ученик", "author_role": "student", "audience": "adult", "course_id": "it-english",
@@ -75,10 +76,11 @@ class Community:
         self.storage = portal.storage
         self.settings = portal.settings
         self.relay = RelayService(self.storage)
+        self._support_hits: dict[str, list[float]] = {}
 
     # -- роли ----------------------------------------------------------------------
     def teacher_status(self, viewer: Viewer) -> str | None:
-        """approved — может работать с биржей. Преподаватель действующей пары считается проверенным."""
+        """approved – может работать с биржей. Преподаватель действующей пары считается проверенным."""
         row = self.storage.get_teacher(viewer.user_id)
         if row and row["status"] == "rejected":
             return "rejected"
@@ -105,12 +107,12 @@ class Community:
     def _clean(self, text: str | None, what: str) -> str | None:
         """Публичный текст не должен содержать контактов."""
         if text and self.assistant.moderate(text).is_violation:
-            raise PortalError(422, f"{what}: без телефонов, ников и ссылок — общение идёт через платформу школы")
+            raise PortalError(422, f"{what}: без телефонов, ников и ссылок – общение идёт через платформу школы")
         return text
 
     # == переписка вне урока =============================================================
-    # Ветки: «pair:<id>» — преподаватель и ученик; «pp:<id>:<родитель>» — преподаватель и родитель;
-    # «ps:<id>:<родитель>» — родитель и школа. Школа читает переписки своих преподавателей, но не пишет в них.
+    # Ветки: «pair:<id>» – преподаватель и ученик; «pp:<id>:<родитель>» – преподаватель и родитель;
+    # «ps:<id>:<родитель>» – родитель и школа. Школа читает переписки своих преподавателей, но не пишет в них.
     def _parent_name(self, user_id: str) -> str:
         acc = self.storage.get_account(user_id) if user_id.startswith("a_") else None
         return f"{acc['name'].split()[0]} (родитель)" if acc else "Родитель"
@@ -211,7 +213,7 @@ class Community:
         pair, role, alias = t.pair, t.role, t.alias
         lesson = self.storage.active_lesson(pair.chat_id) if chat_id == pair.chat_id else None
         strict = self.portal.is_strict(pair.chat_id) and not chat_id.startswith("ps:")  # со школой можно делиться
-        if lesson:  # во время урока сообщение ученику — часть урока: слова, ДЗ, конспект
+        if lesson:  # во время урока сообщение ученику – часть урока: слова, ДЗ, конспект
             out = self.assistant.process_message(lesson["id"], viewer.user_id, alias, text,
                                                  role=Role.TUTOR if role == TUTOR else Role.STUDENT, moderate=strict)
             result, incident_id = out.moderation, out.incident_id
@@ -257,7 +259,7 @@ class Community:
             raise PortalError(403, "отзыв могут оставить ученики, родители и преподаватели школы")
         rating = body.get("rating")
         if not isinstance(rating, int) or isinstance(rating, bool) or not 1 <= rating <= 5:
-            raise PortalError(400, "оценка — от 1 до 5")
+            raise PortalError(400, "оценка – от 1 до 5")
         text = _field(body, "text", 1500, required=True)
         if len(text) < 20:
             raise PortalError(400, "напишите хотя бы пару предложений (от 20 символов)")
@@ -270,7 +272,7 @@ class Community:
         audience = body.get("audience") if body.get("audience") in AUDIENCES else None
         review_id = self.storage.add_review(user_id=viewer.user_id, author_role=role, author_name=name,
                                             audience=audience, course_id=course_id, rating=rating, text=text)
-        self.portal.notify_admin(f"⭐ Новый отзыв #{review_id} ({rating}/5) от «{name}» — ждёт одобрения в кабинете.")
+        self.portal.notify_admin(f"⭐ Новый отзыв #{review_id} ({rating}/5) от «{name}» – ждёт одобрения в кабинете.")
         return {"id": review_id, "status": "pending"}
 
     def my_reviews(self, viewer: Viewer) -> dict[str, Any]:
@@ -308,7 +310,7 @@ class Community:
         specialties = _field(body, "specialties", 300)
         rate = body.get("rate")
         if rate is not None and (not isinstance(rate, int) or isinstance(rate, bool) or not 300 <= rate <= 20000):
-            raise PortalError(400, "ставка — от 300 до 20 000 ₽ за урок")
+            raise PortalError(400, "ставка – от 300 до 20 000 ₽ за урок")
         for value, what in ((name, "Имя"), (bio, "О себе"), (specialties, "Специализация")):
             self._clean(value, what)
         new = self.storage.get_teacher(viewer.user_id) is None
@@ -317,7 +319,7 @@ class Community:
         self.storage.upsert_teacher(viewer.user_id, name, bio=bio, languages=languages, specialties=specialties,
                                     rate=rate, status="approved" if auto else "pending")
         if new and not auto:
-            self.portal.notify_admin(f"👩‍🏫 Новая анкета преподавателя «{name}» — одобрите в кабинете (Преподаватели).")
+            self.portal.notify_admin(f"👩‍🏫 Новая анкета преподавателя «{name}» – одобрите в кабинете (Преподаватели).")
         return self.teacher_profile(viewer)
 
     def admin_teachers(self, viewer: Viewer) -> dict[str, Any]:
@@ -356,7 +358,7 @@ class Community:
         schedule = _field(body, "schedule", 200)
         age = body.get("age")
         if age is not None and (not isinstance(age, int) or isinstance(age, bool) or not 4 <= age <= 99):
-            raise PortalError(400, "возраст — от 4 до 99")
+            raise PortalError(400, "возраст – от 4 до 99")
         choice = lambda key, opts: body.get(key) if body.get(key) in opts else None  # noqa: E731
         audience, language, level, budget = (choice("audience", AUDIENCES), choice("language", LANGUAGES),
                                              choice("level", LEVELS), choice("budget", BUDGETS))
@@ -372,7 +374,7 @@ class Community:
             self._clean(value, what)
         if ip and self.storage.market_requests_since(ip, datetime.now(timezone.utc) - timedelta(days=1)) \
                 >= REQUESTS_PER_DAY:
-            raise PortalError(429, "слишком много заявок — попробуйте завтра")
+            raise PortalError(429, "слишком много заявок – попробуйте завтра")
         request_id, key = secrets.token_hex(5), secrets.token_urlsafe(24)
         self.storage.add_market_request(id=request_id, owner_hash=hash_token(key), name=name.split()[0], age=age,
                                         audience=audience, language=language, course_id=course_id, level=level,
@@ -406,7 +408,7 @@ class Community:
     def _owned(self, request_id: str, key: str | None) -> dict[str, Any]:
         r = self.storage.market_request(request_id)
         if not r or not key or hash_token(key) != r["owner_hash"]:
-            raise PortalError(404, "заявка не найдена — проверьте ссылку")
+            raise PortalError(404, "заявка не найдена – проверьте ссылку")
         return r
 
     def owner_view(self, request_id: str, key: str | None) -> dict[str, Any]:
@@ -432,7 +434,7 @@ class Community:
         message = _field(body, "message", 1000, required=True)
         price = body.get("price")
         if not isinstance(price, int) or isinstance(price, bool) or not 300 <= price <= 20000:
-            raise PortalError(400, "цена — от 300 до 20 000 ₽ за урок")
+            raise PortalError(400, "цена – от 300 до 20 000 ₽ за урок")
         result, incident_id = self.assistant.moderate_chat_message(f"market:{request_id}", viewer.user_id,
                                                                    self.teacher_name(viewer.user_id), message,
                                                                    role=Role.TUTOR)
@@ -454,13 +456,49 @@ class Community:
         kind = body.get("kind") if body.get("kind") in self.FEEDBACK_KINDS else "other"
         text = body.get("text")
         if not isinstance(text, str) or not 5 <= len(text.strip()) <= 3000:
-            raise PortalError(400, "напишите пару слов — от 5 до 3000 символов")
+            raise PortalError(400, "напишите пару слов – от 5 до 3000 символов")
         acc = self.storage.get_account(viewer.user_id) if viewer.user_id.startswith("a_") else None
         name, role = (acc["name"], acc["role"]) if acc else (None, None)
         fid = self.storage.add_feedback(viewer.user_id, name, role, kind, text.strip())
         who = f"{name} ({role}, {acc['email']})" if acc else f"пользователь {viewer.user_id}"
-        self.portal.notify_admin(f"{self.FEEDBACK_KINDS[kind]} — обратная связь #{fid} от {who}:\n{text.strip()[:1500]}")
+        self.portal.notify_admin(f"{self.FEEDBACK_KINDS[kind]} – обратная связь #{fid} от {who}:\n{text.strip()[:1500]}")
         return {"id": fid}
+
+    def support(self, body: Any, viewer: Viewer | None, ip: str | None) -> dict[str, Any]:
+        """Окно помощи: вопрос из любого места сайта, в том числе до входа. Приходит админу в Telegram и на почту поддержки."""
+        import time as _time
+
+        body = body if isinstance(body, dict) else {}
+        if body.get("website"):  # ловушка для ботов
+            return {"id": None}
+        text = body.get("text")
+        if not isinstance(text, str) or not 5 <= len(text.strip()) <= 3000:
+            raise PortalError(400, "опишите вопрос в двух словах (от 5 символов)")
+        acc = self.storage.get_account(viewer.user_id) if viewer and viewer.user_id.startswith("a_") else None
+        contact = (acc["email"] if acc else _field(body, "contact", 120)) or ""
+        if not acc and not re.search(r"\S+@\S+\.\S+|@\w{3,}|\d{6,}", contact):
+            raise PortalError(400, "оставьте почту или @ник в Telegram, чтобы мы могли ответить")
+        key = ip or "-"
+        now = _time.monotonic()
+        hits = [t for t in self._support_hits.get(key, []) if now - t < 3600]
+        if len(hits) >= 8:
+            raise PortalError(429, "вы уже отправили несколько обращений, мы ответим на них, подождите немного")
+        self._support_hits[key] = hits + [now]
+        kind = body.get("kind") if body.get("kind") in ("help", "bug", "payment", "idea") else "help"
+        page = _field(body, "page", 120) or ""
+        name, role = (acc["name"], acc["role"]) if acc else (_field(body, "name", 60), None)
+        fid = self.storage.add_feedback(viewer.user_id if viewer else "anon", name, role, f"help:{kind}", text.strip(), contact)
+        label = {"help": "Вопрос", "bug": "Ошибка", "payment": "Оплата", "idea": "Идея"}[kind]
+        who = f"{name or 'аноним'} ({role or 'не вошёл'}), {contact}"
+        message = f"{label} #{fid}\nОт: {who}\nСтраница: {page or '—'}\n\n{text.strip()[:2500]}"
+        self.portal.notify_admin("🆘 " + message)
+        self.portal.mailer.send(self.settings.support_email, f"[{self.settings.school_name}] {label} #{fid}", message,
+                                reply_to=contact if "@" in contact and " " not in contact else None)
+        if "@" in contact and " " not in contact:
+            self.portal.mailer.send(contact, f"{self.settings.school_name}: мы получили ваше обращение",
+                                    f"Здравствуйте! Мы получили сообщение №{fid} и ответим на эту почту, обычно в течение дня.\n\n"
+                                    f"Ваш вопрос:\n{text.strip()[:1000]}", reply_to=self.settings.support_email)
+        return {"id": fid, "email": self.settings.support_email}
 
     def feedback_list(self, viewer: Viewer) -> dict[str, Any]:
         self._admin(viewer)
@@ -479,14 +517,14 @@ class Community:
             raise PortalError(404, "отклик не найден")
         teacher_id = proposal["teacher_id"]
         teacher = proposal["teacher_name"] or self.teacher_name(teacher_id)
-        # Анонимная пара в боте: преподаватель привязан сразу, ученику — ссылка-приглашение
+        # Анонимная пара в боте: преподаватель привязан сразу, ученику – ссылка-приглашение
         pair = self.relay.create_pair(teacher, r["name"], created_by="market")
         self.storage.bind_pair_user(pair.id, TUTOR, teacher_id)
         self.storage.update_market_request(request_id, status="matched", chosen_proposal=proposal_id, pair_id=pair.id)
         for p in self.storage.proposals(request_id):
             self.storage.set_proposal_status(p["id"], "accepted" if p["id"] == proposal_id else "declined")
         self.portal.telegram(teacher_id, f"🎉 Ученик «{r['name']}» выбрал вас на бирже (заявка #{request_id}, "
-                                         f"{proposal['price']} ₽ за урок). Пара {pair.id} создана — как только ученик "
+                                         f"{proposal['price']} ₽ за урок). Пара {pair.id} создана – как только ученик "
                                          "подключится, бот сообщит. Пишите ему через бота.")
         self.portal.notify_admin(f"🤝 Биржа: заявка #{request_id} → преподаватель «{teacher}» ({proposal['price']} ₽). "
                                  f"Пара {pair.id}. Связь с учеником: {r['contact']}")
@@ -537,7 +575,8 @@ class Community:
         for a in self.portal.accesses(viewer):
             if a.role != PARENT:
                 continue
-            lessons = [x for x in self.storage.lessons_for_chats([a.chat_id], limit=100) if x["status"] == "finished"]
+            lessons = [x for x in self.storage.lessons_for_chats([a.chat_id], limit=100) if x["status"] == "finished"
+                       and (self.storage.report_published(x["id"]) or self.storage.get_report(x["id"]) is None)]
             last = self.storage.get_report(lessons[0]["id"]) if lessons else None
             words = 0
             if lessons:

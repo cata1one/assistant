@@ -1,9 +1,9 @@
 {
-  "name": "better-study-site",
+  "name": "bright-site",
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "Сайт школы Better study: React + Tailwind + Framer Motion + Lenis. Сборка кладётся в tutor_assistant/web.",
+  "description": "Сайт Bright: React + Tailwind. Сборка кладётся в tutor_assistant/web.",
   "scripts": {
     "dev": "vite",
     "build": "vite build"

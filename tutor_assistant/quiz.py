@@ -58,7 +58,7 @@ def generate_test(vocabulary: list[VocabItem], seed: str | int = 0, max_question
         questions.append(TestQuestion(kind="gap", question=f"Вставьте пропущенное слово: {_blank(v.example or '', v.key)}",
                                       options=options if len(options) > 1 else [], answer=v.word))
 
-    # 4) Без переводов — хотя бы задания «переведите слово»
+    # 4) Без переводов – хотя бы задания «переведите слово»
     if not translated:
         for v in items[:max_questions]:
             questions.append(TestQuestion(kind="open", question=f"Переведите слово «{v.word}» и составьте с ним предложение",

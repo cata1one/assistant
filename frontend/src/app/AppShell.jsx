@@ -1,13 +1,15 @@
 import {
   BookOpen, Building2, CreditCard, FileStack, Home, Layers, LogOut, MessagesSquare, NotebookPen, PenTool, Search, Settings,
-  ShieldAlert, Shield, Sparkles, Users,
+  ShieldAlert, Shield, Sparkles, Users, Wallet,
 } from "lucide-react";
 import { useEffect } from "react";
 import { brandOf, useSession } from "../lib/session.js";
+import Help from "../site/Help.jsx";
 import { Loading } from "../ui/kit.jsx";
 import Logo from "../ui/Logo.jsx";
 import BoardPage from "./BoardPage.jsx";
 import { BoardsPage, LessonsPage, MessagesPage, ProfilePage } from "./common.jsx";
+import { LessonPayPage } from "./lessonpay.jsx";
 import Lesson from "./Lesson.jsx";
 import Room from "./Room.jsx";
 import { AdminPage, SchoolHome, SchoolLessonsPage, SignalsPage, TutorsPage } from "./school.jsx";
@@ -29,7 +31,7 @@ const NAV = {
     ["materials", "Материалы", FileStack, MaterialsPage],
     ["homework", "Домашка", NotebookPen, HomeworkPage],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, true],
-    ["find", "Найти учеников", Search, null, false, "#/market?tab=students"],
+    ["pay", "Оплата занятий", Wallet, LessonPayPage],
     ["plan", "Тариф", CreditCard, PlanPage],
     ["profile", "Профиль", Settings, ProfilePage],
   ],
@@ -58,6 +60,7 @@ const NAV = {
     ["lessons", "Уроки", BookOpen, SchoolLessonsPage],
     ["units", "Занятия", Layers, UnitsPage],
     ["materials", "База материалов", FileStack, MaterialsPage],
+    ["pay", "Оплата занятий", Wallet, LessonPayPage],
     ["plan", "Тариф", CreditCard, PlanPage],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, true],
     ["profile", "Профиль", Settings, ProfilePage],
@@ -74,7 +77,7 @@ function Sidebar({ items, current, session }) {
   const unread = session.me?.unread || 0;
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-white/70 px-3 py-5 backdrop-blur lg:flex">
-      <a href="#/" className="px-3" aria-label="На сайт"><Logo brand={brandOf(session.role)} size={28} /></a>
+      <a href="#/" className="px-3" aria-label="На сайт"><Logo size={28} school={session.role === "school"} /></a>
       <nav aria-label="Кабинет" className="mt-7 grid gap-0.5">
         {items.map(([id, title, Icon, , , href]) => (
           <a key={id} href={href || `#/app/${id === "home" ? "" : id}`} aria-current={current === id ? "page" : undefined}
@@ -87,6 +90,11 @@ function Sidebar({ items, current, session }) {
       <div className="mt-auto rounded-2xl bg-cream p-3 text-sm">
         <p className="truncate font-bold">{session.account?.name || "Вход через Telegram"}</p>
         <p className="truncate text-xs text-ink-mute">{session.account?.org?.name || { tutor: "Частный репетитор", student: "Ученик", parent: "Родитель", school: "Школа", admin: "Администратор" }[session.role]}</p>
+        {["tutor", "school"].includes(session.role) && session.account?.billing?.state && session.account.billing.state !== "free" && (
+          <a href="#/app/plan" className="mt-1 block truncate text-xs font-semibold text-brand">
+            {{ trial: `Пробный период: ${session.account.billing.days_left + 1} дн.`, active: `Тариф до ${new Date(session.account.billing.until).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}`, expired: "Нужно оплатить" }[session.account.billing.state]}
+          </a>
+        )}
         <button type="button" onClick={() => { session.logout(); window.location.hash = "#/"; }} className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-mute hover:text-ink"><LogOut size={13} /> Выйти</button>
       </div>
     </aside>
@@ -107,11 +115,11 @@ function TabBar({ items, current }) {
   );
 }
 
-function MobileHeader({ items, current, brand }) {
+function MobileHeader({ items, current, school }) {
   const more = items.filter((x) => !x[4]);
   return (
     <header className="flex items-center gap-2 px-4 pt-4 lg:hidden">
-      <a href="#/" aria-label="На сайт"><Logo brand={brand} size={26} /></a>
+      <a href="#/" aria-label="На сайт"><Logo size={26} school={school} /></a>
       <details className="relative ml-auto">
         <summary className="btn-light btn-sm list-none">Ещё</summary>
         <div className="absolute right-0 z-50 mt-2 grid w-56 gap-0.5 rounded-2xl border border-line bg-white p-2 shadow-lift">
@@ -147,7 +155,7 @@ export default function AppShell({ route }) {
     <div className="flex min-h-screen bg-cream" style={session.role === "student" ? { background: (THEMES[session.account?.prefs?.theme] || THEMES.default).bg } : undefined}>
       <Sidebar items={items} current={current} session={session} />
       <div className="min-w-0 flex-1">
-        <MobileHeader items={items} current={current} brand={brandOf(session.role)} />
+        <MobileHeader items={items} current={current} school={session.role === "school"} />
         <main className={`mx-auto px-4 pb-28 pt-6 md:px-8 lg:pb-10 ${area === "board" ? "max-w-none" : "max-w-6xl"}`}>
           {["tutor", "school"].includes(session.role) && session.account?.billing?.state !== "active" && area === "app" && sub !== "plan" && <BillingStatus billing={session.account?.billing} compact />}
           {area === "lesson" && sub ? <Lesson id={sub} /> : area === "board" ? <BoardPage params={route.params} />
@@ -155,6 +163,7 @@ export default function AppShell({ route }) {
         </main>
       </div>
       <TabBar items={items} current={current} />
+      {area !== "board" && <Help />}
     </div>
   );
 }

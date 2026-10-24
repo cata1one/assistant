@@ -10,9 +10,9 @@ function WordCard({ w, onDelete, tutorView }) {
   const [flipped, setFlipped] = useState(false);
   return (
     <div className="group relative">
-      <button type="button" onClick={() => setFlipped(!flipped)} aria-label={`${w.word} — ${flipped ? "показать слово" : "показать перевод"}`}
+      <button type="button" onClick={() => setFlipped(!flipped)} aria-label={`${w.word} – ${flipped ? "показать слово" : "показать перевод"}`}
         className={`card card-hover flex min-h-[110px] w-full flex-col items-center justify-center !p-4 text-center ${flipped ? "!bg-brand-tint" : ""}`}>
-        <span className="font-display text-lg font-extrabold">{flipped ? w.translation || "—" : w.word}</span>
+        <span className="font-display text-lg font-extrabold">{flipped ? w.translation || "–" : w.word}</span>
         {!flipped && w.transcription && <span className="mt-1 text-sm text-ink-mute">{w.transcription}</span>}
         {flipped && w.example && <span className="mt-1 text-xs text-ink-mute">{w.example}</span>}
         <span className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-ink-mute">{tutorView && w.source === "student" ? "добавил ученик" : SOURCE[w.source] || ""}</span>
@@ -27,7 +27,7 @@ function WordCard({ w, onDelete, tutorView }) {
   );
 }
 
-/** Словарь: слова уроков, ДЗ, от преподавателя и свои. chatId — словарь конкретного ученика (для преподавателя). */
+/** Словарь: слова уроков, ДЗ, от преподавателя и свои. chatId – словарь конкретного ученика (для преподавателя). */
 export function Vocab({ chatId, tutorView }) {
   const path = `/site/v1/vocab${chatId ? `?chat_id=${encodeURIComponent(chatId)}` : ""}`;
   const { data, error, reload } = useApi(path, [chatId]);
@@ -52,10 +52,10 @@ export function Vocab({ chatId, tutorView }) {
     <>
       <form onSubmit={add} className="card mb-5 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
         <label className="label">{tutorView ? "Добавить слова ученику" : "Добавить свои слова"}
-          <textarea className="field min-h-[64px] font-normal" required maxLength={3000} value={text} onChange={(e) => setText(e.target.value)} placeholder={"kitchen — кухня\n你好 (nǐ hǎo) — привет"} />
+          <textarea className="field min-h-[64px] font-normal" required maxLength={3000} value={text} onChange={(e) => setText(e.target.value)} placeholder={"kitchen – кухня\n你好 (nǐ hǎo) – привет"} />
         </label>
         <button type="submit" className="btn-brand"><Plus size={16} /> Добавить</button>
-        <p className="text-xs text-ink-mute md:col-span-2">По слову в строке: «слово — перевод». Слова сразу появляются в карточках.</p>
+        <p className="text-xs text-ink-mute md:col-span-2">По слову в строке: «слово – перевод». Слова сразу появляются в карточках.</p>
         {msg && <Notice tone="ok" className="md:col-span-2">{msg}</Notice>}
         {err && <div className="md:col-span-2"><ErrorBox error={err} /></div>}
       </form>
@@ -70,7 +70,7 @@ export function Vocab({ chatId, tutorView }) {
 export function WordsPage() {
   return (
     <>
-      <PageTitle title="Словарь" text="Новые слова с уроков, из домашних заданий и от преподавателя. Лишнее можно убрать — кнопка в углу карточки."
+      <PageTitle title="Словарь" text="Новые слова с уроков, из домашних заданий и от преподавателя. Лишнее можно убрать – кнопка в углу карточки."
         actions={<a href="#/app/cards" className="btn-brand"><Repeat size={16} /> Учить карточками</a>} />
       <Vocab />
     </>

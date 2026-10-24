@@ -69,7 +69,7 @@ class Settings:
     target_language: str = "en"  # изучаемый язык (en, de, fr, es, it, ...)
     native_language: str = "ru"  # язык ученика / конспекта
 
-    # LLM (Claude). mode: auto — включить, если есть ключ; on — всегда; off — только офлайн.
+    # LLM (Claude). mode: auto – включить, если есть ключ; on – всегда; off – только офлайн.
     llm_mode: str = "auto"
     llm_model: str = DEFAULT_MODEL
     llm_fallbacks: bool = True
@@ -91,10 +91,10 @@ class Settings:
     split_window_seconds: int = 180  # окно склейки номера, разбитого на сообщения
     relay_media: bool = True  # анонимный мост: пересылать фото/файлы (их содержимое не проверяется)
 
-    # Распознавание речи (голосовые, запись урока). mode: auto — если установлен faster-whisper; on; off.
+    # Распознавание речи (голосовые, запись урока). mode: auto – если установлен faster-whisper; on; off.
     stt_mode: str = "auto"
-    stt_model: str = "small"  # tiny | base | small | medium | large-v3 — чем больше, тем точнее и медленнее
-    stt_language: str = ""  # пусто — определять автоматически (урок обычно смешанный: ru + изучаемый язык)
+    stt_model: str = "small"  # tiny | base | small | medium | large-v3 – чем больше, тем точнее и медленнее
+    stt_language: str = ""  # пусто – определять автоматически (урок обычно смешанный: ru + изучаемый язык)
     stt_device: str = "cpu"  # cpu | cuda
     stt_compute_type: str = "int8"
     stt_model_dir: str = ""  # папка с моделями (для серверов без доступа в интернет)
@@ -109,14 +109,14 @@ class Settings:
     telegram_proxy: str = ""  # прокси для связи с Telegram: http://host:port или socks5://user:pass@host:port
     admin_chat_id: str = ""  # куда слать уведомления о нарушениях
     admin_user_ids: tuple[str, ...] = ()
-    api_token: str = ""  # Bearer-токен HTTP API (пусто — без авторизации, только для локальной разработки)
+    api_token: str = ""  # Bearer-токен HTTP API (пусто – без авторизации, только для локальной разработки)
     api_host: str = "127.0.0.1"
     api_port: int = 8080
 
     # Сайт школы (раздаётся тем же сервером, что и API)
-    school_name: str = "Better study"
-    site_url: str = ""  # публичный адрес сайта, например https://myschool.ru — для ссылок в личный кабинет
-    bot_username: str = ""  # имя Telegram-бота школы без @ — кнопки «Написать в Telegram» на сайте
+    school_name: str = "Bright"
+    site_url: str = ""  # публичный адрес сайта, например https://myschool.ru – для ссылок в личный кабинет
+    bot_username: str = ""  # имя Telegram-бота школы без @ – кнопки «Написать в Telegram» на сайте
     classroom_domains: tuple[str, ...] = ("progressme.ru",)  # где проходят уроки: ссылки на класс только отсюда
     access_token_days: int = 30  # срок действия ссылки в личный кабинет
     # Онлайн-класс (видеосвязь WebRTC в браузере). JSON-список ICE-серверов; для учеников за строгим NAT
@@ -125,6 +125,21 @@ class Settings:
     demo_reviews: bool = False  # показывать примеры отзывов с пометкой «пример», пока нет настоящих
     market_fee_percent: int = 20  # комиссия школы с занятий, найденных через биржу (показывается преподавателям)
     trust_proxy: bool = False  # сайт за nginx: брать IP посетителя из X-Forwarded-For (для защиты от спама)
+
+    # Почта: письма об оплате занятий, обращения в поддержку. Без SMTP письма не уходят (остаются уведомления на сайте и в Telegram)
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""  # от чьего имени; по умолчанию как smtp_user
+    support_email: str = "monework@mail.ru"  # сюда приходят обращения из окна помощи
+
+    # Оплата тарифа через ЮKassa (карты, СБП). Пока ключи не заданы, оплата отключена, а срок продлевает администратор
+    yookassa_shop_id: str = ""
+    yookassa_secret_key: str = ""
+    yookassa_receipt: bool = False  # слать чек (54-ФЗ) вместе с платежом: нужно, если вы самозанятый или ИП на УСН
+    yookassa_tax_system: int = 0  # код системы налогообложения для чека, 0 – не указывать (берётся из настроек магазина)
+    yookassa_vat_code: int = 1  # 1 – без НДС
 
     @classmethod
     def from_env(cls, dotenv: str | None = ".env") -> Settings:
@@ -176,6 +191,17 @@ class Settings:
             ai_key=_env("TUTOR_AI_KEY"),
             ai_model=_env("TUTOR_AI_MODEL"),
             ai_timeout=float(_env_int("TUTOR_AI_TIMEOUT", int(cls.ai_timeout))),
+            smtp_host=_env("TUTOR_SMTP_HOST"),
+            smtp_port=_env_int("TUTOR_SMTP_PORT", cls.smtp_port),
+            smtp_user=_env("TUTOR_SMTP_USER"),
+            smtp_password=_env("TUTOR_SMTP_PASSWORD"),
+            smtp_from=_env("TUTOR_SMTP_FROM"),
+            support_email=_env("TUTOR_SUPPORT_EMAIL", cls.support_email),
+            yookassa_shop_id=_env("YOOKASSA_SHOP_ID"),
+            yookassa_secret_key=_env("YOOKASSA_SECRET_KEY"),
+            yookassa_receipt=_env_bool("YOOKASSA_RECEIPT", cls.yookassa_receipt),
+            yookassa_tax_system=_env_int("YOOKASSA_TAX_SYSTEM", cls.yookassa_tax_system),
+            yookassa_vat_code=_env_int("YOOKASSA_VAT_CODE", cls.yookassa_vat_code),
         )
 
     @property
@@ -184,6 +210,14 @@ class Settings:
             return ZoneInfo(self.timezone)
         except (ZoneInfoNotFoundError, ValueError):
             return ZoneInfo("UTC")
+
+    @property
+    def smtp_enabled(self) -> bool:
+        return bool(self.smtp_host and (self.smtp_from or self.smtp_user))
+
+    @property
+    def yookassa_enabled(self) -> bool:
+        return bool(self.yookassa_shop_id and self.yookassa_secret_key)
 
     @property
     def llm_enabled(self) -> bool:

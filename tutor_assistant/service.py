@@ -29,7 +29,7 @@ from .vocabulary import VocabularyCollector
 
 log = logging.getLogger(__name__)
 
-SPEECH_TAIL_CHARS = 120  # хвост предыдущего фрагмента речи — номер может разорваться на границе фрагментов
+SPEECH_TAIL_CHARS = 120  # хвост предыдущего фрагмента речи – номер может разорваться на границе фрагментов
 
 
 class LessonNotFound(LookupError):
@@ -172,7 +172,7 @@ class TutorAssistant:
     def start_lesson(self, chat_id: str | None = None, tutor_id: str | None = None, tutor_name: str | None = None,
                      student_id: str | None = None, student_name: str | None = None,
                      title: str | None = None, require_recording: bool | None = None) -> dict[str, Any]:
-        """Начать урок. С ``require_recording`` урок без записи (или с долгим перерывом) — нарушение."""
+        """Начать урок. С ``require_recording`` урок без записи (или с долгим перерывом) – нарушение."""
         if chat_id is not None:
             active = self.storage.active_lesson(chat_id)
             if active:
@@ -205,7 +205,7 @@ class TutorAssistant:
 
     @staticmethod
     def owner_for(lesson: dict[str, Any]) -> str:
-        """Чей это словарь: ученика, а если он неизвестен — чата/урока."""
+        """Чей это словарь: ученика, а если он неизвестен – чата/урока."""
         if lesson.get("student_id"):
             return f"student:{lesson['student_id']}"
         if lesson.get("chat_id"):
@@ -226,7 +226,7 @@ class TutorAssistant:
                         source: str = "text", moderate: bool = True) -> MessageOutcome:
         """Реплика урока: проверка, сохранение (без контактов), сбор слов и ДЗ.
 
-        ``context_text`` — предыдущий фрагмент речи того же говорящего: номер,
+        ``context_text`` – предыдущий фрагмент речи того же говорящего: номер,
         продиктованный на стыке двух фрагментов записи, проверяется целиком.
         """
         lesson = self.lesson(lesson_id)
@@ -248,7 +248,7 @@ class TutorAssistant:
                 result.redacted_text = REDACTED_MESSAGE
         stored = result.redacted_text if result.blocked else text
         note = parent_note(text) if role_ in (Role.TUTOR, Role.UNKNOWN) else None
-        if note is None:  # заметка для родителей — не часть урока и не попадает в конспект ученика
+        if note is None:  # заметка для родителей – не часть урока и не попадает в конспект ученика
             self.storage.add_message(lesson_id, None if speaker_id is None else str(speaker_id), speaker_name, role_,
                                      stored, source=source)
 
@@ -281,7 +281,7 @@ class TutorAssistant:
         return MessageOutcome(lesson_id, result, stored, incident_id, new_words, new_hw)
 
     def lesson_language(self, lesson: dict[str, Any]) -> str:
-        """Изучаемый язык урока: язык ученика из кабинета преподавателя, иначе — из настроек."""
+        """Изучаемый язык урока: язык ученика из кабинета преподавателя, иначе – из настроек."""
         return self.storage.chat_language(lesson.get("chat_id")) or self.settings.target_language
 
     def _build_report(self, lesson: dict[str, Any], use_llm: bool) -> LessonReport:
@@ -300,7 +300,7 @@ class TutorAssistant:
         )
 
     def improve_report(self, lesson_id: str) -> LessonReport | None:
-        """Доработка готового офлайн-отчёта ИИ (для медленных бесплатных моделей — в фоне после урока).
+        """Доработка готового офлайн-отчёта ИИ (для медленных бесплатных моделей – в фоне после урока).
 
         Если преподаватель уже отредактировал отчёт, его правки не перезаписываются.
         """
@@ -308,11 +308,11 @@ class TutorAssistant:
         report = self._build_report(lesson, use_llm=True)
         current = self.storage.get_report(lesson_id)
         if current and "отредактировано преподавателем" in current.notes:
-            if current.generated_by == "pending":  # правки преподавателя важнее — черновик больше не ждёт ИИ
+            if current.generated_by == "pending":  # правки преподавателя важнее – черновик больше не ждёт ИИ
                 current.generated_by = "offline"
                 self.storage.save_report(lesson_id, current)
             return None
-        if report.generated_by == "offline" and current:  # ИИ не справился — оставляем офлайн-отчёт
+        if report.generated_by == "offline" and current:  # ИИ не справился – оставляем офлайн-отчёт
             current.generated_by = "offline"
             current.notes = [*current.notes, *report.notes][-10:]
             self.storage.save_report(lesson_id, current)
@@ -322,7 +322,7 @@ class TutorAssistant:
         return report
 
     def finish_lesson(self, lesson_id: str, use_llm: bool = True, ai_pending: bool = False) -> LessonReport:
-        """Завершает урок и строит отчёт. ai_pending — отчёт пока офлайн, ИИ доработает его в фоне."""
+        """Завершает урок и строит отчёт. ai_pending – отчёт пока офлайн, ИИ доработает его в фоне."""
         lesson = self.lesson(lesson_id)
         owner = self.owner_for(lesson)
         report = self._build_report(lesson, use_llm=use_llm)
@@ -398,7 +398,7 @@ class TutorAssistant:
                       recording: bool = False, moderate: bool = True) -> AudioOutcome:
         """Фрагмент речи урока: распознать → проверить → сохранить в расшифровку урока.
 
-        ``recording=True`` — фрагмент непрерывной записи урока (отмечается для контроля перерывов).
+        ``recording=True`` – фрагмент непрерывной записи урока (отмечается для контроля перерывов).
         """
         self.lesson(lesson_id)
         transcription, error = self.transcribe(audio)
@@ -444,7 +444,7 @@ class TutorAssistant:
                 "seconds": round(rec["seconds"], 1), "last_chunk_at": rec["last_chunk_at"], "idle_seconds": round(idle)}
 
     def check_recording_gaps(self, now: datetime | None = None) -> list[dict[str, Any]]:
-        """Найти идущие уроки, где запись не включили или она прервалась. Каждый перерыв — одно нарушение."""
+        """Найти идущие уроки, где запись не включили или она прервалась. Каждый перерыв – одно нарушение."""
         now = now or datetime.now(timezone.utc)
         found = []
         for rec in self.storage.active_recordings():
@@ -492,7 +492,7 @@ class TutorAssistant:
         В отчёт и в Claude попадает только текст со скрытыми контактами.
         """
         utterances = parse_transcript(text, tutor_names, student_names)
-        guard = ConversationGuard(self.guard, window_seconds=10**9)  # в транскрипте время неизвестно — склеиваем подряд
+        guard = ConversationGuard(self.guard, window_seconds=10**9)  # в транскрипте время неизвестно – склеиваем подряд
         clean: list[Utterance] = []
         violations: list[dict[str, Any]] = []
         for i, u in enumerate(utterances):
@@ -542,7 +542,7 @@ class TutorAssistant:
             last = self.storage.last_lesson(student_id=owner.split(":", 1)[1])
         else:
             last = None
-        # Словарь чата может принадлежать ученику прошлого урока и/или текущего — учитываем оба.
+        # Словарь чата может принадлежать ученику прошлого урока и/или текущего – учитываем оба.
         owners = [owner] if owner else list(dict.fromkeys(self.owner_for(x) for x in (active, last) if x))
 
         if command == "words_today":

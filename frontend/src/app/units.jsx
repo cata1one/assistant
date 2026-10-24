@@ -34,8 +34,8 @@ const textToQuestions = (text) => text.split(/\n\s*\n/).map((chunk) => {
 
 function toEdit(b) {
   const e = { ...b };
-  if (b.type === "words") e.itemsText = (b.items || []).map((w) => (w.translation ? `${w.word} — ${w.translation}` : w.word)).join("\n");
-  if (b.type === "match") e.pairsText = (b.pairs || []).map((p) => `${p[0]} — ${p[1]}`).join("\n");
+  if (b.type === "words") e.itemsText = (b.items || []).map((w) => (w.translation ? `${w.word} – ${w.translation}` : w.word)).join("\n");
+  if (b.type === "match") e.pairsText = (b.pairs || []).map((p) => `${p[0]} – ${p[1]}`).join("\n");
   if (b.type === "choice" || b.type === "listening") e.qText = questionsToText(b.questions);
   return e;
 }
@@ -60,15 +60,15 @@ function BlockEditor({ b, onChange, audios }) {
     <div className="grid gap-3">
       <input className="field" value={b.title || ""} onChange={set("title")} placeholder="Заголовок задания" aria-label="Заголовок" />
       {b.type === "text" && area("body", "Текст, правило или инструкция", 6)}
-      {b.type === "words" && <>{area("itemsText", "kitchen — кухня\nwardrobe — шкаф", 5)}<p className="text-xs text-ink-mute">При выдаче занятия эти слова сразу попадут в карточки ученика.</p></>}
+      {b.type === "words" && <>{area("itemsText", "kitchen – кухня\nwardrobe – шкаф", 5)}<p className="text-xs text-ink-mute">При выдаче занятия эти слова сразу попадут в карточки ученика.</p></>}
       {b.type === "gap" && (
         <>
           {area("text", "I [have been] to London. She [has|'s] got a cat.", 6)}
-          <p className="text-xs text-ink-mute">Правильный ответ — в квадратных скобках. Несколько верных вариантов — через «|»: [have been|'ve been].</p>
+          <p className="text-xs text-ink-mute">Правильный ответ – в квадратных скобках. Несколько верных вариантов – через «|»: [have been|'ve been].</p>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!b.bank} onChange={set("bank")} /> Показать слова для вставки (банк слов)</label>
         </>
       )}
-      {b.type === "match" && <>{area("pairsText", "bustling — full of people and activity\nsuburb — пригород", 6)}<p className="text-xs text-ink-mute">По паре в строке через « — ». Ученик увидит правую колонку перемешанной.</p></>}
+      {b.type === "match" && <>{area("pairsText", "bustling – full of people and activity\nsuburb – пригород", 6)}<p className="text-xs text-ink-mute">По паре в строке через « – ». Ученик увидит правую колонку перемешанной.</p></>}
       {(b.type === "choice" || b.type === "listening") && (
         <>
           {b.type === "listening" && (
@@ -83,8 +83,8 @@ function BlockEditor({ b, onChange, audios }) {
                   {audios.map((m) => <option key={m.id} value={m.url}>{m.title}</option>)}
                 </select>
               </div>
-              {area("script", "Текст записи. Пропуски для ученика — в [скобках]: My name is [Anna].", 5)}
-              <p className="text-xs text-ink-mute">Без аудиофайла текст прочитает голос браузера — бесплатно. Аудиофайл загрузите в «Материалы».</p>
+              {area("script", "Текст записи. Пропуски для ученика – в [скобках]: My name is [Anna].", 5)}
+              <p className="text-xs text-ink-mute">Без аудиофайла текст прочитает голос браузера – бесплатно. Аудиофайл загрузите в «Материалы».</p>
             </>
           )}
           {area("qText", "Вопрос?\n*правильный ответ\nнеправильный\nнеправильный\n\nСледующий вопрос?\n…", 7)}
@@ -148,7 +148,7 @@ function CreateModal({ ai, onClose }) {
           <select className="field" value={f.language} onChange={set("language")} aria-label="Язык">{LANGS.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}</select>
           <input className="field" value={f.level} onChange={set("level")} maxLength={20} placeholder="A2, B1, HSK 2" aria-label="Уровень" />
         </div>
-        <label className="label">Слова (необязательно)<textarea className="field font-normal" rows={4} value={f.words} onChange={set("words")} placeholder={"luggage — багаж\nboarding pass — посадочный талон"} /></label>
+        <label className="label">Слова (необязательно)<textarea className="field font-normal" rows={4} value={f.words} onChange={set("words")} placeholder={"luggage – багаж\nboarding pass – посадочный талон"} /></label>
         <label className="label">Свой текст (необязательно)<textarea className="field font-normal" rows={3} value={f.text} onChange={set("text")} placeholder="Текст, по которому строить задания" /></label>
         {ai && <input className="field" value={f.wishes} onChange={set("wishes")} maxLength={1000} placeholder="Пожелания для ИИ: «для подростка, больше говорения»" aria-label="Пожелания" />}
         <ErrorBox error={error} />
@@ -157,7 +157,7 @@ function CreateModal({ ai, onClose }) {
           <button type="button" className={ai ? "btn-light" : "btn-brand"} disabled={busy} onClick={() => go("offline")}><Sparkles size={16} /> Собрать из моих слов и текста</button>
           <button type="button" className="btn-ghost" onClick={() => { pendingDraft = { title: f.topic || "Новое занятие", language: f.language, level: f.level, blocks: [] }; window.location.hash = "#/app/units/new"; }}>Пустое занятие</button>
         </div>
-        {!ai && <p className="text-xs text-ink-mute">ИИ на сервере не подключён: занятие собирается из ваших слов и текста — пары, пропуски, тест и аудирование. Как подключить бесплатный ИИ — в README, раздел «Конструктор занятий».</p>}
+        {!ai && <p className="text-xs text-ink-mute">ИИ на сервере не подключён: занятие собирается из ваших слов и текста – пары, пропуски, тест и аудирование. Как подключить бесплатный ИИ – в README, раздел «Конструктор занятий».</p>}
       </div>
     </Modal>
   );
@@ -201,12 +201,12 @@ export function UnitsPage() {
   );
   return (
     <>
-      <PageTitle title="Занятия" text="Интерактивные уроки: вставить слова, пары, тесты, аудирование. Выдавайте их как домашнее задание — ответы проверяются сами."
+      <PageTitle title="Занятия" text="Интерактивные уроки: вставить слова, пары, тесты, аудирование. Выдавайте их как домашнее задание – ответы проверяются сами."
         actions={<button type="button" className="btn-brand" onClick={() => setCreate(true)}><Plus size={16} /> Создать занятие</button>} />
       <div className="mb-5"><Tabs label="Занятия" value={tab} onChange={setTab} items={[{ id: "mine", title: "Мои занятия" }, { id: "library", title: "Готовые: IELTS, HSK, грамматика" }]} /></div>
       <ErrorBox error={error || err} />
       {!data ? <Loading /> : tab === "mine" ? (
-        !data.units.length ? <Empty icon={Layers} title="Занятий пока нет" text="Создайте занятие с ИИ или из своих слов — или возьмите готовое из библиотеки." action={<button type="button" className="btn-light" onClick={() => setTab("library")}>Открыть библиотеку</button>} />
+        !data.units.length ? <Empty icon={Layers} title="Занятий пока нет" text="Создайте занятие с ИИ или из своих слов – или возьмите готовое из библиотеки." action={<button type="button" className="btn-light" onClick={() => setTab("library")}>Открыть библиотеку</button>} />
           : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.units.map((u) => card(u, false))}</div>
       ) : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.library.map((u) => card(u, true))}</div>}
       {create && <CreateModal ai={data?.ai} onClose={() => setCreate(false)} />}
@@ -326,7 +326,7 @@ export function DoUnit({ hwId }) {
   return (
     <>
       <a href="#/app/homework" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-ink-mute hover:text-ink"><ArrowLeft size={14} /> Домашние задания</a>
-      <PageTitle title={data.unit.title} text={student ? "Выполните задания и нажмите «Отправить» — ответы проверятся сразу." : data.result ? "Ответы ученика." : "Ученик ещё не выполнил занятие."} />
+      <PageTitle title={data.unit.title} text={student ? "Выполните задания и нажмите «Отправить» – ответы проверятся сразу." : data.result ? "Ответы ученика." : "Ученик ещё не выполнил занятие."} />
       {(student || data.result) && (
         <UnitPlayer unit={data.unit} result={data.result} readOnly={!student || data.status === "checked"} submitLabel="Отправить преподавателю"
           onSubmit={async (answers) => { const r = await request("POST", `/site/v1/homework/${hwId}/unit`, { answers }); reload(); return r; }} />

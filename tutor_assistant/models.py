@@ -115,7 +115,7 @@ class ParentReport(BaseModel):
     achievements: list[str] = Field(default_factory=list)  # успехи
     attention: list[str] = Field(default_factory=list)  # на что обратить внимание
     teacher_remarks: list[str] = Field(default_factory=list)  # замечания преподавателя
-    homework_status: str = "unknown"  # done | partial | not_done | unknown — как выполнено прошлое ДЗ
+    homework_status: str = "unknown"  # done | partial | not_done | unknown – как выполнено прошлое ДЗ
     recommendations: list[str] = Field(default_factory=list)  # как помочь дома
     activity: str | None = None  # активность на уроке
 

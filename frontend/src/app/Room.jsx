@@ -8,7 +8,7 @@ import { ErrorBox, Loading, Notice } from "../ui/kit.jsx";
 
 const Board = lazy(() => import("../board/Board.jsx"));
 
-/** Видео: srcObject нельзя задать атрибутом — ставим через ref. */
+/** Видео: srcObject нельзя задать атрибутом – ставим через ref. */
 function VideoView({ stream, muted = false, mirror = false, className = "" }) {
   const ref = useRef(null);
   useEffect(() => { if (ref.current) ref.current.srcObject = stream || null; }, [stream]);
@@ -28,7 +28,7 @@ async function getMedia() {
   try {
     return await navigator.mediaDevices.getUserMedia({ audio, video: { width: { ideal: 1280 }, height: { ideal: 720 } } });
   } catch {
-    return navigator.mediaDevices.getUserMedia({ audio }); // без камеры урок возможен, без микрофона — нет
+    return navigator.mediaDevices.getUserMedia({ audio }); // без камеры урок возможен, без микрофона – нет
   }
 }
 
@@ -49,16 +49,17 @@ function Lobby({ onJoin, error }) {
     <div className="mx-auto grid max-w-5xl items-center gap-6 lg:grid-cols-[1.3fr_1fr]">
       <div className="relative aspect-video overflow-hidden rounded-[2rem] bg-ink shadow-lift">
         {preview?.getVideoTracks().length ? <VideoView stream={preview} muted mirror className="h-full w-full object-cover" />
-          : <div className="grid h-full place-items-center text-white/60">{preview ? "Камера выключена — урок пройдёт со звуком" : "Проверяем камеру и микрофон…"}</div>}
+          : <div className="grid h-full place-items-center text-white/60">{preview ? "Камера выключена – урок пройдёт со звуком" : "Проверяем камеру и микрофон…"}</div>}
       </div>
       <div className="card">
         <h2 className="text-2xl">Готовы начать?</h2>
         <ul className="mt-4 grid gap-3 text-sm text-ink-soft">
-          <li className="flex gap-3"><Circle size={16} className="mt-0.5 shrink-0 fill-teach text-teach" />Урок записывается и расшифровывается — так собирается конспект.</li>
-          <li className="flex gap-3"><PenLine size={16} className="mt-0.5 shrink-0 text-brand" />Доска, материалы и видео — прямо в уроке, без демонстрации экрана.</li>
+          <li className="flex gap-3"><Circle size={16} className="mt-0.5 shrink-0 fill-teach text-teach" />Речь расшифровывается в текст для конспекта. Видео и звук не сохраняются.</li>
+          <li className="flex gap-3"><PenLine size={16} className="mt-0.5 shrink-0 text-brand" />Доска, материалы и видео – прямо в уроке, без демонстрации экрана.</li>
           <li className="flex gap-3"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-mint" />После урока конспект, слова и ДЗ появятся в кабинете.</li>
         </ul>
         <ErrorBox error={mediaError || error} />
+        {error?.status === 402 && <a href="#/app" className="btn-light mt-3 w-full">К оплате занятия</a>}
         <button type="button" className="btn-brand btn-lg mt-6 w-full" disabled={!preview}
           onClick={() => { preview.__joined = true; onJoin(preview); }}>Войти в урок</button>
       </div>
@@ -174,7 +175,7 @@ export default function Room({ id }) {
   };
   const leave = async () => { await client.current?.leave(); window.location.hash = "#/app"; };
   const finish = async () => {
-    if (!window.confirm("Завершить урок? Конспект и отчёты уйдут ученику и родителям.")) return;
+    if (!window.confirm("Завершить урок? Конспект и домашка соберутся автоматически.")) return;
     setBusy(true);
     try {
       await client.current?.stopRecorder(); // последний фрагмент речи попадёт в отчёт
@@ -192,7 +193,10 @@ export default function Room({ id }) {
     return (
       <div className="mx-auto max-w-xl py-16 text-center">
         <h1 className="text-3xl">Спасибо за урок!</h1>
-        <p className="mt-3 text-ink-soft">{result?.ai_pending ? "ИИ готовит конспект по записи урока — это займёт несколько минут. Ученик и родители получат его, как только он будет готов, а вы сможете его отредактировать." : "Конспект, новые слова, тест и домашнее задание готовятся по записи урока и появятся в кабинете."}</p>
+        <p className="mt-3 text-ink-soft">{tutor && result?.on_review
+          ? (result.ai_pending ? "ИИ готовит конспект, это займёт несколько минут. Когда он будет готов, проверьте его на странице урока и отправьте ученику." : "Конспект готов и ждёт вас на странице урока. Проверьте его, поправьте что нужно и отправьте ученику.")
+          : result?.ai_pending ? "ИИ готовит конспект по расшифровке урока, это займёт несколько минут. Ученик и родители получат его, как только он будет готов, а вы сможете его отредактировать."
+            : "Конспект, новые слова, тест и домашнее задание появятся в кабинете."}</p>
         {result?.violations ? <Notice tone="warn" className="mt-5">Нарушений на уроке: {result.violations}.</Notice> : null}
         <div className="mt-6 flex justify-center gap-3"><a className="btn-brand" href={`#/lesson/${id}`}>Материалы урока</a><a className="btn-light" href="#/app">В кабинет</a></div>
       </div>

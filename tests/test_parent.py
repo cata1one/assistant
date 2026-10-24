@@ -135,7 +135,7 @@ def test_progress_between_lessons(speech_assistant):
     assert r2.progress.corrections_prev == 2 and r2.progress.corrections_now == 0
     assert any("Ошибок меньше, чем на прошлом уроке: 2 → 0" in x for x in r2.parent.achievements)
     assert r2.parent.homework_status == "done"
-    assert "Прогресс: уроков — 2" in render.render_parent_report(r2)
+    assert "Прогресс: уроков – 2" in render.render_parent_report(r2)
 
 
 def test_note_with_contacts_is_rejected(speech_assistant):

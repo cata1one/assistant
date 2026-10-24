@@ -112,7 +112,7 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
       {result && result.total > 0 && (
         <div className={`card flex items-center gap-4 ${result.score === result.total ? "!bg-mint-soft" : "!bg-brand-tint"}`}>
           <span className="num font-display text-4xl font-extrabold">{result.score}/{result.total}</span>
-          <span>{result.score === result.total ? "Всё верно — отлично!" : "Правильные ответы показаны зелёным."}</span>
+          <span>{result.score === result.total ? "Всё верно – отлично!" : "Правильные ответы показаны зелёным."}</span>
         </div>
       )}
       {unit.blocks.map((b, i) => (
@@ -124,7 +124,7 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
               {b.items.map((w) => (
                 <li key={w.word} className="flex items-center gap-2 rounded-2xl bg-cream px-3 py-2">
                   <button type="button" onClick={() => speak(w.word.replace(/\s*\(.*\)$/, ""), ttsOf(unit.language))} aria-label={`Произнести ${w.word}`} className="text-brand"><Volume2 size={16} /></button>
-                  <b>{w.word}</b>{w.translation && <span className="text-ink-mute">— {w.translation}</span>}
+                  <b>{w.word}</b>{w.translation && <span className="text-ink-mute">– {w.translation}</span>}
                 </li>
               ))}
             </ul>
@@ -139,7 +139,7 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
                     <span className="font-semibold">{l} {r(i) && <Mark ok={ok} />}</span>
                     <select className={`field !py-2 ${r(i) ? (ok ? "!border-mint" : "!border-teach") : ""}`} disabled={!!result} value={(answers[i] || [])[j] || ""}
                       onChange={(e) => { const n = [...(answers[i] || [])]; n[j] = e.target.value; set(i, n); }} aria-label={`Пара для ${l}`}>
-                      <option value="">— выберите —</option>
+                      <option value="">– выберите –</option>
                       {b.right.map((x) => <option key={x} value={x}>{x}</option>)}
                     </select>
                     {r(i) && !ok && <span className="text-sm font-semibold text-[#146b4c] sm:col-start-2">{r(i).pair_answers[j]}</span>}

@@ -5,7 +5,7 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /**
  * Обрезка картинки: рамку двигают пальцем или мышью, углы растягивают.
- * crop — [x, y, w, h] в долях исходной картинки.
+ * crop – [x, y, w, h] в долях исходной картинки.
  */
 export default function CropDialog({ src, crop, onApply, onClose }) {
   const [r, setR] = useState(() => crop || [0.05, 0.05, 0.9, 0.9]);

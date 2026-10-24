@@ -1,12 +1,13 @@
 """Тарифы и доступ: пробный период, оплата, реферальная скидка.
 
-* Новый преподаватель или школа получают 3 дня со всеми функциями.
-* «Преподаватель» — 300 ₽ в месяц, всё без ограничений. «Онлайн-школа» — 500 ₽ в месяц за
-  преподавателя (кабинет школы, контроль контактов, общая база). Оплата на 3 и 12 месяцев — дешевле.
+* Новый преподаватель или школа получают 3 дня со всеми функциями (или сразу платят со скидкой).
+* «Преподаватель» стоит 290 ₽ в месяц, всё без ограничений. Первый оплаченный месяц на 20% дешевле.
+  «Онлайн-школа» стоит 490 ₽ в месяц за преподавателя (кабинет школы, контроль контактов, общая база).
+  Оплата на 3 и 12 месяцев ещё дешевле: минус 10% и 20%.
 * Преподаватель школы работает по тарифу школы. Ученики и родители не платят.
-* Пригласите коллегу: когда он оплатит тариф, вам — скидка 50% на следующее продление.
+* Пригласите коллегу: когда он оплатит тариф, вам скидка 50% на следующее продление.
 
-Онлайн-оплата пока не подключена: срок оплаты продлевает администратор платформы.
+Оплата идёт через ЮKassa (карта, СБП); пока ключи магазина не заданы, срок продлевает администратор.
 """
 
 from __future__ import annotations
@@ -15,11 +16,22 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 TRIAL_DAYS = 3
-PLANS: dict[str, dict[str, Any]] = {
-    "teacher": {"title": "Преподаватель", "price": 300, "periods": {1: 300, 3: 810, 12: 2880}},
-    "school": {"title": "Онлайн-школа", "price": 500, "per": "за преподавателя", "periods": {1: 500, 3: 1350, 12: 4800}},
-}
+PERIOD_DISCOUNT = {1: 0, 3: 10, 12: 20}  # % за оплату на несколько месяцев сразу
+FIRST_MONTH_DISCOUNT = 20  # % на первый оплаченный месяц тарифа «Преподаватель»
 REF_DISCOUNT = 50  # % на следующее продление за каждого коллегу, оплатившего тариф
+MONTHLY = {"teacher": 290, "school": 490}
+
+
+def _periods(monthly: int) -> dict[int, int]:
+    return {m: round(monthly * m * (100 - d) / 100) for m, d in PERIOD_DISCOUNT.items()}
+
+
+PLANS: dict[str, dict[str, Any]] = {
+    "teacher": {"title": "Преподаватель", "price": MONTHLY["teacher"], "periods": _periods(MONTHLY["teacher"]),
+                "first_month": round(MONTHLY["teacher"] * (100 - FIRST_MONTH_DISCOUNT) / 100)},
+    "school": {"title": "Онлайн-школа", "price": MONTHLY["school"], "per": "за преподавателя",
+               "periods": _periods(MONTHLY["school"])},
+}
 
 
 def now() -> datetime:
@@ -45,7 +57,7 @@ def payer(storage: Any, acc: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def plan_state(storage: Any, acc: dict[str, Any] | None, at: datetime | None = None) -> dict[str, Any]:
-    """trial — пробный период, active — оплачено, expired — нужно оплатить, free — ученик или родитель."""
+    """trial – пробный период, active – оплачено, expired – нужно оплатить, free – ученик или родитель."""
     if not acc:
         return {"state": "free"}
     who = payer(storage, acc)
@@ -75,7 +87,7 @@ def require_active(storage: Any, user_id: str) -> None:
     if st["state"] == "expired":
         raise PortalError(402, "Срок тарифа закончился: школа продлевает доступ своим преподавателям."
                           if st.get("by_school") else
-                          "Пробный период закончился. Оформите тариф «Преподаватель» за 300 ₽ в месяц, чтобы продолжить.")
+                          "Пробный период закончился. Оформите тариф «Преподаватель» за 290 ₽ в месяц, чтобы продолжить.")
 
 
 def trial_until(days: int = TRIAL_DAYS) -> str:
@@ -84,7 +96,8 @@ def trial_until(days: int = TRIAL_DAYS) -> str:
 
 def extend(storage: Any, acc: dict[str, Any], months: int) -> str:
     """Продлить оплату (после оплаты или вручную администратором)."""
-    start = max(now(), _dt(acc.get("paid_until")) or now())
+    # Неиспользованные дни пробного периода не сгорают: срок отсчитывается от самой поздней даты
+    start = max(now(), _dt(acc.get("paid_until")) or now(), _dt(acc.get("trial_until")) or now())
     until = (start + timedelta(days=30 * months)).isoformat(timespec="seconds")
     storage.update_account(acc["id"], paid_until=until)
     return until
@@ -97,9 +110,20 @@ def referrals(storage: Any, acc: dict[str, Any]) -> dict[str, Any]:
             "discounts": max(0, paid - int(acc.get("ref_used") or 0)), "percent": REF_DISCOUNT}
 
 
-def price(acc: dict[str, Any], months: int, storage: Any, teachers: int = 1, use_discount: bool = False) -> int:
+def quote(acc: dict[str, Any], months: int, storage: Any, teachers: int = 1, use_referral: bool = True) -> dict[str, Any]:
+    """Сколько заплатить: цена периода и применимая скидка (берётся наибольшая, скидки не суммируются)."""
     plan = PLANS["school" if acc.get("role") == "school" else "teacher"]
-    total = plan["periods"].get(months, plan["price"] * months) * max(1, teachers)
-    if use_discount and referrals(storage, acc)["discounts"] > 0:
-        total = round(total * (100 - REF_DISCOUNT) / 100)
-    return total
+    base = plan["periods"].get(months) or plan["price"] * months
+    base *= max(1, teachers)
+    options: list[tuple[int, str]] = []
+    if use_referral and referrals(storage, acc)["discounts"] > 0:
+        options.append((REF_DISCOUNT, "referral"))
+    if months == 1 and acc.get("role") != "school" and not storage.has_paid(acc["id"]):
+        options.append((FIRST_MONTH_DISCOUNT, "first"))
+    percent, reason = max(options, default=(0, ""))
+    total = round(base * (100 - percent) / 100)
+    return {"months": months, "base": base, "total": total, "percent": percent, "reason": reason or None}
+
+
+def price(acc: dict[str, Any], months: int, storage: Any, teachers: int = 1, use_discount: bool = False) -> int:
+    return quote(acc, months, storage, teachers)["total"]

@@ -13,7 +13,7 @@ LIBRARY: list[dict[str, Any]] = [
         "tags": ["IELTS", "Speaking"],
         "blocks": [
             {"type": "text", "title": "Как отвечать в Part 1",
-             "body": "В первой части экзаменатор задаёт короткие вопросы о вас. Хороший ответ — 2–3 предложения: "
+             "body": "В первой части экзаменатор задаёт короткие вопросы о вас. Хороший ответ – 2–3 предложения: "
                      "прямой ответ, причина или пример, немного деталей.\n\nDo you like your hometown? → "
                      "Yes, I do. It's a bustling city with lots of things to do, but the parks make it feel calm."},
             {"type": "words", "title": "Новые слова", "items": [
@@ -83,14 +83,14 @@ LIBRARY: list[dict[str, Any]] = [
         "level": "B1–B2", "tags": ["IELTS", "Listening"],
         "blocks": [
             {"type": "text", "title": "Как это устроено",
-             "body": "В первой части — разговор двух людей о бытовой ситуации. Нужно дописать форму: имя, дату, время, "
+             "body": "В первой части – разговор двух людей о бытовой ситуации. Нужно дописать форму: имя, дату, время, "
                      "цену. Перед прослушиванием прочитайте пропуски и подумайте, какое слово подходит. Можно "
                      "слушать два раза."},
             {"type": "listening", "title": "Послушайте и заполните форму", "lang": "en-GB", "script":
-                "Good morning, Riverside Sports Centre. — Hi, I'd like to join the swimming club. — Of course. Can I "
-                "have your surname? — It's [Fletcher], F-L-E-T-C-H-E-R. — Thank you. Which membership would you like, "
-                "monthly or yearly? — [Monthly], please. — The beginners' group meets on [Tuesday] evenings at "
-                "[seven|7] o'clock. — Great. How much is it? — It's [thirty|30] pounds a month, and you'll need to "
+                "Good morning, Riverside Sports Centre. – Hi, I'd like to join the swimming club. – Of course. Can I "
+                "have your surname? – It's [Fletcher], F-L-E-T-C-H-E-R. – Thank you. Which membership would you like, "
+                "monthly or yearly? – [Monthly], please. – The beginners' group meets on [Tuesday] evenings at "
+                "[seven|7] o'clock. – Great. How much is it? – It's [thirty|30] pounds a month, and you'll need to "
                 "bring your own [towel].",
              "questions": [
                  {"q": "Why is the woman calling?", "options": ["To book a tennis court", "To join the swimming club",
@@ -126,8 +126,8 @@ LIBRARY: list[dict[str, Any]] = [
                 {"q": "Какой тон у слога hǎo в 你好?", "options": ["первый", "второй", "третий", "четвёртый"], "answer": 2},
             ]},
             {"type": "listening", "title": "Послушайте и выберите", "lang": "zh-CN", "script": "对不起。没关系。",
-             "questions": [{"q": "Что вы услышали?", "options": ["Спасибо — пожалуйста", "Извините — ничего страшного",
-                                                                 "Здравствуйте — до свидания"], "answer": 1}]},
+             "questions": [{"q": "Что вы услышали?", "options": ["Спасибо – пожалуйста", "Извините – ничего страшного",
+                                                                 "Здравствуйте – до свидания"], "answer": 1}]},
         ],
     },
     {
@@ -163,9 +163,9 @@ LIBRARY: list[dict[str, Any]] = [
         "tags": ["Грамматика"],
         "blocks": [
             {"type": "text", "title": "Правило",
-             "body": "Present Perfect (have/has + V3) — опыт и результат к настоящему моменту, время не важно или не "
+             "body": "Present Perfect (have/has + V3) – опыт и результат к настоящему моменту, время не важно или не "
                      "закончилось: I have been to London. She has lost her keys.\n"
-                     "Past Simple (V2) — законченное действие в прошлом с указанием времени: I went to London last year.\n"
+                     "Past Simple (V2) – законченное действие в прошлом с указанием времени: I went to London last year.\n"
                      "Маркеры Present Perfect: ever, never, already, yet, just, since, for. Маркеры Past Simple: yesterday, "
                      "ago, last week, in 2019."},
             {"type": "gap", "title": "Поставьте глагол в нужную форму", "text":
@@ -179,7 +179,7 @@ LIBRARY: list[dict[str, Any]] = [
                 {"q": "We ___ to the cinema last night.", "options": ["have gone", "went", "go"], "answer": 1},
             ]},
             {"type": "write", "title": "Расскажите о себе",
-             "prompt": "Напишите 3 предложения о том, что вы уже делали в жизни (Present Perfect), и 3 — о том, когда "
+             "prompt": "Напишите 3 предложения о том, что вы уже делали в жизни (Present Perfect), и 3 – о том, когда "
                        "именно это было (Past Simple)."},
         ],
     },

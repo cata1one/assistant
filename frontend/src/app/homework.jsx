@@ -177,9 +177,9 @@ function AssignForm({ onDone }) {
         </select>
       )}
       <textarea className="field min-h-[90px]" required={!f.unit_id} maxLength={3000} value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })}
-        placeholder={f.unit_id ? "Комментарий к занятию (необязательно)" : "Что сделать: упражнения, видео, «Новые слова: apple — яблоко, table — стол»…"} aria-label="Задание" />
-      <label className="label">Новые слова — сразу в карточки ученика
-        <textarea className="field min-h-[70px] font-normal" maxLength={3000} value={f.words} onChange={(e) => setF({ ...f, words: e.target.value })} placeholder={"kitchen — кухня\nwardrobe — шкаф"} />
+        placeholder={f.unit_id ? "Комментарий к занятию (необязательно)" : "Что сделать: упражнения, видео, «Новые слова: apple – яблоко, table – стол»…"} aria-label="Задание" />
+      <label className="label">Новые слова – сразу в карточки ученика
+        <textarea className="field min-h-[70px] font-normal" maxLength={3000} value={f.words} onChange={(e) => setF({ ...f, words: e.target.value })} placeholder={"kitchen – кухня\nwardrobe – шкаф"} />
         <span className="text-xs font-normal text-ink-mute">По слову в строке. Слова из текста задания после «Новые слова:» и слова занятия тоже попадут в карточки.</span>
       </label>
       {materials.length > 0 && (

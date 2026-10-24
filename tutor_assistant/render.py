@@ -17,7 +17,7 @@ def _word_line(v: VocabItem, i: int) -> str:
     if v.part_of_speech:
         line += f" ({v.part_of_speech})"
     if v.translation:
-        line += f" — {v.translation}"
+        line += f" – {v.translation}"
     if v.example:
         line += f"\n   Пример: {v.example}"
     return line
@@ -58,13 +58,13 @@ def render_test(test: list[TestQuestion], with_answers: bool = False) -> str:
             if q.options and q.answer in q.options:
                 idx = q.options.index(q.answer)
                 ans = f"{LETTERS[idx] if idx < len(LETTERS) else idx + 1}) {q.answer}"
-            lines.append(f"{i}. {ans}" + (f" — {q.explanation}" if q.explanation else ""))
+            lines.append(f"{i}. {ans}" + (f" – {q.explanation}" if q.explanation else ""))
     return "\n".join(lines)
 
 
 def render_summary(r: LessonReport) -> str:
     lang = LANGUAGE_NAMES.get(r.target_language, r.target_language)
-    head = f"📘 Конспект урока от {r.date}" + (f" — {r.title}" if r.title else "")
+    head = f"📘 Конспект урока от {r.date}" + (f" – {r.title}" if r.title else "")
     lines = [head]
     if r.topic:
         lines.append(f"Тема: {r.topic}")
@@ -80,7 +80,7 @@ def render_summary(r: LessonReport) -> str:
             if rule.explanation and rule.explanation.rstrip(".") != rule.title.rstrip("."):
                 lines.append(f"   {rule.explanation}")
             for ex in rule.examples:
-                lines.append(f"   — {ex}")
+                lines.append(f"   – {ex}")
     if r.corrections:
         lines += ["", "🛠 Работа над ошибками:"]
         for c in r.corrections:
@@ -111,7 +111,7 @@ def render_student_report(r: LessonReport) -> str:
     blocks = [render_summary(r), render_review(r), render_words(r.vocabulary, "Новые слова урока")]
     if r.extra_words:
         blocks.append(render_words(r.extra_words, "Также звучали на уроке"))
-    blocks += [render_test(r.test, with_answers=False) + "\n\nОтветы — в файле конспекта (раздел «Ответы»).",
+    blocks += [render_test(r.test, with_answers=False) + "\n\nОтветы – в файле конспекта (раздел «Ответы»).",
                render_homework(r.homework_teacher, r.homework_generated)]
     return "\n\n".join(b for b in blocks if b)
 
@@ -119,7 +119,7 @@ def render_student_report(r: LessonReport) -> str:
 def render_parent_report(r: LessonReport) -> str:
     """Отчёт для родителей: успехи, на что обратить внимание, замечания, ДЗ, как помочь дома."""
     p = r.parent
-    who = f" — {p.student_name}" if p.student_name else ""
+    who = f" – {p.student_name}" if p.student_name else ""
     lines = [f"👨‍👩‍👧 Отчёт об уроке {r.date}{who}"]
     if r.topic:
         lines.append(f"Тема: {r.topic}")
@@ -139,7 +139,7 @@ def render_parent_report(r: LessonReport) -> str:
         lines += [f"{i}. {t.text}" for i, t in enumerate(r.homework_teacher, 1)]
     if r.progress and r.progress.lessons_total > 1:
         pr = r.progress
-        lines += ["", f"📈 Прогресс: уроков — {pr.lessons_total}, слов в словаре — {pr.words_total}"
+        lines += ["", f"📈 Прогресс: уроков – {pr.lessons_total}, слов в словаре – {pr.words_total}"
                       f" (+{pr.words_this_lesson} за урок)"]
     if p.recommendations:
         lines += ["", "💡 Как помочь дома:"] + [f"• {x}" for x in p.recommendations]
@@ -152,7 +152,7 @@ def render_report(r: LessonReport, with_answers: bool = True) -> str:
     if r.extra_words:
         blocks.append(render_words(r.extra_words, "Также звучали на уроке"))
     blocks += [render_test(r.test, with_answers=with_answers), render_homework(r.homework_teacher, r.homework_generated),
-               render_stats(r), "— — —\n" + render_parent_report(r)]
+               render_stats(r), "— – —\n" + render_parent_report(r)]
     if r.notes:
         blocks.append("ℹ️ " + "\nℹ️ ".join(r.notes))
     return "\n\n".join(b for b in blocks if b)
@@ -165,7 +165,7 @@ def render_parent_markdown(r: LessonReport) -> str:
 
 
 def render_report_markdown(r: LessonReport) -> str:
-    md = [f"# Конспект урока — {r.date}" + (f": {r.title}" if r.title else "")]
+    md = [f"# Конспект урока – {r.date}" + (f": {r.title}" if r.title else "")]
     if r.topic:
         md.append(f"**Тема:** {r.topic}")
     if r.summary:
@@ -190,13 +190,13 @@ def render_report_markdown(r: LessonReport) -> str:
         md.append("## Что повторить к следующему уроку\n" + "\n".join(f"- {x}" for x in r.review_items))
     if r.corrections:
         md.append("## Работа над ошибками\n" + "\n".join(
-            f"- ~~{c.wrong}~~ → **{c.correct}**" + (f" — {c.note}" if c.note else "") if c.wrong != "—"
+            f"- ~~{c.wrong}~~ → **{c.correct}**" + (f" – {c.note}" if c.note else "") if c.wrong != "—"
             else f"- **{c.correct}**" for c in r.corrections))
     if r.test:
         md.append("## Тест\n" + "\n".join(
             f"{i}. {q.question}" + "".join(f"\n   - {o}" for o in q.options) for i, q in enumerate(r.test, 1)))
         md.append("<details><summary>Ответы</summary>\n\n" + "\n".join(
-            f"{i}. {q.answer}" + (f" — {q.explanation}" if q.explanation else "") for i, q in enumerate(r.test, 1))
+            f"{i}. {q.answer}" + (f" – {q.explanation}" if q.explanation else "") for i, q in enumerate(r.test, 1))
             + "\n</details>")
     hw = []
     if r.homework_teacher:

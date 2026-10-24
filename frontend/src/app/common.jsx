@@ -6,6 +6,7 @@ import { fmtDate, request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Notice, PageTitle } from "../ui/kit.jsx";
 import { DecorSettings } from "./decor.jsx";
+import { PhotoSettings, ReviewSetting } from "./extras.jsx";
 
 /** Загрузка данных с сервера: { data, error, reload }. */
 export function useApi(path, deps = []) {
@@ -120,7 +121,7 @@ export function BoardsPage() {
           {err && <div className="md:col-span-3"><ErrorBox error={err} /></div>}
         </form>
       )}
-      {!data ? <Loading /> : !data.boards.length ? <Empty icon={PenTool} title="Досок пока нет" text={canCreate ? "Создайте доску для ученика или начните урок — доска появится автоматически." : "Когда преподаватель откроет доску, она появится здесь."} /> : (
+      {!data ? <Loading /> : !data.boards.length ? <Empty icon={PenTool} title="Досок пока нет" text={canCreate ? "Создайте доску для ученика или начните урок – доска появится автоматически." : "Когда преподаватель откроет доску, она появится здесь."} /> : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {data.boards.map((b) => (
             <a key={b.id} href={`#/board?id=${b.id}`} className="card card-hover !p-5">
@@ -145,7 +146,7 @@ export function MessagesPage() {
   useEffect(() => { if (!active && chats[0]) setActive(chats[0].chat_id); }, [chats, active]);
   return (
     <>
-      <PageTitle title="Сообщения" text="Переписка идёт через платформу — личные контакты собеседники не видят." />
+      <PageTitle title="Сообщения" text="Переписка идёт через платформу – личные контакты собеседники не видят." />
       <ErrorBox error={error} />
       {!data ? <Loading /> : !chats.length ? <Empty icon={MessagesSquare} title="Переписок пока нет" text="Они появятся, когда к вам подключится ученик, преподаватель или родитель." /> : (
         <div className="grid gap-4 md:grid-cols-[280px_1fr]">
@@ -232,9 +233,9 @@ function Conversation({ chatId }) {
 export function Flashcard({ w }) {
   const [flipped, setFlipped] = useState(false);
   return (
-    <button type="button" onClick={() => setFlipped(!flipped)} aria-label={`${w.word} — ${flipped ? "показать слово" : "показать перевод"}`}
+    <button type="button" onClick={() => setFlipped(!flipped)} aria-label={`${w.word} – ${flipped ? "показать слово" : "показать перевод"}`}
       className={`card card-hover flex min-h-[110px] flex-col items-center justify-center !p-4 text-center ${flipped ? "!bg-brand-tint" : ""}`}>
-      <span className="font-display text-lg font-extrabold">{flipped ? w.translation || "—" : w.word}</span>
+      <span className="font-display text-lg font-extrabold">{flipped ? w.translation || "–" : w.word}</span>
       {!flipped && w.transcription && <span className="mt-1 text-sm text-ink-mute">{w.transcription}</span>}
       {flipped && w.example && <span className="mt-1 text-xs text-ink-mute">{w.example}</span>}
     </button>
@@ -263,7 +264,9 @@ export function ProfilePage() {
   return (
     <>
       <PageTitle title="Профиль" />
+      {acc && <div className="mb-4"><PhotoSettings /></div>}
       {session.role === "student" && acc && <div className="mb-4"><DecorSettings /></div>}
+      {session.role === "tutor" && acc && <div className="mb-4"><ReviewSetting /></div>}
       <div className="grid gap-4 lg:grid-cols-2">
         {acc ? (
           <form onSubmit={save} className="card grid gap-4">
@@ -311,7 +314,7 @@ function FeedbackForm() {
   return (
     <form id="feedback" onSubmit={send} className="card grid gap-3">
       <h2 className="text-lg">Обратная связь</h2>
-      <p className="-mt-1 text-sm text-ink-mute">Предложите идею или расскажите, что неудобно, — мы читаем каждое сообщение.</p>
+      <p className="-mt-1 text-sm text-ink-mute">Предложите идею или расскажите, что неудобно, – мы читаем каждое сообщение.</p>
       <div className="flex flex-wrap gap-1.5">{FEEDBACK.map(([k, t]) => <button key={k} type="button" onClick={() => setKind(k)} className={`chip !text-sm ${kind === k ? "chip-brand" : ""}`}>{t}</button>)}</div>
       <textarea className="field min-h-[90px]" required minLength={5} maxLength={3000} value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === "bug" ? "Что делали, что произошло, с телефона или компьютера" : "Ваше сообщение"} aria-label="Сообщение" />
       {msg && <Notice tone="ok">{msg}</Notice>}
@@ -353,5 +356,5 @@ function ReviewForm() {
 
 // == Пустой кабинет (вошли из бота, но ни к кому не подключены) =================================
 export function NotConnected() {
-  return <Empty icon={BookOpen} title="Вы пока ни к кому не подключены" text="Откройте ссылку-приглашение от преподавателя или школы — и всё появится здесь." />;
+  return <Empty icon={BookOpen} title="Вы пока ни к кому не подключены" text="Откройте ссылку-приглашение от преподавателя или школы – и всё появится здесь." />;
 }

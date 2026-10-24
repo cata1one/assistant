@@ -1,24 +1,25 @@
 /**
- * Логотип Better: облачко реплики (язык — это разговор) с буквой «b» внутри.
- * Цвет — текущий продукт (BetterStudy синий, BetterTeach коралловый) через currentColor.
+ * Логотип Bright: буква «b» на цветной плитке и тёплая искра рядом, как луч света.
+ * Цвет плитки берётся у текущей роли (коралловый для преподавателей, синий для учеников) через currentColor.
+ * У онлайн-школ рядом пишется School, у остальных название остаётся просто Bright.
  */
 export function LogoMark({ size = 30, className = "" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className={`text-brand ${className}`}>
-      <path fill="currentColor" d="M8 3h17a5 5 0 0 1 5 5v12a5 5 0 0 1-5 5H15l-6.2 4.6c-.6.4-1.3 0-1.3-.7V25H8a5 5 0 0 1-5-5V8a5 5 0 0 1 5-5z" />
-      <rect x="9.6" y="7" width="3.4" height="14.2" rx="1.7" fill="#fff" />
-      <circle cx="17" cy="16.6" r="4.4" fill="none" stroke="#fff" strokeWidth="3.4" />
+      <rect width="32" height="32" rx="9.5" fill="currentColor" />
+      <rect x="9" y="6.5" width="4.2" height="19" rx="2.1" fill="#fff" />
+      <circle cx="18.2" cy="18.4" r="5.2" fill="none" stroke="#fff" strokeWidth="4.2" />
+      <path d="M24.6 5.2l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z" fill="#FFD25E" />
     </svg>
   );
 }
 
-export default function Logo({ brand = "study", size = 30, className = "" }) {
-  const word = brand === "teach" ? "Teach" : "Study";
+export default function Logo({ size = 30, school = false, className = "" }) {
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`} aria-label={`Better${word}`}>
+    <span className={`inline-flex items-center gap-2 ${className}`} aria-label={school ? "Bright School" : "Bright"}>
       <LogoMark size={size} />
-      <span className="font-display text-[1.2rem] font-extrabold tracking-[-0.03em] text-ink">
-        Better<span className="text-brand">{word}</span>
+      <span className="font-display text-[1.28rem] font-extrabold leading-none tracking-[-0.035em] text-ink">
+        Bright{school && <span className="ml-1 font-semibold text-brand">School</span>}
       </span>
     </span>
   );

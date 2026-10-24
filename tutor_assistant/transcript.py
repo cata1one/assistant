@@ -116,7 +116,7 @@ def parse_transcript(
 
 
 def _infer_unknown_roles(utterances: list[Utterance]) -> None:
-    """Если роли не подписаны: тот, кто говорит больше, — преподаватель."""
+    """Если роли не подписаны: тот, кто говорит больше, – преподаватель."""
     unknown = {u.speaker for u in utterances if u.role == Role.UNKNOWN and u.speaker != "—"}
     if not unknown:
         return

@@ -1,13 +1,13 @@
 """Учебные инструменты: материалы, домашние задания, карточки слов с интервальным повторением.
 
-* **Материалы** — файлы (PDF, картинки, презентации, аудио, видео) и ссылки. Видео VK, YouTube
-  и Rutube встраиваются плеером прямо в урок и на доску — без демонстрации экрана.
-  Свои материалы у репетитора, общая база — у школы. Перенос с ProgressMe: выгрузите материалы
+* **Материалы** – файлы (PDF, картинки, презентации, аудио, видео) и ссылки. Видео VK, YouTube
+  и Rutube встраиваются плеером прямо в урок и на доску – без демонстрации экрана.
+  Свои материалы у репетитора, общая база – у школы. Перенос с ProgressMe: выгрузите материалы
   файлами и перетащите их сюда пачкой.
 * **Домашние задания** выдаёт преподаватель; ученик отмечает выполнение и пишет ответ,
   родитель видит статус.
 * **Карточки**: новые слова урока сразу попадают в колоду. Повторение по алгоритму SM-2
-  (кривая забывания): «не помню» — через 10 минут, дальше 1 день, 3 дня и всё реже.
+  (кривая забывания): «не помню» – через 10 минут, дальше 1 день, 3 дня и всё реже.
 """
 
 from __future__ import annotations
@@ -111,7 +111,7 @@ class Learning:
 
     def materials(self, viewer: Viewer) -> dict[str, Any]:
         acc = self._material_owner(viewer)
-        rows = self.storage.materials_for(acc["id"], acc.get("org_id"))
+        rows = [r for r in self.storage.materials_for(acc["id"], acc.get("org_id")) if r.get("folder") != "Аватар"]
         return {"materials": [self._public_material(r, acc) for r in rows]}
 
     def _public_material(self, r: dict[str, Any], acc: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -208,7 +208,7 @@ class Learning:
         billing.require_active(self.storage, viewer.user_id)
         unit = None
         if body.get("unit_id"):
-            from .units import Units  # занятия используют этот модуль — импорт здесь, без цикла
+            from .units import Units  # занятия используют этот модуль – импорт здесь, без цикла
             unit = Units(self).accessible(viewer, str(body["unit_id"]))
         text = _lines(body, "text", 3000) or (f"Выполните занятие «{unit['title']}»" if unit else None)
         if not text:
@@ -301,6 +301,35 @@ class Learning:
             raise PortalError(403, "нельзя изменить это задание")
         return {"id": assignment_id, "status": status}
 
+    def upload_photo(self, viewer: Viewer, raw: bytes | None, headers: Any) -> dict[str, Any]:
+        """Своя картинка профиля: ученик и преподаватель. Браузер заранее уменьшает её до небольшого квадрата."""
+        acc = self._account(viewer)
+        if not raw:
+            raise PortalError(400, "пустой файл")
+        if len(raw) > 3 * 1024 * 1024:
+            raise PortalError(413, "картинка больше 3 МБ")
+        mime = (headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if mime not in ("image/png", "image/jpeg", "image/webp") or not _looks_like_image(raw):
+            raise PortalError(415, "нужна картинка PNG, JPG или WEBP")
+        import json as _json
+
+        try:
+            prefs = _json.loads(acc.get("prefs") or "{}")
+        except ValueError:
+            prefs = {}
+        old = prefs.get("photo")
+        file_id = secrets.token_hex(12)
+        (self.files_dir / (file_id + ALLOWED_TYPES[mime])).write_bytes(raw)
+        self.storage.add_material(id=file_id, owner_id=acc["id"], title="Моё фото", kind="file", mime=mime, size=len(raw),
+                                  folder="Аватар")
+        if old and FILE_ID_RE.match(str(old)):
+            for f in self.files_dir.glob(str(old) + ".*"):
+                f.unlink(missing_ok=True)
+            self.storage.delete_material(str(old))
+        prefs["photo"] = file_id
+        self.storage.update_account(acc["id"], prefs=_json.dumps(prefs, ensure_ascii=False))
+        return {"photo": file_id, "url": f"/site/v1/files/{file_id}"}
+
     def attach(self, viewer: Viewer, assignment_id: int, raw: bytes | None, headers: Any) -> dict[str, Any]:
         """Ученик прикладывает к ДЗ фото тетради или скриншот."""
         row, access = self._assignment_access(viewer, assignment_id)
@@ -342,7 +371,7 @@ class Learning:
             return [chat_id]
         chats = [a.chat_id for a in self.portal.accesses(viewer) if a.role == STUDENT]
         if not chats:
-            raise PortalError(403, "словарь и карточки — у ученика")
+            raise PortalError(403, "словарь и карточки – у ученика")
         return chats
 
     def word_list(self, viewer: Viewer, chat_id: str | None = None) -> list[dict[str, Any]]:
@@ -380,7 +409,7 @@ class Learning:
         self._check_text(chats[0], text)
         words = parse_words(text)
         if not words:
-            raise PortalError(400, "по одному слову в строке: «kitchen — кухня»")
+            raise PortalError(400, "по одному слову в строке: «kitchen – кухня»")
         added = self._save_words(chats[0], words, "tutor" if access.role == TUTOR else "student")
         return {"added": added, **self.vocab(viewer, body.get("chat_id"))}
 
@@ -399,7 +428,7 @@ class Learning:
 
     def _student_words(self, viewer: Viewer) -> list[dict[str, Any]]:
         if not any(a.role == STUDENT for a in self.portal.accesses(viewer)):
-            raise PortalError(403, "карточки — для учеников")
+            raise PortalError(403, "карточки – для учеников")
         return self.word_list(viewer)
 
     def cards(self, viewer: Viewer, now: datetime | None = None) -> dict[str, Any]:

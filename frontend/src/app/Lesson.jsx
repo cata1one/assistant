@@ -37,7 +37,7 @@ function Test({ test, lessonId }) {
               {v && (
                 <p className={`mt-3 flex flex-wrap items-center gap-2 text-sm ${v.correct ? "text-[#146b4c]" : "text-teach-deep"}`}>
                   {v.correct ? <><CheckCircle2 size={15} /> Верно</> : <><XCircle size={15} /> Правильно: {v.answer}</>}
-                  {v.explanation && <span className="text-ink-mute">— {v.explanation}</span>}
+                  {v.explanation && <span className="text-ink-mute">– {v.explanation}</span>}
                 </p>
               )}
             </div>
@@ -71,7 +71,7 @@ function Student({ res, id }) {
         )}
         {r.corrections.length > 0 && (
           <Panel title="Работа над ошибками" icon={Wrench}>
-            <ul className="grid gap-2">{r.corrections.map((c, i) => <li key={i}><s className="text-teach-deep/70">{c.wrong}</s> → <b className="text-[#146b4c]">{c.correct}</b>{c.note ? <span className="text-ink-mute"> — {c.note}</span> : null}</li>)}</ul>
+            <ul className="grid gap-2">{r.corrections.map((c, i) => <li key={i}><s className="text-teach-deep/70">{c.wrong}</s> → <b className="text-[#146b4c]">{c.correct}</b>{c.note ? <span className="text-ink-mute"> – {c.note}</span> : null}</li>)}</ul>
           </Panel>
         )}
         {r.review_items.length > 0 && <Panel title="Что повторить" icon={Repeat}><Bullets items={r.review_items} /></Panel>}
@@ -113,17 +113,58 @@ function Parent({ res }) {
 /** ИИ ещё готовит конспект по расшифровке: показываем черновик и обновляем страницу сами. */
 function AiPending({ reload }) {
   useEffect(() => { const t = setInterval(reload, 15000); return () => clearInterval(t); }, [reload]);
-  return <Notice className="mb-4">ИИ готовит подробный конспект по записи урока — обычно это занимает несколько минут. Пока показан черновик; страница обновится сама.</Notice>;
+  return <Notice className="mb-4">ИИ готовит подробный конспект по записи урока – обычно это занимает несколько минут. Пока показан черновик; страница обновится сама.</Notice>;
 }
 
 const joinLines = (a) => (a || []).join("\n");
+
+/** Конспект ждёт проверки: ученик и родители его не видят, пока преподаватель не нажмёт «Отправить». */
+function PublishBar({ id, onDone, pending }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const publish = async () => {
+    setBusy(true); setError(null);
+    try { await request("POST", `/site/v1/lessons/${encodeURIComponent(id)}/publish`, {}); onDone(); } catch (x) { setError(x); setBusy(false); }
+  };
+  return (
+    <div className="card mb-4 flex flex-wrap items-center gap-4 !border-sun/50 !bg-sun-soft/60 !p-4">
+      <p className="min-w-0 flex-1 text-sm"><b>Конспект ждёт вашей проверки.</b> Ученик и родители его пока не видят. Поправьте, что нужно, и отправьте.</p>
+      <button type="button" className="btn-brand" disabled={busy || pending} onClick={publish}>{pending ? "ИИ ещё готовит…" : busy ? "Отправляем…" : "Отправить ученику"}</button>
+      {error && <div className="w-full"><ErrorBox error={error} /></div>}
+    </div>
+  );
+}
+
+/** Упражнения по теме урока: слова и тема превращаются в занятие, которое можно сразу выдать как домашку. */
+function Exercises({ id }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [done, setDone] = useState(null);
+  const make = async (assign) => {
+    setBusy(true); setError(null);
+    try {
+      const res = await request("POST", `/site/v1/lessons/${encodeURIComponent(id)}/exercises`, { assign });
+      if (assign) setDone(res); else window.location.hash = `#/app/units/${res.unit_id}`;
+    } catch (x) { setError(x); }
+    setBusy(false);
+  };
+  return (
+    <div className="card mt-4 flex flex-wrap items-center gap-3">
+      <div className="min-w-0 flex-1"><h2 className="text-lg">Домашка по этому уроку</h2><p className="text-sm text-ink-mute">Соберём упражнения из слов и темы урока: пары, пропуски, тест. Перед выдачей их можно отредактировать.</p></div>
+      <button type="button" className="btn-light" disabled={busy} onClick={() => make(false)}>Создать и открыть</button>
+      <button type="button" className="btn-brand" disabled={busy} onClick={() => make(true)}>Создать и выдать ученику</button>
+      {done && <div className="w-full"><Notice tone="ok">Выдано. <a className="link" href={`#/app/units/${done.unit_id}`}>Открыть занятие</a> или <a className="link" href="#/app/homework">посмотреть домашки</a>.</Notice></div>}
+      {error && <div className="w-full"><ErrorBox error={error} /></div>}
+    </div>
+  );
+}
 
 /** Преподаватель правит отчёт: то, что увидят ученик и родители. */
 function EditReport({ res, onSaved }) {
   const r = res.report;
   const [f, setF] = useState({
     topic: r.topic || "", summary: r.summary || "", key_points: joinLines(r.key_points),
-    vocabulary: (r.vocabulary || []).map((w) => (w.translation ? `${w.word} — ${w.translation}` : w.word)).join("\n"),
+    vocabulary: (r.vocabulary || []).map((w) => (w.translation ? `${w.word} – ${w.translation}` : w.word)).join("\n"),
     homework: joinLines([...(r.homework_teacher || []), ...(r.homework_generated || [])].map((h) => h.text)),
     review_items: joinLines(r.review_items),
     p_summary: r.parent?.summary || "", achievements: joinLines(r.parent?.achievements), attention: joinLines(r.parent?.attention),
@@ -154,7 +195,7 @@ function EditReport({ res, onSaved }) {
           <label className="label">Тема<input className="field" maxLength={200} value={f.topic} onChange={set("topic")} /></label>
           {area("summary", "Главное", null, 3)}
           {area("key_points", "Ключевые пункты", "по пункту в строке")}
-          {area("vocabulary", "Новые слова", "«слово — перевод», по слову в строке. Изменения сразу попадут в карточки ученика.", 5)}
+          {area("vocabulary", "Новые слова", "«слово – перевод», по слову в строке. Изменения сразу попадут в карточки ученика.", 5)}
           {area("homework", "Домашнее задание", "по заданию в строке")}
           {area("review_items", "Что повторить", "по пункту в строке")}
         </div>
@@ -178,7 +219,7 @@ export default function Lesson({ id }) {
   const [editing, setEditing] = useState(false);
   if (error) return <><Back /><ErrorBox error={error} /></>;
   if (!res) return <Loading />;
-  if (!res.report) return <><Back /><PageTitle title={res.title || "Урок"} /><Notice>Материалы появятся после урока.</Notice></>;
+  if (!res.report) return <><Back /><PageTitle title={res.title || "Урок"} /><Notice>{res.on_review ? "Преподаватель проверяет конспект и скоро его отправит. Слова появятся в карточках сразу после этого." : "Материалы появятся после урока."}</Notice></>;
   const pending = res.generated_by === "pending" && <AiPending reload={reload} />;
   if (res.role === "student") return <>{pending}<Student res={res} id={id} /></>;
   if (res.role === "parent") return <>{pending}<Parent res={res} /></>;
@@ -195,9 +236,11 @@ export default function Lesson({ id }) {
     <>
       <Back />
       {pending}
+      {res.role === "tutor" && res.published === false && <PublishBar id={id} onDone={reload} pending={res.generated_by === "pending"} />}
       <PageTitle title={res.report.topic || res.title || "Урок"} text={`${fmtDate(res.started_at)} · ${res.with}`}
         actions={res.role === "tutor" && <button type="button" className="btn-brand" onClick={() => setEditing(true)}>Редактировать отчёт</button>} />
       <pre className="card whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-soft">{res.text}</pre>
+      {res.role === "tutor" && <Exercises id={id} />}
     </>
   );
 }

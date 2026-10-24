@@ -1,10 +1,10 @@
 """Telegram-бот: модератор чата урока и помощник преподавателя.
 
 Как подключить:
-1. Создайте бота у @BotFather, токен — в TELEGRAM_BOT_TOKEN.
+1. Создайте бота у @BotFather, токен – в TELEGRAM_BOT_TOKEN.
 2. В @BotFather: /setprivacy → Disable (иначе бот не видит обычные сообщения группы).
 3. Добавьте бота в чат урока и сделайте администратором с правом «Удалять сообщения».
-4. Преподаватель пишет /lesson_start, в конце — /lesson_end.
+4. Преподаватель пишет /lesson_start, в конце – /lesson_end.
 
 В личных сообщениях боту можно прислать расшифровку урока (текстом или .txt) —
 бот вернёт конспект, слова, тест, ДЗ и список нарушений.
@@ -65,16 +65,16 @@ UNCHECKED_SPEECH_WARNING = ("⚠️ Голосовые сообщения, ко�
                             "Напишите, пожалуйста, текстом.")
 ROLE_RU = {TUTOR: "преподаватель", "student": "ученик"}
 
-RELAY_HELP = """🔒 Вы общаетесь через бот школы. Собеседник видит только ваш псевдоним — не ваш аккаунт Telegram.
+RELAY_HELP = """🔒 Вы общаетесь через бот школы. Собеседник видит только ваш псевдоним – не ваш аккаунт Telegram.
 Просто пишите сюда: сообщения, фото и файлы будут переданы собеседнику. Чтобы ответить на конкретное
 сообщение, используйте «Ответить» (reply).
 
-Личные контакты (телефон, почта, ники, ссылки на мессенджеры) не передаются — такие сообщения
+Личные контакты (телефон, почта, ники, ссылки на мессенджеры) не передаются – такие сообщения
 блокируются, а администратор школы получает уведомление.
 
-/chats — выбрать собеседника (если их несколько)
-/lesson_start [тема], /lesson_end — начать и завершить урок (преподаватель)
-«новые слова сегодня», «дз», «тест», «конспект» — материалы урока"""
+/chats – выбрать собеседника (если их несколько)
+/lesson_start [тема], /lesson_end – начать и завершить урок (преподаватель)
+«новые слова сегодня», «дз», «тест», «конспект» – материалы урока"""
 
 
 class TutorBot:
@@ -135,8 +135,8 @@ class TutorBot:
     async def cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text(HELP_TEXT + "\nКоманды: /lesson_start [тема], /lesson_end, /words, "
                                                   "/words_today, /dictionary, /homework, /test, /answers, /summary, "
-                                                  "/report, /check <текст>, /chats, /recording, /note <текст>, /cabinet — личный кабинет на сайте, "
-                                                  "/classroom — класс ProgressMe, /teacher — анкета преподавателя для биржи учеников\n"
+                                                  "/report, /check <текст>, /chats, /recording, /note <текст>, /cabinet – личный кабинет на сайте, "
+                                                  "/classroom – класс ProgressMe, /teacher – анкета преподавателя для биржи учеников\n"
                                                   "Администраторам: /new_pair Преподаватель | Ученик, /pairs, "
                                                   "/unpair <id>, /parent_link, /incidents, /classroom <id пары> <ссылка>")
 
@@ -189,7 +189,7 @@ class TutorBot:
             report = await asyncio.to_thread(self.assistant.finish_lesson, lesson["id"])
         except Exception:
             log.exception("Ошибка при завершении урока %s", lesson["id"])
-            await msg.reply_text("Не удалось подготовить отчёт. Урок сохранён — попробуйте /lesson_end ещё раз.")
+            await msg.reply_text("Не удалось подготовить отчёт. Урок сохранён – попробуйте /lesson_end ещё раз.")
             return
         await self._deliver_reports(context, report, chat_key=str(chat.id), student_targets=[chat.id],
                                     tutor_target=int(lesson["tutor_id"]) if str(lesson.get("tutor_id") or "").lstrip("-").isdigit()
@@ -197,14 +197,14 @@ class TutorBot:
 
     async def _deliver_reports(self, context: ContextTypes.DEFAULT_TYPE, report: Any, chat_key: str,
                                student_targets: list[int], tutor_target: int | None) -> None:
-        """Ученику — конспект, преподавателю — полный отчёт с ответами, родителям — отчёт об успехах."""
+        """Ученику – конспект, преподавателю – полный отчёт с ответами, родителям – отчёт об успехах."""
         md = io.BytesIO(render.render_report_markdown(report).encode("utf-8"))
         for target in student_targets:
             try:
                 await self._send_long(context, target, render.render_student_report(report))
                 md.seek(0)
                 await context.bot.send_document(target, document=md, filename=f"konspekt_{report.date}.md",
-                                                caption="Конспект урока (ответы к тесту — в конце файла)")
+                                                caption="Конспект урока (ответы к тесту – в конце файла)")
             except TelegramError as exc:
                 log.warning("Не удалось отправить конспект в %s: %s", target, exc)
         parents = self.assistant.storage.parents_for(chat_key)
@@ -217,7 +217,7 @@ class TutorBot:
                 log.warning("Не удалось отправить отчёт родителю %s: %s", parent, exc)
         if tutor_target is not None:
             status = (f"📨 Отчёт отправлен родителям: {delivered}." if parents else
-                      "ℹ️ Родители ученика не подключены — ссылку для них выдаёт администратор школы (/parent_link).")
+                      "ℹ️ Родители ученика не подключены – ссылку для них выдаёт администратор школы (/parent_link).")
             try:
                 await self._send_long(context, tutor_target, "📋 Полный отчёт для преподавателя\n\n"
                                       + render.render_report(report, with_answers=True) + "\n\n" + status)
@@ -225,7 +225,7 @@ class TutorBot:
                 log.warning("Не удалось отправить отчёт преподавателю: %s", exc)
 
     async def cmd_note(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """/note текст — замечание преподавателя для родителей (ученик его не видит)."""
+        """/note текст – замечание преподавателя для родителей (ученик его не видит)."""
         msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
         text = " ".join(context.args or []).strip()
         if chat.type == ChatType.PRIVATE:
@@ -250,7 +250,7 @@ class TutorBot:
             await self._safe(reply, "Использование: /note Миша стал увереннее говорить, но нужно повторить времена")
             return
         ok, result = self.assistant.add_note(lesson["id"], text, str(user.id), self._name(update))
-        await self._safe(reply, "📝 Заметка для родителей сохранена — она войдёт в отчёт после урока." if ok else
+        await self._safe(reply, "📝 Заметка для родителей сохранена – она войдёт в отчёт после урока." if ok else
                          f"🚫 Заметка не сохранена: {result.summary}. Личные контакты передавать нельзя.")
 
     @staticmethod
@@ -284,7 +284,7 @@ class TutorBot:
             if chat.type != ChatType.PRIVATE:
                 await msg.reply_text("Ссылка для родителей отправлена администратору в личные сообщения.")
         except TelegramError:
-            await msg.reply_text("Не могу написать вам в личку — откройте диалог с ботом (/start) и повторите.")
+            await msg.reply_text("Не могу написать вам в личку – откройте диалог с ботом (/start) и повторите.")
 
     # -- сайт школы: личный кабинет и класс ProgressMe ---------------------------------
     def _classroom_markup(self, chat_key: str, lesson_id: str | None = None) -> InlineKeyboardMarkup | None:
@@ -318,8 +318,8 @@ class TutorBot:
         markup = (InlineKeyboardMarkup([[InlineKeyboardButton("Открыть личный кабинет", url=link)]])
                   if link and link.startswith("https://") else None)
         await msg.reply_text(f"🔑 Ваш личный кабинет: конспекты, словарь, тесты и доска.\n{link}\n\n"
-                             f"Ссылка действует {self.settings.access_token_days} дн. Никому её не пересылайте — "
-                             "по ней открывается ваш кабинет. Выйти на всех устройствах — кнопка «Выйти» в кабинете.",
+                             f"Ссылка действует {self.settings.access_token_days} дн. Никому её не пересылайте – "
+                             "по ней открывается ваш кабинет. Выйти на всех устройствах – кнопка «Выйти» в кабинете.",
                              reply_markup=markup, disable_web_page_preview=True)
 
     async def cmd_teacher(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -331,7 +331,7 @@ class TutorBot:
         uid = str(user.id)
         name = " ".join(context.args or []).strip()[:60] or (user.full_name or "Преподаватель")[:60]
         if self.assistant.moderate(name).is_violation:
-            await msg.reply_text("Имя — без ников, телефонов и ссылок.")
+            await msg.reply_text("Имя – без ников, телефонов и ссылок.")
             return
         existing = self.assistant.storage.get_teacher(uid)
         is_tutor = any(p.tutor_user_id == uid for p, _ in self.relay.pairs_for(uid))
@@ -406,13 +406,13 @@ class TutorBot:
         if re.search(r"отч[её]т|успех|прогресс|как\s+дела|report", text):
             reports = self.assistant.parent_report_for(str(user.id))
             if not reports:
-                await msg.reply_text("Отчётов пока нет — он придёт после ближайшего урока.")
+                await msg.reply_text("Отчётов пока нет – он придёт после ближайшего урока.")
                 return
             for _, report in reports:
                 for part in render.split_message(render.render_parent_report(report)):
                     await msg.reply_text(part)
             return
-        await msg.reply_text("Здесь приходят отчёты об уроках. Последний отчёт — напишите «отчёт». "
+        await msg.reply_text("Здесь приходят отчёты об уроках. Последний отчёт – напишите «отчёт». "
                              "С вопросами обращайтесь в поддержку школы.")
 
     async def _answer(self, update: Update, command: str) -> None:
@@ -451,7 +451,7 @@ class TutorBot:
         if not rows:
             await update.effective_message.reply_text("Нарушений не зафиксировано.")
             return
-        lines = [f"#{r['id']} {r['created_at'][:16].replace('T', ' ')} — {r['user_name'] or r['user_id']} ({r['role']}): "
+        lines = [f"#{r['id']} {r['created_at'][:16].replace('T', ' ')} – {r['user_name'] or r['user_id']} ({r['role']}): "
                  f"{r['summary']} [{r['action']}]" for r in rows]
         await self._send_long(context, chat.id, "🚨 Последние нарушения:\n" + "\n".join(lines))
 
@@ -459,7 +459,7 @@ class TutorBot:
     def _recording_notice(self, lesson_id: str) -> str:
         notice = RECORDING_NOTICE
         if not self.assistant.speech_available and not self.settings.relay_unchecked_audio:
-            notice += "\n🎤 Проверка речи на сервере сейчас недоступна — голосовые сообщения не передаются, пишите текстом."
+            notice += "\n🎤 Проверка речи на сервере сейчас недоступна – голосовые сообщения не передаются, пишите текстом."
         if self.settings.require_recording:
             notice += (f"\n🎙 Включите запись занятия на компьютере:\n"
                        f"python -m tutor_assistant record --lesson {lesson_id}\n"
@@ -468,7 +468,7 @@ class TutorBot:
 
     @staticmethod
     def _speech_attachment(msg: Any) -> Any | None:
-        """Голосовое, «кружочек», аудио или видео — всё, где может звучать речь."""
+        """Голосовое, «кружочек», аудио или видео – всё, где может звучать речь."""
         return msg.voice or msg.video_note or msg.audio or msg.video or None
 
     async def _download(self, attachment: Any) -> bytes | None:
@@ -479,7 +479,7 @@ class TutorBot:
 
     async def _check_speech(self, update: Update, attachment: Any, lesson: dict[str, Any] | None, chat_id: str,
                             speaker: str, role: str | None) -> AudioOutcome:
-        """Скачать и проверить речь. Возвращает AudioOutcome; checked=False — проверить не удалось."""
+        """Скачать и проверить речь. Возвращает AudioOutcome; checked=False – проверить не удалось."""
         msg, user = update.effective_message, update.effective_user
         if not self.assistant.speech_available:
             return AudioOutcome(checked=False, error=self.assistant.transcriber.last_error)
@@ -488,7 +488,7 @@ class TutorBot:
         except TelegramError as exc:
             return AudioOutcome(checked=False, error=f"не удалось скачать файл: {exc}")
         if data is None:
-            return AudioOutcome(checked=False, error="файл больше 20 МБ — бот не может его проверить")
+            return AudioOutcome(checked=False, error="файл больше 20 МБ – бот не может его проверить")
         ts = msg.date.timestamp() if msg.date else time.time()
         if lesson:
             return await asyncio.to_thread(self.assistant.process_audio, lesson["id"], str(user.id), speaker, data,
@@ -629,7 +629,7 @@ class TutorBot:
             text = f"{warning}\n\n{name}: {result.redacted_text}"
             await context.bot.send_message(chat.id, text, disable_web_page_preview=True)
         else:
-            await msg.reply_text(f"{warning}\n(Не удалось удалить сообщение — нужны права администратора.)")
+            await msg.reply_text(f"{warning}\n(Не удалось удалить сообщение – нужны права администратора.)")
 
     async def on_private_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg = update.effective_message
@@ -643,11 +643,11 @@ class TutorBot:
             return
         r = self.assistant.moderate(text)
         if r.is_violation:
-            await msg.reply_text(f"Проверка: {r.summary or 'нарушение'} — в чате урока такое сообщение было бы "
+            await msg.reply_text(f"Проверка: {r.summary or 'нарушение'} – в чате урока такое сообщение было бы "
                                  f"{'скрыто' if r.blocked else 'помечено'}.")
             return
-        await msg.reply_text("Пришлите расшифровку урока (текстом или файлом .txt) — подготовлю конспект, словарь, "
-                             "тест и ДЗ. Или спросите: «новые слова сегодня», «дз», «мой словарь». /help — справка.")
+        await msg.reply_text("Пришлите расшифровку урока (текстом или файлом .txt) – подготовлю конспект, словарь, "
+                             "тест и ДЗ. Или спросите: «новые слова сегодня», «дз», «мой словарь». /help – справка.")
 
     async def on_private_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         doc = update.effective_message.document
@@ -672,7 +672,7 @@ class TutorBot:
     async def _analyze_recording(self, update: Update, context: ContextTypes.DEFAULT_TYPE, attachment: Any) -> None:
         msg = update.effective_message
         if not self.assistant.speech_available:
-            await msg.reply_text("Распознавание речи на сервере не установлено — пришлите расшифровку текстом.")
+            await msg.reply_text("Распознавание речи на сервере не установлено – пришлите расшифровку текстом.")
             return
         if attachment.file_size and attachment.file_size > MAX_BOT_DOWNLOAD:
             await msg.reply_text("Telegram позволяет боту скачивать файлы до 20 МБ. Длинную запись загрузите командой\n"
@@ -693,7 +693,7 @@ class TutorBot:
                                            violations: list[dict[str, Any]]) -> None:
         await self._send_long(context, chat_id, render.render_report(report))
         if violations:
-            lines = [f"• {v['speaker']}: {v['summary']} — «{v['original_text'][:200]}»" for v in violations]
+            lines = [f"• {v['speaker']}: {v['summary']} – «{v['original_text'][:200]}»" for v in violations]
             await self._send_long(context, chat_id, "🚨 Нарушения правил общения:\n" + "\n".join(lines))
 
     async def _analyze(self, update: Update, context: ContextTypes.DEFAULT_TYPE, text: str,
@@ -734,7 +734,7 @@ class TutorBot:
         if context.args[0].startswith("a_"):  # привязка Telegram к аккаунту сайта
             acc = Accounts(self.portal).link_telegram(context.args[0][2:], str(user.id))
             await msg.reply_text(f"✅ Telegram привязан к аккаунту «{acc['name']}». Сюда будут приходить отчёты, "
-                                 "домашние задания и сообщения." if acc else "❌ Ссылка устарела — получите новую в профиле.")
+                                 "домашние задания и сообщения." if acc else "❌ Ссылка устарела – получите новую в профиле.")
             return
         if context.args[0].startswith("p_"):
             await self._parent_start(update, context, context.args[0][2:])
@@ -883,7 +883,7 @@ class TutorBot:
             report = await asyncio.to_thread(self.assistant.finish_lesson, lesson["id"])
         except Exception:
             log.exception("Ошибка при завершении урока %s", lesson["id"])
-            await msg.reply_text("Не удалось подготовить отчёт. Урок сохранён — попробуйте /lesson_end ещё раз.")
+            await msg.reply_text("Не удалось подготовить отчёт. Урок сохранён – попробуйте /lesson_end ещё раз.")
             return
         await self._deliver_reports(context, report, chat_key=pair.chat_id,
                                     student_targets=[int(pair.student_user_id)] if pair.student_user_id else [],
@@ -898,7 +898,7 @@ class TutorBot:
                 check.append(ent.url)
                 show.append(ent.url)
             elif ent.type == MessageEntity.TEXT_MENTION and ent.user:
-                check.append(f"tg://user?id={ent.user.id}")  # ссылка на аккаунт — всегда нарушение
+                check.append(f"tg://user?id={ent.user.id}")  # ссылка на аккаунт – всегда нарушение
         if getattr(msg, "contact", None):
             check.append(f"мой номер телефона {msg.contact.phone_number or ''} контакт {msg.contact.user_id or ''}")
         return check, show
@@ -916,7 +916,7 @@ class TutorBot:
             if current:
                 target = (current[0], current[1], None)
             elif self.relay.pairs_for(uid):
-                await msg.reply_text("У вас несколько собеседников — выберите, кому писать: /chats")
+                await msg.reply_text("У вас несколько собеседников – выберите, кому писать: /chats")
                 return
         if target is None and self.assistant.storage.parent_chats(uid):
             await self._parent_message(update)
@@ -965,7 +965,7 @@ class TutorBot:
             if audio.blocked:
                 await self._notify_admin_text(context, (
                     f"🚨 Нарушение #{audio.incident_id or '—'} (анонимный мост, пара {pair.id}, голосовое): "
-                    f"{audio.moderation.summary}\nКто: {ROLE_RU[role]} «{alias}» — аккаунт {self._name(update)}, "
+                    f"{audio.moderation.summary}\nКто: {ROLE_RU[role]} «{alias}» – аккаунт {self._name(update)}, "
                     f"id {uid}\nРасшифровка:\n{audio.text}"))
                 await msg.reply_text(f"🚫 Голосовое сообщение не доставлено.\n{audio.moderation.warning}")
                 return
@@ -990,16 +990,16 @@ class TutorBot:
         if result is not None and result.is_violation:
             await self._notify_admin_text(context, (
                 f"🚨 Нарушение #{incident_id or '—'} (анонимный мост, пара {pair.id}): {result.summary}\n"
-                f"Кто: {ROLE_RU[role]} «{alias}» — аккаунт {self._name(update)}, id {uid}\n"
+                f"Кто: {ROLE_RU[role]} «{alias}» – аккаунт {self._name(update)}, id {uid}\n"
                 f"Действие: {'не доставлено' if result.blocked else 'доставлено с предупреждением'}\n"
                 f"Исходный текст:\n{result.original_text}"))
         if msg.contact and (result is None or not result.blocked):
-            # Карточка контакта раскрывает аккаунт даже без номера — не пересылается никогда.
+            # Карточка контакта раскрывает аккаунт даже без номера – не пересылается никогда.
             await msg.reply_text("🚫 Контакты через бот не передаются.")
             return
         if result is not None and result.blocked:
             await msg.reply_text(f"🚫 Сообщение не доставлено.\n{result.warning}")
-            # Части номера, отправленные раньше, уже у собеседника — удаляем их копии.
+            # Части номера, отправленные раньше, уже у собеседника – удаляем их копии.
             refs = [r for r in result.related_refs if isinstance(r, int)]
             for chat_id, message_id in self.relay.delivered_copies(uid, refs):
                 try:
@@ -1010,12 +1010,12 @@ class TutorBot:
         if result is not None and result.action == "warn":
             await msg.reply_text(result.warning or "")
         if outcome is not None and outcome.parent_note is not None:
-            await msg.reply_text("📝 Заметка для родителей сохранена — ученику она не отправлена.")
+            await msg.reply_text("📝 Заметка для родителей сохранена – ученику она не отправлена.")
             return
 
         other = pair.other_user(role)
         if not other:
-            await msg.reply_text(f"⏳ {ROLE_RU[pair.other_role(role)].capitalize()} ещё не подключился к боту — "
+            await msg.reply_text(f"⏳ {ROLE_RU[pair.other_role(role)].capitalize()} ещё не подключился к боту – "
                                  "сообщение не доставлено. Попробуйте позже.")
             return
         is_media = not msg.text and msg.effective_attachment is not None
@@ -1034,7 +1034,7 @@ class TutorBot:
                 caption = f"{alias}: {msg.caption}{links}" if msg.caption else f"{alias}"
                 sent = await context.bot.copy_message(int(other), from_chat_id=msg.chat_id, message_id=msg.message_id,
                                                       caption=caption[:CAPTION_LIMIT], reply_parameters=reply)
-            else:  # стикеры, кружочки — без подписи
+            else:  # стикеры, кружочки – без подписи
                 await context.bot.send_message(int(other), f"{alias}:", reply_parameters=reply)
                 sent = await context.bot.copy_message(int(other), from_chat_id=msg.chat_id, message_id=msg.message_id)
         except TelegramError as exc:
@@ -1131,7 +1131,7 @@ def run_bot(settings: Settings, with_site: bool = False, host: str | None = None
         log.error("Нет связи с серверами Telegram (%s). Проверьте интернет и TELEGRAM_BOT_TOKEN. "
                   "Если api.telegram.org недоступен, задайте прокси в TELEGRAM_PROXY (см. .env.example).", exc)
         if server:
-            log.warning("Бот не запущен, но сайт продолжает работать: http://%s:%s (остановить — Ctrl+C)", host, port)
+            log.warning("Бот не запущен, но сайт продолжает работать: http://%s:%s (остановить – Ctrl+C)", host, port)
             try:
                 threading.Event().wait()
             except KeyboardInterrupt:

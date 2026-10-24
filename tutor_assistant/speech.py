@@ -1,7 +1,7 @@
 """Распознавание речи: голосовые сообщения, «кружочки», запись урока.
 
 По умолчанию используется локальная модель Whisper (пакет ``faster-whisper``):
-аудио не покидает сервер школы — это важно, потому что в записи уроков есть
+аудио не покидает сервер школы – это важно, потому что в записи уроков есть
 персональные данные. Модель скачивается один раз при первом использовании
 (или кладётся в ``TUTOR_STT_MODEL_DIR`` на серверах без интернета).
 
@@ -29,7 +29,9 @@ AudioInput = bytes | bytearray | str | Path | BinaryIO
 LOAD_RETRY_SECONDS = 60.0
 
 # Подсказка модели: урок иностранного языка, речь на русском вперемешку с изучаемым языком.
-INITIAL_PROMPT = "Урок иностранного языка. Преподаватель и ученик говорят по-русски и по-английски."
+INITIAL_PROMPT = ("Урок иностранного языка. Преподаватель и ученик говорят по-русски и на изучаемом языке: "
+                  "English, 中文, español, français, italiano, português, العربية, српски, हिन्दी, ελληνικά. "
+                  "Слова: homework, vocabulary, Present Perfect, grammar, pronunciation, listening.")
 
 
 @dataclass
@@ -75,7 +77,7 @@ class WhisperTranscriber:
 
     def __init__(self, model: str = "small", device: str = "cpu", compute_type: str = "int8",
                  language: str | None = None, model_dir: str | None = None):
-        from faster_whisper import WhisperModel  # noqa: F401 — проверяем, что пакет установлен
+        from faster_whisper import WhisperModel  # noqa: F401 – проверяем, что пакет установлен
 
         self.model_name = model
         self.device = device
@@ -102,7 +104,7 @@ class WhisperTranscriber:
                 self._model = WhisperModel(self.model_name, device=self.device, compute_type=self.compute_type,
                                            download_root=self.model_dir)
             except Exception as exc:
-                # Не пытаемся скачать модель на каждом фрагменте — повтор не чаще раза в минуту.
+                # Не пытаемся скачать модель на каждом фрагменте – повтор не чаще раза в минуту.
                 self._load_failed_at = time.monotonic()
                 self.last_error = f"не удалось загрузить модель {self.model_name}: {exc}"
                 raise RuntimeError(self.last_error) from exc
@@ -120,8 +122,11 @@ class WhisperTranscriber:
         with self._lock:  # модель одна; запросы выполняются по очереди
             model = self._load()
             segments_iter, info = model.transcribe(
-                source, language=language or self.language, vad_filter=True, beam_size=5,
+                source, language=language or self.language, beam_size=5, best_of=5,
+                # Тишину и вдохи отбрасываем: без этого Whisper «слышит» в паузах выдуманные фразы
+                vad_filter=True, vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 200},
                 condition_on_previous_text=False, initial_prompt=INITIAL_PROMPT,
+                temperature=(0.0, 0.2, 0.4), no_speech_threshold=0.5, compression_ratio_threshold=2.2,
             )
             segments = [Segment(float(s.start), float(s.end), s.text.strip()) for s in segments_iter if s.text.strip()]
         return Transcription(text=" ".join(s.text for s in segments).strip(), segments=segments,
@@ -145,7 +150,7 @@ def make_transcriber(settings: Settings) -> Transcriber:
 def audio_duration(audio: AudioInput) -> float:
     """Длительность фрагмента без распознавания (для учёта записи, когда речь проверить не удалось).
 
-    WAV читается стандартной библиотекой; WebM/Ogg/MP4 из браузера — через PyAV, если он установлен
+    WAV читается стандартной библиотекой; WebM/Ogg/MP4 из браузера – через PyAV, если он установлен
     (у записей MediaRecorder в заголовке нет длительности, поэтому считаем по последнему пакету).
     """
     if not isinstance(audio, (bytes, bytearray)):
@@ -169,7 +174,7 @@ def audio_duration(audio: AudioInput) -> float:
                 if packet.pts is not None:
                     end = max(end, packet.pts + (packet.duration or 0))
             return round(float(end * stream.time_base), 2)
-    except Exception:  # битый файл — длительность неизвестна
+    except Exception:  # битый файл – длительность неизвестна
         return 0.0
 
 

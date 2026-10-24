@@ -9,8 +9,8 @@ import CropDialog from "./Crop.jsx";
 import { PACKS, stickerById } from "./stickers.js";
 
 /*
- * Доска BetterTeach: бесконечный холст из DOM-объектов.
- * Каждая правка — операция «obj» (последняя версия объекта с данным oid побеждает) или «del».
+ * Доска Bright: бесконечный холст из DOM-объектов.
+ * Каждая правка – операция «obj» (последняя версия объекта с данным oid побеждает) или «del».
  * На общей доске операции уходят на сервер, а новые приходят опросом раз в ~1 секунду.
  */
 
@@ -108,7 +108,7 @@ const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, active
       </div>
     );
   }
-  // файл и ссылка — карточки
+  // файл и ссылка – карточки
   const Icon = o.type === "file" ? FileText : Link2;
   return (
     <div data-oid={o.oid} className={`${cls} card flex items-center gap-3 !p-4`} style={style}>
@@ -242,7 +242,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   };
   useEffect(() => {
     const el = vp.current;
-    el.addEventListener("wheel", onWheel, { passive: false }); // passive: false — чтобы колесо не листало страницу
+    el.addEventListener("wheel", onWheel, { passive: false }); // passive: false – чтобы колесо не листало страницу
     return () => el.removeEventListener("wheel", onWheel);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -251,7 +251,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
     if (e.target.closest?.("[data-play]")) return;
     vp.current.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
-    if (pointers.current.size === 2) { // два пальца — масштаб и сдвиг
+    if (pointers.current.size === 2) { // два пальца – масштаб и сдвиг
       const [a, b] = [...pointers.current.values()];
       gesture.current = { kind: "pinch", d: Math.hypot(a[0] - b[0], a[1] - b[1]), mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
       setDraft(null);
@@ -260,7 +260,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
     const p = toWorld(e);
     const hitEl = e.target.closest?.("[data-oid]");
     const hit = hitEl ? objsRef.current.get(hitEl.dataset.oid) : null;
-    // Палец на пустом месте, а инструмент ещё не выбирали — рисуем: так ожидают на телефоне
+    // Палец на пустом месте, а инструмент ещё не выбирали – рисуем: так ожидают на телефоне
     if (e.pointerType === "touch" && !picked.current && tool === "select" && !hit) {
       picked.current = true;
       setTool("pen");
@@ -480,7 +480,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
         </div>
       </div>
 
-      {/* Инструменты — слева, как в Miro */}
+      {/* Инструменты – слева, как в Miro */}
       <div className="glass absolute left-2 top-1/2 flex max-h-[calc(100%-1.5rem)] -translate-y-1/2 flex-col gap-1 overflow-y-auto rounded-2xl p-1.5 sm:left-3" style={{ touchAction: "pan-y" }} role="toolbar" aria-label="Инструменты доски">
         {TOOLS.map(([id, Icon, title]) => (
           <button key={id} type="button" title={title} aria-label={title} aria-pressed={tool === id} onClick={() => { picked.current = true; setTool(id); }}
@@ -502,7 +502,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
         <button type="button" title="Отменить (Ctrl+Z)" aria-label="Отменить" onClick={undo} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-white"><Undo2 size={18} /></button>
       </div>
 
-      {/* Цвет и толщина — сверху */}
+      {/* Цвет и толщина – сверху */}
       <div className="glass absolute left-16 right-3 top-3 flex items-center gap-1.5 overflow-x-auto rounded-full px-2 py-1.5 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
         {(tool === "note" ? NOTE_COLORS : COLORS).map((c) => (
           <button key={c} type="button" aria-label={`Цвет ${c}`} onClick={() => (tool === "note" ? setNoteColor(c) : setColor(c))}
@@ -519,7 +519,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
         {canClear && <button type="button" className="btn-ghost btn-sm" onClick={() => { if (window.confirm("Очистить доску для всех?")) send("clear", {}, null); }}>Очистить</button>}
       </div>
 
-      {/* Масштаб — справа снизу */}
+      {/* Масштаб – справа снизу */}
       <div className="glass absolute bottom-3 right-3 flex items-center gap-1 rounded-full px-1.5 py-1">
         <button type="button" aria-label="Уменьшить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-white" onClick={() => { const r = vp.current.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); }}><Minus size={16} /></button>
         <span className="num w-12 text-center text-xs font-semibold">{Math.round(view.z * 100)}%</span>
@@ -573,7 +573,7 @@ function MaterialsPicker({ open, onClose, onPick }) {
   useEffect(() => { if (open) request("GET", "/site/v1/materials").then((d) => setList(d.materials)).catch(() => setList([])); }, [open]);
   return (
     <Modal open={open} onClose={onClose} title="Материалы на доску" wide>
-      {!list ? <p className="muted">Загружаем…</p> : !list.length ? <p className="muted">Материалов пока нет — добавьте их в разделе «Материалы».</p> : (
+      {!list ? <p className="muted">Загружаем…</p> : !list.length ? <p className="muted">Материалов пока нет – добавьте их в разделе «Материалы».</p> : (
         <div className="grid gap-2 sm:grid-cols-2">
           {list.map((m) => (
             <button key={m.id} type="button" onClick={() => onPick(m)} className="flex items-center gap-3 rounded-2xl border border-line p-3 text-left transition hover:border-brand hover:bg-brand-tint">
@@ -593,7 +593,7 @@ function VideoDialog({ open, onClose, onAdd }) {
   const [title, setTitle] = useState("");
   return (
     <Modal open={open} onClose={onClose} title="Видео на доску">
-      <p className="mb-4 text-sm text-ink-mute">Вставьте ссылку на VK Видео, YouTube или Rutube — видео встанет на доску, и ученик посмотрит его вместе с вами без демонстрации экрана.</p>
+      <p className="mb-4 text-sm text-ink-mute">Вставьте ссылку на VK Видео, YouTube или Rutube – видео встанет на доску, и ученик посмотрит его вместе с вами без демонстрации экрана.</p>
       <div className="grid gap-3">
         <input className="field" placeholder="https://vkvideo.ru/video-…" value={url} onChange={(e) => setUrl(e.target.value)} aria-label="Ссылка на видео" />
         <input className="field" placeholder="Название (необязательно)" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Название" />

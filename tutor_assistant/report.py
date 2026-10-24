@@ -40,7 +40,7 @@ from .vocabulary import VocabularyCollector, attach_examples, auto_candidates
 
 
 def collect_lesson_material(utterances: list[Utterance], target_language: str) -> tuple[list[VocabItem], list[HomeworkTask]]:
-    """Объявленные слова и ДЗ преподавателя — в порядке реплик."""
+    """Объявленные слова и ДЗ преподавателя – в порядке реплик."""
     vocab = VocabularyCollector(target_language)
     hw = HomeworkCollector()
     for u in utterances:
@@ -68,14 +68,14 @@ def build_report(
     lessons_before: int = 0,
     student_name: str | None = None,
 ) -> LessonReport:
-    """Строит отчёт. Если передан ``llm`` и он доступен — конспект, тест и отчёт родителям делает Claude.
+    """Строит отчёт. Если передан ``llm`` и он доступен – конспект, тест и отчёт родителям делает Claude.
 
-    ``announced``/``assigned`` — слова и ДЗ, уже собранные по ходу живого урока;
-    если не переданы, извлекаются из реплик. ``notes`` — заметки преподавателя для
-    родителей, ``previous`` — отчёт прошлого урока ученика (для динамики).
+    ``announced``/``assigned`` – слова и ДЗ, уже собранные по ходу живого урока;
+    если не переданы, извлекаются из реплик. ``notes`` – заметки преподавателя для
+    родителей, ``previous`` – отчёт прошлого урока ученика (для динамики).
     """
     known = [k for k in known_words if k]
-    # Заметки «Родителям: …» — не материал урока: в конспект ученика они не попадают.
+    # Заметки «Родителям: …» – не материал урока: в конспект ученика они не попадают.
     notes = list(notes or [])
     lesson_utts: list[Utterance] = []
     for u in utterances:
@@ -111,7 +111,7 @@ def build_report(
     if llm is not None and llm.available and utterances:
         llm_result = llm.generate_lesson_report(
             transcript=utterances_to_text(utterances), target_language=settings.target_language,
-            announced_words=[f"{v.word} — {v.translation}" if v.translation else v.word for v in announced],
+            announced_words=[f"{v.word} – {v.translation}" if v.translation else v.word for v in announced],
             assigned_homework=[t.text for t in assigned],
             known_words=known,
             title=title,
@@ -134,7 +134,7 @@ def build_report(
         report.homework_generated = generate_homework(vocabulary or extra, rules, topic, settings.target_language,
                                                       has_teacher_homework=bool(assigned))
         if not vocabulary and extra:
-            report.notes.append("Преподаватель не продиктовал список новых слов — показаны слова, которые звучали на уроке.")
+            report.notes.append("Преподаватель не продиктовал список новых слов – показаны слова, которые звучали на уроке.")
 
     report.progress = compute_progress(report, known, previous, lessons_before)
     offline_parent = build_parent_report(report, utterances, student_name, notes, report.progress)
@@ -166,7 +166,7 @@ def _progress_text(previous: LessonReport | None, lessons_before: int) -> str | 
 
 def _merge_parent(r: LLMLessonReport, offline: ParentReport, notes: list[str]) -> ParentReport:
     remarks, seen = [], set()
-    for item in [*notes, *r.parent_teacher_remarks]:  # заметки преподавателя — всегда, как он их написал
+    for item in [*notes, *r.parent_teacher_remarks]:  # заметки преподавателя – всегда, как он их написал
         key = item.lower().strip(" .«»")
         if item.strip() and key not in seen:
             seen.add(key)

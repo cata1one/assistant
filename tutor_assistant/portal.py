@@ -1,12 +1,12 @@
 """Личный кабинет на сайте школы: материалы уроков, тест, словарь, доска, заявки.
 
-Доступ — по одноразово выданной ботом ссылке (команда /cabinet). В базе хранится
+Доступ – по одноразово выданной ботом ссылке (команда /cabinet). В базе хранится
 только хеш токена. Каждый видит только свои пары и уроки, причём в своей роли:
 
-* ученик — конспект, слова, тест (ответы проверяет сервер) и ДЗ;
-* родитель — отчёт об успехах;
-* преподаватель — полный отчёт;
-* администратор школы — ещё и заявки с сайта и ссылки на классы ProgressMe.
+* ученик – конспект, слова, тест (ответы проверяет сервер) и ДЗ;
+* родитель – отчёт об успехах;
+* преподаватель – полный отчёт;
+* администратор школы – ещё и заявки с сайта и ссылки на классы ProgressMe.
 
 Контакты участников на сайт не попадают: в кабинете только имена из пары.
 """
@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from . import catalog, render
+from .mailer import Mailer
 from .models import HOMEWORK_STATUS_RU, LessonReport, Role, word_key
 from .relay import STUDENT, TUTOR, Pair
 from .service import TutorAssistant
@@ -115,13 +116,14 @@ class Portal:
         self.storage = assistant.storage
         self.settings = assistant.settings
         self.application_handlers: list[Any] = []
-        self.telegram_send: Any = None  # подменяется в тестах; по умолчанию — Bot API через очередь
+        self.telegram_send: Any = None  # подменяется в тестах; по умолчанию – Bot API через очередь
+        self.mailer = Mailer(self.settings)
 
     def telegram(self, chat_id: str | None, text: str) -> bool:
-        """Сообщение в Telegram без запущенного бота. False — некуда или нечем отправить."""
+        """Сообщение в Telegram без запущенного бота. False – некуда или нечем отправить."""
         if not chat_id:
             return False
-        if str(chat_id).startswith("a_"):  # аккаунт сайта: в Telegram — только если он привязан
+        if str(chat_id).startswith("a_"):  # аккаунт сайта: в Telegram – только если он привязан
             acc = self.storage.get_account(str(chat_id))
             chat_id = acc.get("tg_user_id") if acc else None
             if not chat_id:
@@ -134,6 +136,13 @@ class Portal:
         send_telegram_async(self.settings.telegram_token, str(chat_id), text)
         return True
 
+    def notify_account(self, user_id: str | None, subject: str, text: str) -> None:
+        """Уведомление человеку: письмо на почту аккаунта и сообщение в Telegram, если он его привязал."""
+        acc = self.storage.get_account(user_id) if user_id and user_id.startswith("a_") else None
+        if acc:
+            self.mailer.send(acc["email"], subject, text, reply_to=self.settings.support_email)
+        self.telegram(user_id, f"{subject}\n\n{text}")
+
     def notify_admin(self, text: str) -> None:
         self.telegram(self.settings.admin_chat_id or None, text)
 
@@ -145,7 +154,7 @@ class Portal:
             self.telegram(org["owner_id"], text)
 
     def org_of(self, pair: Pair | None) -> dict[str, Any] | None:
-        """Школа, в которой работает преподаватель пары (None — частный репетитор или пара из бота)."""
+        """Школа, в которой работает преподаватель пары (None – частный репетитор или пара из бота)."""
         if not pair or not pair.tutor_user_id or not pair.tutor_user_id.startswith("a_"):
             return None
         tutor = self.storage.get_account(pair.tutor_user_id)
@@ -169,7 +178,7 @@ class Portal:
             raise PortalError(401, "нужна ссылка в личный кабинет: отправьте боту школы команду /cabinet")
         row = self.storage.get_access_token(hash_token(token.strip()))
         if not row:
-            raise PortalError(401, "ссылка устарела — получите новую командой /cabinet в боте школы")
+            raise PortalError(401, "ссылка устарела – получите новую командой /cabinet в боте школы")
         admin = row["role"] == ADMIN and row["user_id"] in self.settings.admin_user_ids
         return Viewer(row["user_id"], admin)
 
@@ -207,8 +216,8 @@ class Portal:
         return list(out.values())
 
     def is_strict(self, chat_id: str) -> bool:
-        """Фильтровать ли контакты: частный репетитор — нет, репетитор школы — по настройке школы,
-        пары школы из Telegram-бота — всегда."""
+        """Фильтровать ли контакты: частный репетитор – нет, репетитор школы – по настройке школы,
+        пары школы из Telegram-бота – всегда."""
         pair = self._pair_of(chat_id)
         if not pair or not pair.tutor_user_id:
             return True
@@ -244,6 +253,9 @@ class Portal:
         items = []
         for lesson in lessons:
             report = self.storage.get_report(lesson["id"]) if lesson["status"] == "finished" else None
+            held = report is not None and by_chat[lesson["chat_id"]].role != TUTOR and not self.storage.report_published(lesson["id"])
+            if held:  # преподаватель ещё проверяет конспект, ученик и родитель его пока не видят
+                report = None
             items.append({
                 "id": lesson["id"], "chat_id": lesson["chat_id"], "role": by_chat[lesson["chat_id"]].role,
                 "title": lesson.get("title") or (report.topic if report else None) or "Урок",
@@ -266,7 +278,11 @@ class Portal:
                 "title": lesson.get("title"), "with": access.title}
         if report is None:
             return {**base, "report": None}
-        base["generated_by"] = report.generated_by  # pending — ИИ ещё готовит конспект
+        published = self.storage.report_published(lesson_id)
+        if access.role != TUTOR and not published:
+            return {**base, "report": None, "on_review": True}
+        base["published"] = published
+        base["generated_by"] = report.generated_by  # pending – ИИ ещё готовит конспект
         if access.role == STUDENT:
             return {**base, "report": student_view(report)}
         if access.role == PARENT:
@@ -280,12 +296,14 @@ class Portal:
         return lesson, self._access(viewer, lesson["chat_id"])
 
     def check_test(self, viewer: Viewer, lesson_id: str, answers: Any) -> dict[str, Any]:
-        self._lesson_access(viewer, lesson_id)
+        _, access = self._lesson_access(viewer, lesson_id)
         report = self.storage.get_report(lesson_id)
+        if report is not None and access.role != TUTOR and not self.storage.report_published(lesson_id):
+            report = None
         if report is None or not report.test:
             raise PortalError(404, "тест появится после урока")
         if not isinstance(answers, list) or len(answers) > len(report.test):
-            raise PortalError(400, "answers — список ответов по порядку вопросов")
+            raise PortalError(400, "answers – список ответов по порядку вопросов")
         results = []
         for i, q in enumerate(report.test):
             given = answers[i] if i < len(answers) and isinstance(answers[i], str) else ""
@@ -306,8 +324,17 @@ class Portal:
                     owners.append(owner)
         seen: set[str] = set()
         words = []
+        hidden_lessons: set[str] = set()  # слова непроверенных конспектов ученику пока не показываем
+        for a in accesses:
+            if a.role in (STUDENT, PARENT):
+                hidden_lessons |= {x["id"] for x in self.storage.lessons_for_chats([a.chat_id], limit=500)
+                                   if x["status"] == "finished" and not self.storage.report_published(x["id"])
+                                   and self.storage.get_report(x["id"]) is not None}
         for owner in owners:
+            origin = self.storage.word_lessons(owner) if hidden_lessons else {}
             for w in self.storage.all_words(owner):
+                if origin.get(w.key) in hidden_lessons:
+                    continue
                 if w.key not in seen:
                     seen.add(w.key)
                     words.append(w.model_dump())
@@ -379,7 +406,7 @@ class Portal:
         if kind == "clear" and access.role not in (TUTOR, ADMIN):
             raise PortalError(403, "очистить доску может преподаватель")
         if self.storage.board_item_count(board_id) >= BOARD_ITEM_LIMIT:
-            raise PortalError(409, "доска заполнена — создайте новую")
+            raise PortalError(409, "доска заполнена – создайте новую")
         data = _validate_obj(body.get("data") or {}) if kind == "obj" else _validate_item(kind, body.get("data") or {})
         text = data.get("text") if kind == "text" else _obj_text(data) if kind == "obj" else None
         warning = None
@@ -411,7 +438,7 @@ class Portal:
             raise PortalError(400, "нужно согласие на обработку персональных данных")
         if ip and self.storage.applications_since(ip, datetime.now(timezone.utc) - timedelta(hours=1)) \
                 >= APPLICATIONS_PER_HOUR:
-            raise PortalError(429, "слишком много заявок — попробуйте позже")
+            raise PortalError(429, "слишком много заявок – попробуйте позже")
         app_id = self.storage.add_application(name=name, contact=contact, course_id=course_id,
                                               level=_field(body, "level", 40), goal=_field(body, "goal", 300),
                                               comment=_field(body, "comment", 1000), ip=ip)
@@ -524,13 +551,13 @@ def _lines(body: dict[str, Any], key: str, max_len: int, required: bool = False)
 
 def _num(v: Any, lo: float, hi: float) -> float:
     if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v:  # NaN
-        raise PortalError(400, "координаты и размеры — числа")
+        raise PortalError(400, "координаты и размеры – числа")
     return round(min(hi, max(lo, float(v))), 1)
 
 
 def _point(p: Any) -> list[float]:
     if not isinstance(p, (list, tuple)) or len(p) != 2:
-        raise PortalError(400, "точка — пара чисел [x, y]")
+        raise PortalError(400, "точка – пара чисел [x, y]")
     return [_num(p[0], 0, BOARD_W), _num(p[1], 0, BOARD_H)]
 
 
@@ -546,12 +573,12 @@ def _obj_text(data: dict[str, Any]) -> str | None:
 
 
 def _validate_obj(data: Any) -> dict[str, Any]:
-    """Объект доски v2. Координаты — в «мировых» единицах бесконечного холста."""
+    """Объект доски v2. Координаты – в «мировых» единицах бесконечного холста."""
     if not isinstance(data, dict):
         raise PortalError(400, "data должно быть объектом")
     oid, typ = data.get("oid"), data.get("type")
     if not isinstance(oid, str) or not OID_RE.match(oid):
-        raise PortalError(400, "oid — 4–32 символа")
+        raise PortalError(400, "oid – 4–32 символа")
     if typ not in OBJ_TYPES:
         raise PortalError(400, "type: " + ", ".join(OBJ_TYPES))
     out: dict[str, Any] = {"oid": oid, "type": typ, "x": _num(data.get("x", 0), -100000, 100000),
@@ -592,7 +619,7 @@ def _validate_obj(data: Any) -> dict[str, Any]:
     elif typ in ("image", "file"):
         src = data.get("src")
         if not isinstance(src, str) or not FILE_SRC_RE.match(src):
-            raise PortalError(400, "картинки и файлы — только из материалов платформы")
+            raise PortalError(400, "картинки и файлы – только из материалов платформы")
         out["src"] = src
         title = data.get("title", "")
         out["title"] = title[:120] if isinstance(title, str) else ""
@@ -600,7 +627,7 @@ def _validate_obj(data: Any) -> dict[str, Any]:
         if typ == "image" and crop is not None:
             if not isinstance(crop, list) or len(crop) != 4 or not all(
                     isinstance(c, (int, float)) and not isinstance(c, bool) and c == c for c in crop):
-                raise PortalError(400, "обрезка — четыре числа")
+                raise PortalError(400, "обрезка – четыре числа")
             x, y = min(0.98, max(0.0, crop[0])), min(0.98, max(0.0, crop[1]))
             w, h = min(1 - x, max(0.02, crop[2])), min(1 - y, max(0.02, crop[3]))
             out["crop"] = [round(x, 4), round(y, 4), round(w, 4), round(h, 4)]
@@ -674,7 +701,7 @@ def _outbox_worker() -> None:
             try:
                 with urllib.request.urlopen(req, timeout=20):
                     break
-            except urllib.error.HTTPError as exc:  # 400/403 — бот заблокирован или чат не найден: не повторяем
+            except urllib.error.HTTPError as exc:  # 400/403 – бот заблокирован или чат не найден: не повторяем
                 log.warning("Telegram отклонил сообщение в %s: %s", chat_id, exc)
                 break
             except Exception as exc:

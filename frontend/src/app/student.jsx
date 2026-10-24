@@ -6,6 +6,8 @@ import { useSession } from "../lib/session.js";
 import { Bullets, Empty, ErrorBox, Loading, PageTitle, Stat } from "../ui/kit.jsx";
 import { LessonList, LiveBanner, NotConnected, Panel, useApi } from "./common.jsx";
 import { DecorHeader } from "./decor.jsx";
+import { HolidayBanner, MoodCard } from "./extras.jsx";
+import { StudentPayCard } from "./lessonpay.jsx";
 import { speak } from "./player.jsx";
 
 // == Ученик ===================================================================================
@@ -21,14 +23,15 @@ export function StudentHome() {
     <>
       <PageTitle title={`Привет, ${(account?.name || "").split(" ")[0] || "друг"}!`}
         text={tutors.length ? `Ваш преподаватель: ${tutors.map((t) => t.title).join(", ")}` : null} />
+      <HolidayBanner student />
       <DecorHeader prefs={account?.prefs} name={account?.name} />
       {!tutors.length && <NotConnected />}
       <LiveBanner lessons={lessons} />
       {tutors.length > 0 && (
         <>
           <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat value={cards?.stats.due ?? "—"} label="карточек повторить" />
-            <Stat value={cards?.stats.learned ?? "—"} label="слов выучено" tone="mint" />
+            <Stat value={cards?.stats.due ?? "–"} label="карточек повторить" />
+            <Stat value={cards?.stats.learned ?? "–"} label="слов выучено" tone="mint" />
             <Stat value={open.length} label="открытых ДЗ" tone="sun" />
             <Stat value={lessons.filter((l) => l.status === "finished").length} label="уроков" tone="lilac" />
           </div>
@@ -36,7 +39,7 @@ export function StudentHome() {
             <Panel title="Слова на сегодня" icon={Repeat}>
               {cards?.queue.length ? (
                 <>
-                  <p className="text-ink-soft">В очереди {cards.queue.length} {cards.queue.length === 1 ? "карточка" : "карточек"} — это займёт пару минут.</p>
+                  <p className="text-ink-soft">В очереди {cards.queue.length} {cards.queue.length === 1 ? "карточка" : "карточек"} – это займёт пару минут.</p>
                   <a href="#/app/cards" className="btn-brand mt-4">Повторить слова</a>
                 </>
               ) : <p className="text-sm text-ink-mute">{cards?.stats.total ? "На сегодня всё повторено. Возвращайтесь завтра!" : "Новые слова с уроков появятся здесь."}</p>}
@@ -45,7 +48,9 @@ export function StudentHome() {
               {open.length ? <ul className="grid gap-2">{open.slice(0, 3).map((h) => <li key={h.id} className="line-clamp-2 rounded-2xl bg-cream px-4 py-3 text-sm">{h.text}</li>)}</ul>
                 : <p className="text-sm text-ink-mute">Открытых заданий нет.</p>}
             </Panel>
+            <StudentPayCard />
             <Panel title="Последние уроки" icon={BookOpen} className="lg:col-span-2"><LessonList lessons={lessons} limit={5} /></Panel>
+            <div className="lg:col-span-2 lg:max-w-md"><MoodCard /></div>
           </div>
         </>
       )}
@@ -60,7 +65,7 @@ const GRADES = [
   ["easy", "Легко", "bg-study-soft text-study hover:brightness-95"],
 ];
 
-// Язык слова: язык ученика у этого преподавателя, иначе — по алфавиту слова
+// Язык слова: язык ученика у этого преподавателя, иначе – по алфавиту слова
 function langOf(word, chatId, chats) {
   const byChat = chats?.find((c) => c.chat_id === chatId)?.language;
   if (byChat) return byChat;
@@ -98,7 +103,7 @@ export function CardsPage() {
   });
   return (
     <>
-      <PageTitle title="Карточки" text="Слова уроков, домашних заданий и занятий попадают сюда сами. Трудные слова возвращаются чаще, лёгкие — реже." />
+      <PageTitle title="Карточки" text="Слова уроков, домашних заданий и занятий попадают сюда сами. Трудные слова возвращаются чаще, лёгкие – реже." />
       <ErrorBox error={error} />
       {!data ? <Loading /> : !data.stats.total ? <Empty icon={Layers} title="Слов пока нет" text="Карточки пополняются сами: слова с уроков, из домашних заданий и занятий. Свои слова можно добавить в словаре." action={<a href="#/app/words" className="btn-light">Добавить слова</a>} /> : !card ? (
         <Empty icon={PartyPopper} title={done ? `Отлично! Повторено: ${done}` : "На сегодня всё"} text="Следующие карточки появятся, когда подойдёт время повторения." action={<a href="#/app/words" className="btn-light">Открыть словарь</a>} />
@@ -111,7 +116,7 @@ export function CardsPage() {
             {card.transcription && <span className="mt-2 text-ink-mute">{card.transcription}</span>}
             {shown ? (
               <span className="mt-6 animate-fadeup">
-                <span className="block text-2xl font-bold text-brand">{card.translation || "—"}</span>
+                <span className="block text-2xl font-bold text-brand">{card.translation || "–"}</span>
                 {card.example && <span className="mt-2 block text-sm text-ink-soft">{card.example}</span>}
               </span>
             ) : <span className="mt-6 text-sm text-ink-mute">Вспомните перевод и нажмите, чтобы проверить (пробел)</span>}
@@ -135,7 +140,7 @@ export function ParentHome() {
   const hw = useApi("/site/v1/homework").data?.homework || [];
   return (
     <>
-      <PageTitle title={`Здравствуйте, ${(account?.name || "").split(" ")[0] || ""}!`} text="Как идут занятия — без Telegram, прямо здесь." />
+      <PageTitle title={`Здравствуйте, ${(account?.name || "").split(" ")[0] || ""}!`} text="Как идут занятия – без Telegram, прямо здесь." />
       <ErrorBox error={error} />
       {!data ? <Loading /> : !data.children.length ? <NotConnected /> : (
         <div className="grid gap-6">

@@ -1,11 +1,11 @@
 """Аккаунты сайта: репетитор (BetterTeach), ученик и родитель (BetterStudy), онлайн-школа.
 
-* Вход по почте и паролю — Telegram не обязателен (у многих он недоступен). Telegram можно
+* Вход по почте и паролю – Telegram не обязателен (у многих он недоступен). Telegram можно
   привязать в профиле: тогда отчёты и сообщения дублируются туда.
 * Репетитор бывает **частный** (сам себе школа, его переписка не фильтруется) или **в школе**
-  (школа видит уроки и отчёты, контакты фильтруются, попытки обмена — сигналы школе).
+  (школа видит уроки и отчёты, контакты фильтруются, попытки обмена – сигналы школе).
 * Ученик и родитель попадают к репетитору по ссылке-приглашению. Ученик сам не создаёт
-  уроки и доски — это делает преподаватель.
+  уроки и доски – это делает преподаватель.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def first_name(name: str) -> str:
-    """Другие пользователи видят только имя — без фамилии."""
+    """Другие пользователи видят только имя – без фамилии."""
     return (name or "").strip().split()[0][:30] if (name or "").strip() else ""
 
 
@@ -66,7 +66,7 @@ class Accounts:
             for k in keys:
                 hits = [t for t in self._attempts.get(k, []) if now - t < 900]
                 if len(hits) >= LOGIN_ATTEMPTS:
-                    raise PortalError(429, "слишком много попыток — подождите 15 минут")
+                    raise PortalError(429, "слишком много попыток – подождите 15 минут")
                 self._attempts[k] = hits + [now]
 
     def register(self, body: Any, ip: str | None) -> dict[str, Any]:
@@ -81,14 +81,14 @@ class Accounts:
         if not EMAIL_RE.match(email):
             raise PortalError(400, "проверьте адрес почты")
         if not isinstance(password, str) or len(password) < 8 or len(password) > 200:
-            raise PortalError(400, "пароль — от 8 символов")
+            raise PortalError(400, "пароль – от 8 символов")
         if not body.get("consent"):
             raise PortalError(400, "нужно согласие на обработку персональных данных")
         if self.assistant.moderate(name).is_violation:
-            raise PortalError(422, "имя — без телефонов, ников и ссылок")
+            raise PortalError(422, "имя – без телефонов, ников и ссылок")
         self._throttle(f"reg:{ip}")
         if self.storage.account_by_email(email):
-            raise PortalError(409, "аккаунт с этой почтой уже есть — войдите")
+            raise PortalError(409, "аккаунт с этой почтой уже есть – войдите")
         account_id = "a_" + secrets.token_hex(8)
         org_id = None
         if role == "school":
@@ -118,11 +118,52 @@ class Accounts:
         joined = self.join(Viewer(row["id"], False), body["invite"]) if body.get("invite") else None
         return {"token": self.portal.issue_token(row["id"]), "account": self.public(row["id"]), "joined": joined}
 
+    # -- восстановление пароля -----------------------------------------------------------------
+    RESET_HOURS = 2
+
+    def forgot_password(self, body: Any, ip: str | None) -> dict[str, Any]:
+        """Письмо со ссылкой для нового пароля. Ответ всегда одинаковый, чтобы нельзя было выяснить, есть ли такая почта."""
+        email = str((body or {}).get("email") or "").strip().lower() if isinstance(body, dict) else ""
+        if not EMAIL_RE.match(email):
+            raise PortalError(400, "проверьте адрес почты")
+        self._throttle(f"forgot-ip:{ip}", f"forgot:{email}")
+        row = self.storage.account_by_email(email)
+        if row:
+            code = secrets.token_urlsafe(24)
+            self.storage.add_invite(code, "reset", row["id"], row["id"])
+            site = self.portal.settings.site_url or ""
+            self.portal.mailer.send(email, f"{self.portal.settings.school_name}: новый пароль",
+                                    f"Здравствуйте, {row['name']}!\n\nЧтобы задать новый пароль, откройте ссылку (она действует {self.RESET_HOURS} ч.):\n"
+                                    f"{site}/#/reset?code={code}\n\nЕсли вы ничего не просили, просто проигнорируйте письмо.",
+                                    reply_to=self.portal.settings.support_email)
+        return {"ok": True, "mail": self.portal.mailer.configured}
+
+    def reset_password(self, body: Any, ip: str | None) -> dict[str, Any]:
+        from datetime import datetime, timedelta, timezone
+
+        body = body if isinstance(body, dict) else {}
+        self._throttle(f"reset-ip:{ip}")
+        inv = self.storage.get_invite(str(body.get("code") or ""))
+        password = body.get("password")
+        if not isinstance(password, str) or not 8 <= len(password) <= 200:
+            raise PortalError(400, "пароль: от 8 символов")
+        fresh = False
+        if inv and inv["kind"] == "reset":
+            try:
+                fresh = datetime.now(timezone.utc) - datetime.fromisoformat(inv["created_at"]) < timedelta(hours=self.RESET_HOURS)
+            except ValueError:
+                fresh = False
+        if not fresh or not self.storage.use_invite(inv["code"]):
+            raise PortalError(410, "ссылка устарела или уже использована: запросите новую на странице входа")
+        self.storage.update_account(inv["target"], password_hash=hash_password(password))
+        self.storage.revoke_access_tokens(inv["target"])  # старые входы закрываем: пароль могли узнать посторонние
+        return {"token": self.portal.issue_token(inv["target"]), "account": self.public(inv["target"])}
+
     # -- профиль ------------------------------------------------------------------
     def account(self, viewer: Viewer) -> dict[str, Any]:
         row = self.storage.get_account(viewer.user_id)
         if not row:
-            raise PortalError(403, "этот раздел — для аккаунтов сайта")
+            raise PortalError(403, "этот раздел – для аккаунтов сайта")
         return row
 
     def public(self, account_id: str) -> dict[str, Any]:
@@ -134,6 +175,8 @@ class Accounts:
                         "owner": org["owner_id"] == row.get("id")} if org else None,
                 "telegram": bool(row.get("tg_user_id")), "billing": billing.plan_state(self.storage, row),
                 "prefs": _prefs(row)}
+        if row.get("role") == "student":
+            data["mood"] = self.mood_of(row)
         if row.get("role") in ("tutor", "school"):
             if not row.get("ref_code"):
                 row["ref_code"] = secrets.token_urlsafe(6)
@@ -155,11 +198,11 @@ class Accounts:
         if "name" in body:
             name = _field(body, "name", 60, required=True)
             if self.assistant.moderate(name).is_violation:
-                raise PortalError(422, "имя — без телефонов, ников и ссылок")
+                raise PortalError(422, "имя – без телефонов, ников и ссылок")
             fields["name"] = name
         if body.get("password"):
             if not isinstance(body["password"], str) or len(body["password"]) < 8:
-                raise PortalError(400, "пароль — от 8 символов")
+                raise PortalError(400, "пароль – от 8 символов")
             fields["password_hash"] = hash_password(body["password"])
         if fields:
             self.storage.update_account(viewer.user_id, **fields)
@@ -203,15 +246,18 @@ class Accounts:
                         "invite": self._links(invite["code"]) if invite and not pair.student_user_id else None,
                         "parent_invite": self._links(self._parent_code(pair)),
                         "language": row.get("language") or self.portal.settings.target_language,
+                        "mood": self.visible_mood(pair.student_user_id),
+                        "photo": self._photo(pair.student_user_id),
+                        "balance": row.get("balance", 0),
                         "active_lesson": active["id"] if active else None})
-        limit = None  # на тарифе — без ограничения числа учеников
+        limit = None  # на тарифе – без ограничения числа учеников
         return {"students": out, "limit": limit}
 
     def add_student(self, viewer: Viewer, body: Any) -> dict[str, Any]:
         tutor = self._tutor(viewer)
         name = first_name(_field(body if isinstance(body, dict) else {}, "name", 40, required=True) or "")
         if self.assistant.moderate(name).is_violation:
-            raise PortalError(422, "имя — без контактов")
+            raise PortalError(422, "имя – без контактов")
         billing.require_active(self.storage, tutor["id"])
         pair = self.relay.create_pair(first_name(tutor["name"]), name, created_by=tutor["id"])
         self.storage.bind_pair_user(pair.id, TUTOR, tutor["id"])
@@ -242,24 +288,81 @@ class Accounts:
             raise PortalError(400, "срок: 1, 3 или 12 месяцев")
         teachers = len(self.storage.org_accounts(acc["org_id"], "tutor")) if acc["role"] == "school" and acc.get("org_id") else 1
         use = bool(body.get("use_discount")) and billing.referrals(self.storage, acc)["discounts"] > 0
-        total = billing.price(acc, months, self.storage, teachers, use)
+        q = billing.quote(acc, months, self.storage, teachers, use_referral=use)
         until = billing.extend(self.storage, acc, months)
-        if use:
+        if q["reason"] == "referral":
             self.storage.update_account(acc["id"], ref_used=str(int(acc.get("ref_used") or 0) + 1))
-        return {"email": acc["email"], "paid_until": until, "price": total, "discount_used": use, "teachers": teachers}
+        pid = "adm_" + secrets.token_hex(8)  # оплата вне сайта: запоминаем, чтобы скидка на первый месяц не повторялась
+        self.storage.add_payment(pid, acc["id"], months, q["total"], q["reason"])
+        self.storage.settle_payment(pid)
+        return {"email": acc["email"], "paid_until": until, "price": q["total"], "discount_used": q["reason"] == "referral",
+                "teachers": teachers}
 
     def update_prefs(self, viewer: Viewer, body: Any) -> dict[str, Any]:
-        """Оформление кабинета: фон, аватар-стикер, наклейки на главной."""
-        self.account(viewer)
+        """Оформление кабинета и личные настройки. Переданные поля меняются, остальные остаются."""
+        row = self.account(viewer)
         body = body if isinstance(body, dict) else {}
-        prefs = {"theme": body.get("theme") if body.get("theme") in THEMES else "default",
-                 "avatar": str(body.get("avatar") or "")[:40] or None,
-                 "stickers": [str(x)[:40] for x in (body.get("stickers") or []) if isinstance(x, str)][:8],
-                 "motto": str(body.get("motto") or "").strip()[:80] or None}
-        if prefs["motto"] and self.assistant.moderate(prefs["motto"]).is_violation:
-            raise PortalError(422, "без контактов, пожалуйста")
+        prefs = _prefs(row)
+        if "theme" in body:
+            prefs["theme"] = body["theme"] if body["theme"] in THEMES else "default"
+        if "avatar" in body:
+            prefs["avatar"] = str(body.get("avatar") or "")[:40] or None
+        if "stickers" in body:
+            prefs["stickers"] = [str(x)[:40] for x in (body.get("stickers") or []) if isinstance(x, str)][:8]
+        if "motto" in body:
+            prefs["motto"] = str(body.get("motto") or "").strip()[:80] or None
+            if prefs["motto"] and self.assistant.moderate(prefs["motto"]).is_violation:
+                raise PortalError(422, "без контактов, пожалуйста")
+        for flag in ("review_reports", "mood_private"):  # проверять конспект перед отправкой / не показывать настроение
+            if flag in body:
+                prefs[flag] = bool(body[flag])
+        if body.get("photo") is None and "photo" in body:  # убрать свою картинку
+            prefs.pop("photo", None)
         self.storage.update_account(viewer.user_id, prefs=json.dumps(prefs, ensure_ascii=False))
         return self.me(viewer)
+
+    def _photo(self, user_id: str | None) -> str | None:
+        row = self.storage.get_account(user_id) if user_id and user_id.startswith("a_") else None
+        photo = _prefs(row).get("photo") if row else None
+        return f"/site/v1/files/{photo}" if photo else None
+
+    # -- настроение («социальная батарейка») -----------------------------------------------------------
+    def _today(self) -> str:
+        from datetime import datetime
+
+        return datetime.now(self.portal.settings.tz).date().isoformat()
+
+    def set_mood(self, viewer: Viewer, body: Any) -> dict[str, Any]:
+        """Ученик сам отмечает заряд от 1 до 5. Не отметил, значит нигде ничего не показывается."""
+        row = self.account(viewer)
+        if row["role"] != "student":
+            raise PortalError(403, "настроение отмечают ученики")
+        level = (body or {}).get("level") if isinstance(body, dict) else None
+        if level is None:
+            self.storage.clear_mood(row["id"], self._today())
+        elif isinstance(level, int) and not isinstance(level, bool) and 1 <= level <= 5:
+            self.storage.set_mood(row["id"], self._today(), level)
+        else:
+            raise PortalError(400, "level: число от 1 до 5")
+        return self.mood_of(row)
+
+    def mood_of(self, row: dict[str, Any]) -> dict[str, Any]:
+        today = self._today()
+        history = self.storage.moods(row["id"], 14)
+        return {"today": next((m["level"] for m in history if m["day"] == today), None), "history": history}
+
+    def visible_mood(self, student_id: str | None) -> dict[str, Any] | None:
+        """Что видит преподаватель: последнюю отметку за три дня, если ученик её поставил и не скрыл."""
+        row = self.storage.get_account(student_id) if student_id and student_id.startswith("a_") else None
+        if not row or _prefs(row).get("mood_private"):
+            return None
+        from datetime import date, timedelta
+
+        today = date.fromisoformat(self._today())
+        for m in self.storage.moods(row["id"], 3):
+            if date.fromisoformat(m["day"]) >= today - timedelta(days=2):
+                return {"level": m["level"], "day": m["day"]}
+        return None
 
     def set_language(self, viewer: Viewer, pair_id: str, body: Any) -> dict[str, Any]:
         tutor = self._tutor(viewer)
@@ -327,7 +430,7 @@ class Accounts:
 
     # -- приглашения ----------------------------------------------------------------
     def invite_info(self, code: str | None) -> dict[str, Any]:
-        """Что за приглашение — показываем до входа, без личных данных."""
+        """Что за приглашение – показываем до входа, без личных данных."""
         if not code:
             raise PortalError(404, "приглашение не найдено")
         inv = self.storage.get_invite(code)
@@ -354,7 +457,7 @@ class Accounts:
         acc = self.account(viewer)
         if info["kind"] == "student":
             if acc["role"] != "student":
-                raise PortalError(409, "это приглашение для ученика — войдите как ученик")
+                raise PortalError(409, "это приглашение для ученика – войдите как ученик")
             inv = self.storage.get_invite(code)
             pair = self.relay.get(inv["target"])
             if pair.student_user_id and pair.student_user_id != acc["id"]:
@@ -373,7 +476,7 @@ class Accounts:
             self.storage.use_invite(code)
             return {"kind": "tutor", "school": info["school"]}
         if acc["role"] != "parent":
-            raise PortalError(409, "это приглашение для родителя — войдите как родитель")
+            raise PortalError(409, "это приглашение для родителя – войдите как родитель")
         invite = self.assistant.subscribe_parent(code, acc["id"])
         if not invite:
             raise PortalError(409, "приглашение уже использовано")
@@ -383,7 +486,8 @@ class Accounts:
         return self.portal.is_strict(chat_id)
 
 
-THEMES = ("default", "sunset", "ocean", "forest", "lavender", "candy", "space", "notebook")
+THEMES = ("default", "sunset", "ocean", "forest", "lavender", "candy", "space", "notebook",
+          "newyear", "valentine", "spring8", "easter", "summer", "autumn", "halloween", "birthday")
 
 
 def _prefs(row: dict[str, Any]) -> dict[str, Any]:

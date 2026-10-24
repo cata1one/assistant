@@ -120,7 +120,7 @@ def test_trial_payment_and_referral(env):
     ref = acc.public(tutor.user_id)["referral"]
     assert ref["paid"] == 1 and ref["discounts"] == 1
     out = acc.admin_extend(admin, {"email": "t@mail.ru", "months": 12, "use_discount": True})
-    assert out["price"] == 1440 and out["discount_used"]  # 2 880 ₽ за год со скидкой 50%
+    assert out["price"] == 1392 and out["discount_used"]  # 2 784 ₽ за год со скидкой 50%
     assert acc.public(tutor.user_id)["billing"]["state"] == "active"
     assert acc.public(tutor.user_id)["referral"]["discounts"] == 0
     acc.add_student(tutor, {"name": "Шестой"})

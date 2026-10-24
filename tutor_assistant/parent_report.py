@@ -1,4 +1,4 @@
-"""Отчёт для родителей и список «что повторить» — по расшифровке урока (в том числе речи).
+"""Отчёт для родителей и список «что повторить» – по расшифровке урока (в том числе речи).
 
 Что извлекается из речи преподавателя:
 
@@ -76,7 +76,7 @@ def _quote(s: str, limit: int = 160) -> str:
 
 
 def homework_status(utterances: Iterable[Utterance]) -> str:
-    """Как выполнено прошлое ДЗ — по словам преподавателя. Новое задание («ДЗ: …») не учитывается."""
+    """Как выполнено прошлое ДЗ – по словам преподавателя. Новое задание («ДЗ: …») не учитывается."""
     for u in utterances:
         if not u.is_tutor:
             continue
@@ -175,13 +175,13 @@ def build_parent_report(report: LessonReport, utterances: list[Utterance], stude
     elif sig["homework_status"] == "partial":
         attention.append("Домашнее задание к этому уроку выполнено не полностью.")
     if len(report.corrections) >= 3:
-        attention.append(f"На уроке исправлено {plural(len(report.corrections), 'ошибка', 'ошибки', 'ошибок')} — "
+        attention.append(f"На уроке исправлено {plural(len(report.corrections), 'ошибка', 'ошибки', 'ошибок')} – "
                          "их стоит повторить (раздел «Что повторить» в конспекте).")
     if progress and progress.corrections_prev is not None and progress.corrections_now - progress.corrections_prev >= 2:
         attention.append(f"Ошибок больше, чем на прошлом уроке: {progress.corrections_prev} → {progress.corrections_now}.")
     activity = activity_level(report)
     if activity and report.stats.student_talk_share < 15:
-        attention.append(f"Ученик говорил мало ({report.stats.student_talk_share:.0f}% времени урока) — "
+        attention.append(f"Ученик говорил мало ({report.stats.student_talk_share:.0f}% времени урока) – "
                          "разговорной практики стоит больше.")
 
     recommendations: list[str] = []

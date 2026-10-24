@@ -1,5 +1,5 @@
 // Стикеры доски: собственные рисунки (SVG) и тематические наборы эмодзи.
-// Картинки из Pinterest использовать нельзя — это чужие работы. Свои стикеры можно загрузить как картинку.
+// Картинки из Pinterest использовать нельзя – это чужие работы. Свои стикеры можно загрузить как картинку.
 
 const svg = (body, vb = "0 0 100 100") =>
   `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">${body}</svg>`)}`;
@@ -56,6 +56,45 @@ const DRAWN = {
   "em-think": svg('<circle cx="50" cy="50" r="42" fill="#FFC24B"/><circle cx="36" cy="42" r="5" fill="#1E2235"/><circle cx="64" cy="42" r="5" fill="#1E2235"/><path d="M28 32l14-4M58 28l14 4" stroke="#1E2235" stroke-width="4" stroke-linecap="round"/><path d="M38 66h24" stroke="#1E2235" stroke-width="6" stroke-linecap="round"/><path d="M70 78q10-4 8-14" stroke="#E0A22A" stroke-width="8" fill="none" stroke-linecap="round"/>'),
   "em-cool": svg('<circle cx="50" cy="50" r="42" fill="#FFC24B"/><path d="M20 38h60v6q-2 14-16 14t-14-12h0q0 12-14 12T20 44z" fill="#1E2235"/><path d="M34 66q16 12 32 0" stroke="#1E2235" stroke-width="6" fill="none" stroke-linecap="round"/>'),
   "em-wow": svg('<circle cx="50" cy="50" r="42" fill="#FFC24B"/><circle cx="36" cy="40" r="7" fill="#fff"/><circle cx="64" cy="40" r="7" fill="#fff"/><circle cx="36" cy="40" r="4" fill="#1E2235"/><circle cx="64" cy="40" r="4" fill="#1E2235"/><ellipse cx="50" cy="66" rx="9" ry="12" fill="#1E2235"/>'),
+  // Новый год и Рождество
+  "ny-snowman": svg('<circle cx="50" cy="72" r="24" fill="#fff" stroke="#C9D6EA" stroke-width="3"/><circle cx="50" cy="40" r="17" fill="#fff" stroke="#C9D6EA" stroke-width="3"/><path d="M36 28h28l-4-18H40z" fill="#3B2F5C"/><rect x="32" y="26" width="36" height="6" rx="3" fill="#E53935"/><circle cx="44" cy="38" r="2.5" fill="#1E2235"/><circle cx="56" cy="38" r="2.5" fill="#1E2235"/><path d="M50 43l12 3-12 3z" fill="#FF8A2B"/><circle cx="50" cy="66" r="2.5" fill="#1E2235"/><circle cx="50" cy="76" r="2.5" fill="#1E2235"/>'),
+  "ny-mitten": svg('<path d="M30 92V50q-8-14 2-20t14 8V18q6-10 14 0v22q4-12 14-6t4 14l-4 30q-2 10-10 14H40q-10 0-10-12z" fill="#E53935"/><rect x="28" y="76" width="46" height="14" rx="4" fill="#fff"/><circle cx="46" cy="58" r="4" fill="#fff"/><circle cx="60" cy="48" r="4" fill="#fff"/>'),
+  "ny-wish": badge("С Новым годом!", "#E53935", "#B71C1C", "#fff", 10),
+  "ch-wish": badge("Merry Christmas!", "#2E9E5B", "#217a45", "#fff", 9),
+  "ch-bell": svg('<path d="M50 10q4 0 4 5 22 6 22 34l8 14H16l8-14q0-28 22-34 0-5 4-5z" fill="#FFC24B" stroke="#E0A22A" stroke-width="3"/><circle cx="50" cy="82" r="8" fill="#E0A22A"/><path d="M30 20q10-10 20-8M70 20q-10-10-20-8" stroke="#2E9E5B" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="38" cy="14" r="4" fill="#E53935"/><circle cx="62" cy="14" r="4" fill="#E53935"/>'),
+  // 23 февраля и 8 Марта
+  "f23-badge": badge("23 февраля", "#3D63F5", "#2A47C9", "#fff", 12),
+  "f23-star": svg('<path d="M50 6l13 28 30 3-23 20 7 30-27-16-27 16 7-30L7 37l30-3z" fill="#E53935" stroke="#B71C1C" stroke-width="3" stroke-linejoin="round"/><text x="50" y="58" text-anchor="middle" font-size="22" font-weight="800" fill="#FFC24B" font-family="Manrope,Arial,sans-serif">23</text>'),
+  "m8-badge": badge("8 Марта", "#FF5C8A", "#d93d6a", "#fff", 15),
+  "m8-bouquet": svg('<path d="M50 94L30 52h40z" fill="#8B7CF6"/><g fill="#FF8AB3"><circle cx="34" cy="38" r="12"/><circle cx="50" cy="26" r="12"/><circle cx="66" cy="38" r="12"/></g><g fill="#FFC24B"><circle cx="34" cy="38" r="4"/><circle cx="50" cy="26" r="4"/><circle cx="66" cy="38" r="4"/></g><path d="M44 44q6 8 12 0" stroke="#2E9E5B" stroke-width="5" fill="none"/>'),
+  // День святого Валентина
+  "vd-letter": svg('<rect x="8" y="22" width="84" height="58" rx="8" fill="#FFE4EA" stroke="#FF5C7A" stroke-width="3"/><path d="M10 26l40 30 40-30" stroke="#FF5C7A" stroke-width="3" fill="none"/><path d="M50 74S34 62 34 52a8 8 0 0 1 16-2 8 8 0 0 1 16 2c0 10-16 22-16 22z" fill="#E53935" transform="translate(0 -4) scale(1 .9) translate(0 8)"/>'),
+  "vd-rose": svg('<path d="M50 94V56" stroke="#2E9E5B" stroke-width="6"/><path d="M50 80q-18-2-22-18 14 0 22 12z" fill="#3F9E4B"/><circle cx="50" cy="36" r="26" fill="#E53935"/><path d="M50 36q-12-6-4-16 8 4 8 12-6 2-4 8z" fill="#B71C1C"/><path d="M36 38q6 14 20 12" stroke="#B71C1C" stroke-width="4" fill="none" stroke-linecap="round"/>'),
+  "vd-wish": badge("Be mine", "#FF5C7A", "#d93d5c", "#fff", 18),
+  // Пасха и Масленица
+  "ea-egg": svg('<path d="M50 6C28 6 16 44 16 62a34 32 0 0 0 68 0C84 44 72 6 50 6z" fill="#8B7CF6"/><path d="M18 56q16 10 32 0t32 0" stroke="#FFC24B" stroke-width="6" fill="none"/><path d="M20 72q15 9 30 0t30 0" stroke="#fff" stroke-width="5" fill="none"/><circle cx="38" cy="38" r="4" fill="#FF8AB3"/><circle cx="62" cy="38" r="4" fill="#FF8AB3"/>'),
+  "ea-chick": svg('<circle cx="50" cy="56" r="34" fill="#FFD84B"/><path d="M26 18l10 16M50 12v16M74 18L64 34" stroke="#FFD84B" stroke-width="6" stroke-linecap="round"/><circle cx="38" cy="50" r="4" fill="#1E2235"/><circle cx="62" cy="50" r="4" fill="#1E2235"/><path d="M44 60h12l-6 8z" fill="#FF8A2B"/><path d="M26 62q-14 6-10 18" stroke="#FFD84B" stroke-width="8" fill="none" stroke-linecap="round"/>'),
+  "ea-wish": badge("Христос воскресе!", "#FFC24B", "#E0A22A", "#7a3b00", 8),
+  "ms-pancakes": svg('<ellipse cx="50" cy="78" rx="38" ry="12" fill="#D9892B"/><ellipse cx="50" cy="68" rx="38" ry="12" fill="#F2B04A"/><ellipse cx="50" cy="56" rx="36" ry="12" fill="#D9892B"/><ellipse cx="50" cy="46" rx="36" ry="12" fill="#F2B04A"/><path d="M26 46q8 12 12 0t12 6 12-6 12 6" fill="#FFF1C2"/><circle cx="50" cy="30" r="8" fill="#E53935"/>'),
+  "ms-sun": badge("Масленица!", "#FF9F1C", "#d98200", "#fff", 14),
+  // День знаний
+  "kn-badge": badge("1 сентября", "#3D63F5", "#2A47C9", "#fff", 13),
+  "kn-bell": svg('<path d="M50 10q4 0 4 5 22 6 22 34l8 14H16l8-14q0-28 22-34 0-5 4-5z" fill="#FFC24B" stroke="#E0A22A" stroke-width="3"/><circle cx="50" cy="82" r="8" fill="#E0A22A"/><path d="M34 30q-6 10-4 22" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".6"/>'),
+  "kn-backpack": svg('<rect x="22" y="20" width="56" height="70" rx="16" fill="#F2643D"/><rect x="32" y="52" width="36" height="26" rx="8" fill="#FF8A65"/><path d="M40 20q0-14 10-14t10 14" stroke="#D44A24" stroke-width="5" fill="none"/><rect x="40" y="62" width="20" height="6" rx="3" fill="#FFF1CF"/>'),
+  // День рождения
+  "bd-wish": badge("Happy Birthday!", "#FF5C7A", "#d93d5c", "#fff", 10),
+  "bd-ru": badge("С днём рождения!", "#8B7CF6", "#6a5ad8", "#fff", 9),
+  "bd-crown": svg('<path d="M12 74L8 28l26 20 16-30 16 30 26-20-4 46z" fill="#FFC24B" stroke="#E0A22A" stroke-width="3" stroke-linejoin="round"/><rect x="12" y="74" width="76" height="12" rx="4" fill="#E0A22A"/><circle cx="8" cy="28" r="5" fill="#E53935"/><circle cx="50" cy="18" r="5" fill="#3D63F5"/><circle cx="92" cy="28" r="5" fill="#22B07D"/>'),
+  "bd-hat": svg('<path d="M50 8l32 78H18z" fill="#8B7CF6"/><path d="M30 56l40 0M24 72h52" stroke="#FFC24B" stroke-width="6"/><circle cx="50" cy="10" r="8" fill="#FF5C7A"/><circle cx="42" cy="38" r="4" fill="#FFC24B"/><circle cx="58" cy="44" r="4" fill="#fff"/>'),
+  // Осень
+  "au-leaf": svg('<path d="M50 94V60M50 8l8 16 14-6-4 18 18-2-12 14 12 10-22 2 4 16-18-8-18 8 4-16-22-2 12-10-12-14 18 2-4-18 14 6z" fill="#E8742A"/><path d="M50 94V50" stroke="#8B5A2B" stroke-width="4"/>'),
+  "au-mushroom": svg('<path d="M10 52a40 36 0 0 1 80 0z" fill="#E53935"/><rect x="36" y="52" width="28" height="36" rx="10" fill="#FFF1CF"/><circle cx="30" cy="38" r="6" fill="#fff"/><circle cx="52" cy="30" r="7" fill="#fff"/><circle cx="72" cy="42" r="5" fill="#fff"/>'),
+  // Похвала по-русски
+  "pr-molodec": badge("Молодец!", "#22B07D", "#178a61", "#fff", 17),
+  "pr-otlichno": badge("Отлично!", "#3D63F5", "#2A47C9", "#fff", 17),
+  "pr-super-ru": badge("Супер!", "#F2643D", "#D44A24", "#fff", 18),
+  "pr-5": svg('<circle cx="50" cy="50" r="42" fill="#22B07D"/><text x="50" y="68" text-anchor="middle" font-size="56" font-weight="800" fill="#fff" font-family="Manrope,Arial,sans-serif">5</text><path d="M18 22q4-10 14-12M82 78q-4 10-14 12" stroke="#FFC24B" stroke-width="5" fill="none" stroke-linecap="round"/>'),
+  "sc-bell-r": svg('<circle cx="50" cy="50" r="42" fill="#FFF1CF"/><path d="M50 22q3 0 3 4 16 4 16 24l6 10H25l6-10q0-20 16-24 0-4 3-4z" fill="#FFC24B"/><circle cx="50" cy="66" r="5" fill="#E0A22A"/>'),
   // Весна и лето
   "sp-flower": svg('<g fill="#FF8AB3"><circle cx="50" cy="26" r="16"/><circle cx="74" cy="44" r="16"/><circle cx="65" cy="72" r="16"/><circle cx="35" cy="72" r="16"/><circle cx="26" cy="44" r="16"/></g><circle cx="50" cy="52" r="13" fill="#FFC24B"/>'),
   "sp-tulip": svg('<path d="M50 92V50" stroke="#2E9E5B" stroke-width="6"/><path d="M50 74q-20-2-24-20 16 0 24 14zM50 80q18-4 22-20-14 2-22 14z" fill="#3F9E4B"/><path d="M30 20l10 12 10-16 10 16 10-12v18a20 20 0 0 1-40 0z" fill="#E53935"/>'),
@@ -96,10 +135,19 @@ const EMOJI = {
   "Космос": ["🚀", "🪐", "🌙", "⭐", "☄️", "👽", "🛸", "🌍", "🔭", "🌌"],
   "Спорт и хобби": ["⚽", "🏀", "🎾", "🏊", "🚴", "🎸", "🎹", "🎮", "📷", "🧩"],
   "День рождения": ["🎂", "🎈", "🎁", "🥳", "🎉", "🕯️", "🍰", "🎊", "👑", "💝"],
+  "Рождество": ["🎄", "⭐", "🔔", "🕯️", "👼", "🕊️", "🍪", "🧦", "🦌", "🎁"],
+  "23 февраля": ["🎖️", "⭐", "🛡️", "🚀", "✈️", "⚓", "🏅", "🎖️", "💪", "🇷🇺"],
+  "8 Марта": ["🌷", "🌸", "💐", "🌹", "🎀", "💝", "🦋", "🍰", "🌼", "👑"],
+  "Валентин": ["💌", "❤️", "💕", "💘", "🌹", "🧸", "🍫", "😍", "💝", "🥰"],
+  "Пасха": ["🥚", "🐣", "🐰", "🌷", "🥕", "🧺", "🐑", "🌼", "🕊️", "🍰"],
+  "Масленица": ["🥞", "☀️", "🍯", "🔥", "🎪", "🍵", "🪆", "❄️", "🎶", "🧈"],
+  "День знаний": ["🔔", "🎒", "📚", "✏️", "💐", "🍎", "🏫", "🧑‍🏫", "📏", "🌻"],
+  "Праздники мира": ["🪔", "🎆", "🥮", "🌕", "🎑", "🌙", "🕌", "💀", "🌼", "🎭", "🥖", "🗼", "🎉", "🏮"],
   "Языки и страны": ["🇬🇧", "🇺🇸", "🇨🇳", "🇪🇸", "🇫🇷", "🇮🇹", "🇵🇹", "🇧🇷", "🇷🇸", "🇬🇷", "🇮🇳", "🇸🇦", "🇦🇪", "🇲🇽"],
 };
 
-const PACK_OF = { hw: "Хэллоуин", ny: "Новый год", cny: "Китайский Новый год", pr: "Похвала", sc: "Школа", wx: "Погода",
+const PACK_OF = { hw: "Хэллоуин", ny: "Новый год", ch: "Рождество", f23: "23 февраля", m8: "8 Марта", vd: "Валентин", ea: "Пасха",
+  ms: "Масленица", kn: "День знаний", au: "Осень", cny: "Китайский Новый год", pr: "Похвала", sc: "Школа", wx: "Погода",
   em: "Эмоции", sp: "Весна и лето", su: "Весна и лето", sx: "Космос", an: "Животные", fd: "Еда", bd: "День рождения" };
 
 export const PACKS = (() => {

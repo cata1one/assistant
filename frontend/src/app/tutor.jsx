@@ -2,10 +2,14 @@ import {
   Check, CheckCircle2, Clapperboard, Copy, File, FileStack, Gift, Link2, NotebookPen, PenTool, Plus, Search, Trash2, Upload,
   UserPlus, Users, Video,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getToken, request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
-import { PLANS, PricingCards } from "../site/parts.jsx";
+import { PricingCards } from "../site/parts.jsx";
+import { PERIOD_TITLE, perDay, rub } from "../lib/pricing.js";
+import { useConfig } from "../lib/config.js";
+import { ProfileAvatar } from "./decor.jsx";
+import { HolidayBanner, MoodChip } from "./extras.jsx";
 import { Avatar, copy, Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Stat } from "../ui/kit.jsx";
 import { LessonList, LiveBanner, Panel, shortDate, startLesson, useApi } from "./common.jsx";
 import { Vocab } from "./vocab.jsx";
@@ -37,40 +41,70 @@ function StartButton({ chatId, active, small }) {
 }
 
 // == Главная ==================================================================================
+function Checklist({ students, lessons }) {
+  const steps = [
+    ["Добавьте первого ученика", students.length > 0, "#/app/students", "К ученикам"],
+    ["Отправьте ему ссылку-приглашение", students.some((s) => s.joined), "#/app/students", "Скопировать ссылку"],
+    ["Проведите пробный урок", lessons.some((l) => l.status === "finished"), "#/app/students", "Начать урок"],
+  ];
+  if (steps.every((x) => x[1])) return null;
+  const next = steps.findIndex((x) => !x[1]);
+  return (
+    <div className="card mb-4 !p-5">
+      <h2 className="text-lg">Три шага до первого урока</h2>
+      <ol className="mt-3 grid gap-2">
+        {steps.map(([t, done, href, cta], i) => (
+          <li key={t} className={`flex flex-wrap items-center gap-3 rounded-2xl px-4 py-2.5 ${i === next ? "bg-brand-tint" : "bg-cream"}`}>
+            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${done ? "bg-mint text-white" : i === next ? "bg-brand text-white" : "bg-white text-ink-mute"}`}>{done ? <Check size={14} /> : i + 1}</span>
+            <span className={`min-w-0 flex-1 text-sm ${done ? "text-ink-mute line-through" : "font-semibold"}`}>{t}</span>
+            {i === next && <a href={href} className="btn-brand btn-sm">{cta}</a>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export function TutorHome() {
   const { account, me } = useSession();
   const { data, error } = useApi("/site/v1/students");
+  const pay = useApi("/site/v1/lesson-pay").data;
   const students = data?.students || [];
   const titles = Object.fromEntries((me?.chats || []).map((c) => [c.chat_id, c.title]));
   const lessons = (me?.lessons || []).map((l) => ({ ...l, with: titles[l.chat_id] }));
   return (
     <>
       <PageTitle title={`Здравствуйте, ${(account?.name || "").split(" ")[0] || "коллега"}!`}
-        text={account?.org ? `Вы преподаёте в школе «${account.org.name}»` : "Частный репетитор — ваша переписка с учениками не фильтруется"} />
+        text={account?.org ? `Вы преподаёте в школе «${account.org.name}»` : "Частный репетитор: ваша переписка с учениками не фильтруется"} />
+      <HolidayBanner />
       <LiveBanner lessons={lessons} />
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      {pay?.pending_total > 0 && (
+        <Notice tone="warn" className="mb-4">Ждут вашего подтверждения оплат: {pay.pending_total}. <a className="link" href="#/app/pay">Проверить</a></Notice>
+      )}
+      {data && <Checklist students={students} lessons={lessons} />}
+      <div className="mt-4 grid grid-cols-3 gap-3">
         <Stat value={students.length} label="учеников" />
         <Stat value={lessons.filter((l) => l.status === "finished").length} label="уроков проведено" tone="mint" />
         <Stat value={me?.unread || 0} label="новых сообщений" tone="sun" />
-        <Stat value={data?.limit ?? "∞"} label="лимит тарифа" tone="lilac" />
       </div>
       <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         <Panel title="Ученики" icon={Users} actions={<a href="#/app/students" className="link text-sm">Все</a>}>
           {error ? <p className="text-sm text-ink-mute">Вы вошли через Telegram-бота. <a className="link" href="#/register?role=tutor">Зарегистрируйтесь на сайте</a>, чтобы приглашать учеников по ссылке.</p> : !data ? <Loading /> : !students.length ? (
-            <div className="text-center"><p className="text-sm text-ink-mute">Добавьте первого ученика — он получит ссылку-приглашение.</p><a href="#/app/students" className="btn-brand mt-4"><UserPlus size={16} /> Добавить ученика</a></div>
+            <div className="text-center"><p className="text-sm text-ink-mute">Добавьте первого ученика, и он получит ссылку-приглашение.</p><a href="#/app/students" className="btn-brand mt-4"><UserPlus size={16} /> Добавить ученика</a></div>
           ) : (
             <ul className="grid gap-2">
               {students.slice(0, 6).map((s) => (
                 <li key={s.pair_id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-line px-3 py-2.5">
-                  <Avatar name={s.name} size={36} />
+                  <ProfileAvatar photo={s.photo} name={s.name} size={36} />
                   <span className="min-w-0 flex-1"><span className="block font-semibold">{s.name}</span><span className="text-xs text-ink-mute">{s.joined ? "подключён" : "ждём по ссылке"}{s.parents ? ` · родителей: ${s.parents}` : ""}</span></span>
+                  <MoodChip mood={s.mood} />
                   {s.joined && <StartButton chatId={s.chat_id} active={s.active_lesson} small />}
                 </li>
               ))}
             </ul>
           )}
         </Panel>
-        <Panel title="Последние уроки" icon={NotebookPen}><LessonList lessons={lessons} limit={5} empty="Проведите первый урок — конспект и отчёты появятся здесь." /></Panel>
+        <Panel title="Последние уроки" icon={NotebookPen}><LessonList lessons={lessons} limit={5} empty="Проведите первый урок, и конспект появится здесь." /></Panel>
       </div>
     </>
   );
@@ -110,13 +144,13 @@ export function StudentsPage() {
         {err && <div className="w-full"><ErrorBox error={err} /></div>}
       </form>
       <ErrorBox error={error} />
-      {!data ? <Loading /> : !list.length ? <Empty icon={Users} title="Учеников пока нет" text="Добавьте ученика — и отправьте ему ссылку-приглашение в любом мессенджере." /> : (
+      {!data ? <Loading /> : !list.length ? <Empty icon={Users} title="Учеников пока нет" text="Добавьте ученика – и отправьте ему ссылку-приглашение в любом мессенджере." /> : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((s) => (
             <div key={s.pair_id} className="card !p-5">
               <div className="flex flex-wrap items-center gap-3">
-                <Avatar name={s.name} />
-                <div className="min-w-0 flex-1"><p className="font-bold">{s.name}</p><p className="text-xs text-ink-mute">{s.joined ? "подключён" : "ещё не подключился"} · родителей: {s.parents}</p></div>
+                <ProfileAvatar photo={s.photo} name={s.name} size={40} />
+                <div className="min-w-0 flex-1"><p className="font-bold">{s.name}</p><p className="text-xs text-ink-mute">{s.joined ? "подключён" : "ещё не подключился"} · родителей: {s.parents}</p><MoodChip mood={s.mood} /></div>
                 <select className="field order-last !w-auto !py-1.5 text-sm sm:order-none" value={s.language} onChange={(e) => setStudentLang(s, e.target.value)} aria-label={`Язык ученика ${s.name}`}>
                   {LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}
                 </select>
@@ -136,7 +170,7 @@ export function StudentsPage() {
         {words && <Vocab chatId={words.chat_id} tutorView />}
       </Modal>
       <Modal open={!!added} onClose={() => setAdded(null)} title={`${added?.name || "Ученик"} добавлен`}>
-        <p className="text-ink-soft">Отправьте ссылки ученику и родителю — в WhatsApp, Telegram, почтой. По ссылке они зарегистрируются и попадут к вам.</p>
+        <p className="text-ink-soft">Отправьте ссылки ученику и родителю – в WhatsApp, Telegram, почтой. По ссылке они зарегистрируются и попадут к вам.</p>
         <div className="mt-4 grid gap-3">
           {[["Ученику", added?.invite?.url], ["Родителю (отчёты и переписка)", added?.parent_invite?.url]].map(([t, url]) => (
             <div key={t}><p className="mb-1 text-sm font-semibold">{t}</p><div className="flex gap-2"><input readOnly className="field text-sm" value={url || ""} onFocus={(e) => e.target.select()} aria-label={t} /><CopyLink label="Копировать" url={url} /></div></div>
@@ -197,14 +231,14 @@ export function MaterialsPage() {
   const list = (data?.materials || []).filter((m) => !needle || m.title.toLowerCase().includes(needle));
   return (
     <>
-      <PageTitle title="Материалы" text={role === "school" ? "Общая база школы — её видят все ваши преподаватели." : "Ваша база: файлы, ссылки и видео. Всё это можно вывести на доску во время урока."} />
+      <PageTitle title="Материалы" text={role === "school" ? "Общая база школы – её видят все ваши преподаватели." : "Ваша база: файлы, ссылки и видео. Всё это можно вывести на доску во время урока."} />
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <div
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
           onDrop={(e) => { e.preventDefault(); setDrag(false); upload(e.dataTransfer.files); }}
           className={`card grid place-items-center border-2 border-dashed !py-10 text-center transition ${drag ? "border-brand bg-brand-tint" : "border-line"}`}>
           <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-soft text-brand"><Upload size={24} /></span>
-          <p className="mt-3 font-bold">Перетащите файлы сюда — можно сразу пачкой</p>
+          <p className="mt-3 font-bold">Перетащите файлы сюда – можно сразу пачкой</p>
           <p className="mt-1 max-w-md text-sm text-ink-mute">PDF, картинки, презентации, документы, аудио и видео до 25 МБ. Переезжаете с ProgressMe? Скачайте свои материалы файлами и перетащите их все разом.</p>
           <input ref={input} type="file" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ""; }} />
           <button type="button" className="btn-brand mt-4" onClick={() => input.current?.click()}>Выбрать файлы</button>
@@ -212,7 +246,7 @@ export function MaterialsPage() {
         </div>
         <form onSubmit={addLink} className="card grid content-start gap-3">
           <h2 className="text-lg">Ссылка или видео</h2>
-          <p className="-mt-1 text-sm text-ink-mute">VK Видео, YouTube и Rutube откроются прямо на доске — без демонстрации экрана.</p>
+          <p className="-mt-1 text-sm text-ink-mute">VK Видео, YouTube и Rutube откроются прямо на доске – без демонстрации экрана.</p>
           <input className="field" type="url" required placeholder="https://vk.com/video…" value={link.url} onChange={(e) => setLink({ ...link, url: e.target.value })} aria-label="Ссылка" />
           <input className="field" maxLength={120} placeholder="Название (необязательно)" value={link.title} onChange={(e) => setLink({ ...link, title: e.target.value })} aria-label="Название" />
           {inSchool && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} /> Добавлять в общую базу школы</label>}
@@ -261,16 +295,96 @@ const fmtUntil = (iso) => new Date(iso).toLocaleDateString("ru-RU", { day: "nume
 
 export function BillingStatus({ billing, compact }) {
   if (!billing || billing.state === "free") return null;
-  if (billing.state === "active") return compact ? null : <Notice tone="ok">Тариф оплачен до {fmtUntil(billing.until)}{billing.by_school ? " — оплачивает школа" : ""}.</Notice>;
+  if (billing.state === "active") return compact ? null : <Notice tone="ok">Тариф оплачен до {fmtUntil(billing.until)}{billing.by_school ? ", оплачивает школа" : ""}.</Notice>;
   if (billing.state === "trial") {
     const left = billing.days_left >= 1 ? `${billing.days_left + 1} дн.` : `${Math.max(1, billing.hours_left)} ч.`;
-    return <Notice className={compact ? "mb-4" : ""}>Пробный период: осталось {left} Все функции открыты. {compact && <a href="#/app/plan" className="link">Тарифы</a>}</Notice>;
+    return <Notice className={compact ? "mb-4" : ""}>Пробный период: осталось {left} Все функции открыты. {compact && !billing.by_school && <a href="#/app/plan" className="link">Оплатить со скидкой</a>}</Notice>;
   }
   return (
     <Notice tone="bad" className={compact ? "mb-4" : ""}>
-      {billing.by_school ? "Срок тарифа школы закончился — попросите школу продлить доступ." : "Пробный период закончился. Ученики и материалы сохранены — оформите тариф, чтобы проводить новые уроки."}
+      {billing.by_school ? "Срок тарифа школы закончился: попросите школу продлить доступ." : "Пробный период закончился. Ученики и материалы сохранены, оформите тариф, чтобы проводить новые уроки."}
       {compact && !billing.by_school && <> <a href="#/app/plan" className="link">Оформить</a></>}
     </Notice>
+  );
+}
+
+function PayPanel({ account }) {
+  const cfg = useConfig();
+  const { data, error, reload } = useApi("/site/v1/billing");
+  const session = useSession();
+  const [months, setMonths] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [note, setNote] = useState(null);
+  const [asked, setAsked] = useState(false);
+
+  // Вернулись со страницы оплаты (?paid=...): уточняем у сервера, дошли ли деньги
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.hash.split("?")[1] || "").get("paid");
+    if (!id) return undefined;
+    let tries = 0;
+    const tick = async () => {
+      try {
+        const res = await request("POST", "/site/v1/billing/check", { id });
+        if (res.status === "succeeded") { setNote({ tone: "ok", text: "Оплата получена, тариф продлён. Спасибо!" }); session.reload(); reload(); return; }
+        if (res.status === "canceled") { setNote({ tone: "bad", text: "Оплата не прошла. Деньги не списаны, можно попробовать ещё раз." }); return; }
+      } catch (x) { setNote({ tone: "bad", text: x.message }); return; }
+      if (++tries < 10) timer = setTimeout(tick, 3000); else setNote({ tone: "warn", text: "Платёж ещё обрабатывается. Как только он дойдёт, тариф продлится сам. Если этого не случилось, напишите нам через «?»." });
+    };
+    let timer = setTimeout(tick, 500);
+    setNote({ tone: "info", text: "Проверяем оплату…" });
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (error) return <ErrorBox error={error} />;
+  if (!data) return <Loading />;
+  if (!data.can_pay) return <Notice>За вас платит школа. Если доступ закончился, напишите владельцу школы.</Notice>;
+  const q = data.quotes.find((x) => x.months === months) || data.quotes[0];
+  const pay = async (method) => {
+    setBusy(true); setErr(null);
+    try { window.location.href = (await request("POST", "/site/v1/billing/pay", { months, method })).url; } catch (x) { setErr(x); setBusy(false); }
+  };
+  const ask = async () => {
+    await request("POST", "/site/v1/support", { kind: "payment", text: `Хочу оплатить тариф на ${months} мес. (${rub(q.total)}). Почта: ${account?.email}` }).catch(() => {});
+    setAsked(true);
+  };
+  const perMonth = Math.round(q.total / q.months);
+  return (
+    <div className="card mt-5">
+      {note && <Notice tone={note.tone} className="mb-4">{note.text}</Notice>}
+      <div role="tablist" aria-label="Срок" className="inline-flex flex-wrap gap-1 rounded-full border border-line bg-white p-1">
+        {data.quotes.map((x) => (
+          <button key={x.months} type="button" role="tab" aria-selected={months === x.months} onClick={() => setMonths(x.months)}
+            className={`rounded-full px-4 py-1.5 text-sm font-semibold ${months === x.months ? "bg-ink text-white" : "text-ink-soft hover:bg-cream"}`}>{PERIOD_TITLE[x.months]}</button>
+        ))}
+      </div>
+      <div className="mt-5 flex flex-wrap items-end gap-x-4 gap-y-1">
+        {q.percent > 0 && <span className="num text-2xl text-ink-mute line-through">{rub(q.base)}</span>}
+        <span className="num font-display text-5xl font-extrabold">{rub(q.total)}</span>
+        <span className="pb-1 text-sm text-ink-mute">{q.months > 1 ? `${rub(perMonth)} в месяц, ${perDay(perMonth)} ₽ в день` : `${perDay(q.total)} ₽ в день`}</span>
+      </div>
+      {q.reason === "first" && <p className="mt-2 text-sm font-semibold text-mint">Скидка {q.percent}% на первый месяц применена.</p>}
+      {q.reason === "referral" && <p className="mt-2 text-sm font-semibold text-mint">Применена скидка {q.percent}% за приглашённого коллегу.</p>}
+      {data.teachers > 1 && <p className="mt-1 text-sm text-ink-mute">Преподавателей в школе: {data.teachers}</p>}
+      {data.state.state === "trial" && <p className="mt-1 text-sm text-ink-mute">Оставшиеся пробные дни не сгорят: срок отсчитывается после них.</p>}
+      <div className="mt-5 flex flex-wrap gap-2">
+        {data.online ? (
+          <>
+            <button type="button" className="btn-brand btn-lg" disabled={busy} onClick={() => pay("sbp")}>{busy ? "Переходим…" : "Оплатить через СБП"}</button>
+            <button type="button" className="btn-light btn-lg" disabled={busy} onClick={() => pay("card")}>Картой</button>
+          </>
+        ) : (
+          <button type="button" className="btn-brand btn-lg" disabled={asked} onClick={ask}>{asked ? "Заявка отправлена" : "Оформить"}</button>
+        )}
+      </div>
+      {!data.online && <p className="mt-3 text-sm text-ink-mute">Онлайн-оплата скоро заработает. Пока нажмите кнопку: мы напишем на {account?.email} и продлим доступ вручную. Вопросы: {cfg.support_email}.</p>}
+      {data.online && <p className="mt-3 text-xs text-ink-mute">Платёж принимает ЮKassa. Автоматических списаний нет, продлевать нужно самому.</p>}
+      <ErrorBox error={err} />
+      {data.history.some((h) => h.status === "succeeded") && (
+        <details className="mt-5 text-sm"><summary className="cursor-pointer font-semibold text-ink-soft">История оплат</summary>
+          <ul className="mt-2 grid gap-1 text-ink-soft">{data.history.filter((h) => h.status === "succeeded").map((h) => <li key={h.id}>{new Date(h.created_at).toLocaleDateString("ru-RU")}: {rub(h.amount)} за {h.months} мес.</li>)}</ul></details>
+      )}
+    </div>
   );
 }
 
@@ -278,26 +392,14 @@ export function PlanPage() {
   const session = useSession();
   const { account } = session;
   const [copied, setCopied] = useState(false);
-  const [sent, setSent] = useState(false);
   const ref = account?.referral;
-  const ask = async (p) => {
-    await request("POST", "/site/v1/feedback", { kind: "other", text: `Хочу оплатить тариф «${p.title}». Почта: ${account?.email}` }).catch(() => {});
-    setSent(true);
-  };
+  const byOrg = account?.org && account.role === "tutor";
   return (
     <>
-      <PageTitle title="Тариф" text={account?.org && account.role === "tutor" ? `Вы преподаёте в школе «${account.org.name}» — доступ оплачивает школа.` : "Один тариф — все функции платформы."} />
+      <PageTitle title="Тариф" text={byOrg ? `Вы преподаёте в школе «${account.org.name}», доступ оплачивает школа.` : "Один тариф, все функции платформы."} />
       <BillingStatus billing={account?.billing} />
-      {!(account?.org && account.role === "tutor") && (
-        <div className="mt-5"><PricingCards inApp /></div>
-      )}
-      <Notice className="mt-5">Онлайн-оплата подключается. Чтобы оформить тариф сейчас, нажмите кнопку — мы свяжемся с вами по почте {account?.email} и продлим доступ.
-        <span className="mt-3 flex flex-wrap gap-2">
-          {PLANS.filter((p) => (account?.role === "school" ? p.id === "school" : p.id === "teacher")).map((p) => (
-            <button key={p.id} type="button" className="btn-brand btn-sm" disabled={sent} onClick={() => ask(p)}>{sent ? "Заявка отправлена" : `Оформить «${p.title}»`}</button>
-          ))}
-        </span>
-      </Notice>
+      {!byOrg && <PayPanel account={account} />}
+      {!byOrg && <details className="mt-5"><summary className="cursor-pointer text-sm font-semibold text-ink-soft">Что входит в тариф</summary><div className="mt-3"><PricingCards inApp /></div></details>}
       {ref && (
         <div className="card mt-6 grid gap-4 md:grid-cols-[1.4fr_1fr] md:items-center">
           <div>

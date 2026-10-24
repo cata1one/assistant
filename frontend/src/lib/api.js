@@ -32,7 +32,7 @@ export const fmtDate = (iso) => {
   catch { return iso; }
 };
 
-/** Отправка файла как есть (тело запроса — сам файл). */
+/** Отправка файла как есть (тело запроса – сам файл). */
 export async function uploadRaw(path, file, extra = {}) {
   const headers = { "Content-Type": file.type || "application/octet-stream", Accept: "application/json",
     "X-File-Name": encodeURIComponent(file.name || "file"), ...extra };

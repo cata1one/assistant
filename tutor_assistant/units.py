@@ -1,16 +1,16 @@
 """Интерактивные занятия (как на ProgressMe): из блоков разного типа.
 
 Блоки:
-* ``text`` — текст или правило;
-* ``words`` — новые слова, при выдаче занятия они сразу попадают в карточки ученика;
-* ``gap`` — вставить слова в текст: правильный ответ пишется в квадратных скобках,
+* ``text`` – текст или правило;
+* ``words`` – новые слова, при выдаче занятия они сразу попадают в карточки ученика;
+* ``gap`` – вставить слова в текст: правильный ответ пишется в квадратных скобках,
   варианты через «|»: «I [have been|'ve been] to London»;
-* ``match`` — пары: слово и определение (перевод);
-* ``choice`` — тест с вариантами ответа;
-* ``listening`` — аудирование: аудиофайл или озвучка текста браузером, пропуски в
+* ``match`` – пары: слово и определение (перевод);
+* ``choice`` – тест с вариантами ответа;
+* ``listening`` – аудирование: аудиофайл или озвучка текста браузером, пропуски в
   тексте (те же квадратные скобки) и вопросы с вариантами;
-* ``write`` — свободный ответ (проверяет преподаватель);
-* ``video`` — видео VK, YouTube или Rutube.
+* ``write`` – свободный ответ (проверяет преподаватель);
+* ``video`` – видео VK, YouTube или Rutube.
 
 Ученику уходит вид без ответов; ответы проверяет сервер.
 """
@@ -55,7 +55,7 @@ def _questions(raw: Any) -> list[dict[str, Any]]:
 def validate_blocks(raw: Any) -> list[dict[str, Any]]:
     """Очищает блоки занятия; непонятные и пустые блоки отбрасываются."""
     if not isinstance(raw, list):
-        raise PortalError(400, "blocks — список блоков")
+        raise PortalError(400, "blocks – список блоков")
     blocks: list[dict[str, Any]] = []
     for b in raw[:MAX_BLOCKS]:
         if not isinstance(b, dict) or b.get("type") not in BLOCK_TYPES:
@@ -203,7 +203,7 @@ def unit_words(unit: dict[str, Any]) -> list[dict[str, Any]]:
 # == генератор без ИИ ===========================================================================
 
 def parse_words(text: str) -> list[dict[str, Any]]:
-    """«kitchen — кухня» по строкам (или через «;») → слова."""
+    """«kitchen – кухня» по строкам (или через «;») → слова."""
     out, seen = [], set()
     for line in re.split(r"[\n;]+", text or ""):
         item = parse_item(line)
@@ -224,10 +224,10 @@ def _bracket_words(text: str, words: list[str]) -> tuple[str, int]:
 
 
 def generate_offline(topic: str, words_text: str, text: str = "", language: str = "en") -> dict[str, Any]:
-    """Занятие из слов и текста преподавателя — работает без ИИ и без интернета."""
+    """Занятие из слов и текста преподавателя – работает без ИИ и без интернета."""
     words = parse_words(words_text)
     if not words and not text.strip():
-        raise PortalError(400, "добавьте слова (по одному в строке: «kitchen — кухня») или текст")
+        raise PortalError(400, "добавьте слова (по одному в строке: «kitchen – кухня») или текст")
     lang = "zh-CN" if language == "zh" else "en-US"
     blocks: list[dict[str, Any]] = []
     if words:
@@ -238,15 +238,15 @@ def generate_offline(topic: str, words_text: str, text: str = "", language: str 
                        "pairs": [[w["word"], w["translation"]] for w in translated[:12]]})
     if text.strip():
         gapped, n = _bracket_words(text.strip(), [w["word"] for w in words])
-        if not n:  # слов из списка в тексте нет — просто текст для чтения
+        if not n:  # слов из списка в тексте нет – просто текст для чтения
             blocks.append({"type": "text", "title": "Прочитайте текст", "body": text.strip()})
-        else:  # полный текст не показываем отдельно — иначе ответы видны
+        else:  # полный текст не показываем отдельно – иначе ответы видны
             blocks.append({"type": "gap", "title": "Вставьте слова в текст", "text": gapped, "bank": True})
             blocks.append({"type": "listening", "title": "Аудирование: послушайте и впишите пропущенные слова",
                            "script": gapped, "lang": lang, "questions": []})
     elif translated:
         blocks.append({"type": "gap", "title": "Напишите слово по переводу",
-                       "text": "\n".join(f"{w['translation']} — [{w['word']}]" for w in translated[:15])})
+                       "text": "\n".join(f"{w['translation']} – [{w['word']}]" for w in translated[:15])})
     if len(translated) >= 4:
         rnd = random.Random(topic + words_text)
         qs = []
@@ -286,7 +286,7 @@ AI_PROMPT = """Ты методист онлайн-школы языков. Со�
 - {"type":"listening","title":"...","script":"Текст для озвучки, пропуски в [скобках]","lang":"en-US","questions":[{"q":"...","options":["..."],"answer":1}]}
 - {"type":"write","title":"...","prompt":"задание на письмо или говорение"}
 Требования: 6–9 блоков, от простого к сложному; ответы однозначные; задания по-русски,
-языковой материал — на изучаемом языке; для китайского добавляй пиньинь в скобках.
+языковой материал – на изучаемом языке; для китайского добавляй пиньинь в скобках.
 Никаких ссылок, телефонов и контактов."""
 
 
@@ -366,7 +366,7 @@ class Units:
         if unit_id:
             u = self.accessible(viewer, unit_id)
             if u["owner_id"] != acc["id"] and acc["role"] != "school":
-                raise PortalError(403, "это занятие школы — скопируйте его к себе, чтобы изменить")
+                raise PortalError(403, "это занятие школы – скопируйте его к себе, чтобы изменить")
         title = _s(body.get("title"), 120) or "Занятие"
         blocks = validate_blocks(body.get("blocks"))
         shared = acc["role"] == "school" or (bool(body.get("shared")) and acc.get("org_id"))
@@ -392,7 +392,7 @@ class Units:
         return {"ok": True}
 
     def generate(self, viewer: Any, body: Any) -> dict[str, Any]:
-        """Черновик занятия: ИИ, если подключён, иначе — из слов и текста преподавателя. Не сохраняется."""
+        """Черновик занятия: ИИ, если подключён, иначе – из слов и текста преподавателя. Не сохраняется."""
         self._owner(viewer)
         body = body if isinstance(body, dict) else {}
         topic = _s(body.get("topic"), 200)
@@ -415,14 +415,42 @@ class Units:
                     pass
             if not (words_text or text):
                 raise PortalError(502, "ИИ не ответил" + (f": {self.ai.last_error}" if self.ai.last_error else "")
-                                  + ". Добавьте слова или текст — соберу занятие без ИИ.")
+                                  + ". Добавьте слова или текст – соберу занятие без ИИ.")
         draft = generate_offline(topic, words_text, text, language)
         return {**draft, "level": level, "generated_by": "offline",
                 "notice": "Собрано без ИИ из ваших слов и текста." if self.ai.provider is None else
-                "ИИ не ответил — собрано из ваших слов и текста."}
+                "ИИ не ответил – собрано из ваших слов и текста."}
+
+    def from_lesson(self, viewer: Any, lesson_id: str, body: Any) -> dict[str, Any]:
+        """Упражнения по пройденной теме: слова и тема урока превращаются в занятие, которое можно сразу выдать ученику."""
+        lesson = self.storage.get_lesson(lesson_id)
+        if not lesson or not lesson.get("chat_id"):
+            raise PortalError(404, "урок не найден")
+        access = self.portal._access(viewer, lesson["chat_id"])
+        if access.role != "tutor":
+            raise PortalError(403, "упражнения по уроку делает преподаватель")
+        report = self.storage.get_report(lesson_id)
+        if report is None:
+            raise PortalError(404, "конспекта урока ещё нет")
+        body = body if isinstance(body, dict) else {}
+        words_text = "\n".join(f"{w.word} – {w.translation}" if w.translation else w.word for w in report.vocabulary)
+        topic = report.topic or lesson.get("title") or "Пройденная тема"
+        language = self.storage.chat_language(lesson["chat_id"]) or self.portal.settings.target_language
+        wishes = "Закрепи тему урока. Ключевые мысли: " + "; ".join(report.key_points[:6]) if report.key_points else ""
+        if not words_text and not (self.ai.provider and report.key_points):
+            raise PortalError(400, "в конспекте нет слов для упражнений: добавьте их в поле «Слова урока»")
+        draft = self.generate(viewer, {"topic": topic, "language": language, "words": words_text, "wishes": wishes})
+        unit = self.save(viewer, {"title": f"Закрепление: {topic}"[:120], "language": language, "level": draft.get("level"),
+                                  "blocks": draft["blocks"], "source": "lesson"})
+        assigned = None
+        if body.get("assign"):
+            assigned = self.learning.assign(viewer, {"chat_id": lesson["chat_id"], "unit_id": unit["id"],
+                                                    "text": f"Выполните упражнения по теме «{topic}»"})
+        return {"unit_id": unit["id"], "title": unit["title"], "generated_by": draft.get("generated_by"),
+                "assigned": assigned is not None, "assignment_id": assigned["id"] if assigned else None}
 
     def check(self, viewer: Any, unit_id: str, body: Any) -> dict[str, Any]:
-        """Проверка в режиме предпросмотра (для преподавателя) — ничего не сохраняет."""
+        """Проверка в режиме предпросмотра (для преподавателя) – ничего не сохраняет."""
         return grade(self.accessible(viewer, unit_id), (body or {}).get("answers") if isinstance(body, dict) else None)
 
     # -- занятие в домашнем задании ----------------------------------------------------------------

@@ -60,13 +60,13 @@ export function SchoolHome() {
 }
 
 function Signals({ list }) {
-  if (!list.length) return <p className="text-sm text-ink-mute">Сигналов нет — никто не пытался обменяться контактами.</p>;
+  if (!list.length) return <p className="text-sm text-ink-mute">Сигналов нет – никто не пытался обменяться контактами.</p>;
   return (
     <ul className="grid gap-2">
       {list.map((s) => (
         <li key={s.id} className="rounded-2xl border border-line bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="font-semibold">{s.who || "—"} <span className="font-normal text-ink-mute">({{ tutor: "преподаватель", student: "ученик", parent: "родитель" }[s.role] || s.role || "участник"})</span></span>
+            <span className="font-semibold">{s.who || "–"} <span className="font-normal text-ink-mute">({{ tutor: "преподаватель", student: "ученик", parent: "родитель" }[s.role] || s.role || "участник"})</span></span>
             <span className="text-xs text-ink-mute">{shortDate(s.created_at)}</span>
           </div>
           <p className="mt-1 text-sm font-semibold text-teach-deep">{s.summary}</p>
@@ -99,7 +99,7 @@ export function TutorsPage() {
     <>
       <PageTitle title="Преподаватели и ученики" text={`${data.tutors.length} преподавателей · ${data.students_total} учеников`} />
       <Panel className="mb-4"><p className="mb-3 text-sm text-ink-soft">Ссылка для новых преподавателей:</p><InviteBox url={data.tutor_invite.url} /></Panel>
-      {!data.tutors.length ? <Empty icon={Users} title="Преподавателей пока нет" text="Отправьте ссылку-приглашение — преподаватель появится здесь после регистрации." /> : (
+      {!data.tutors.length ? <Empty icon={Users} title="Преподавателей пока нет" text="Отправьте ссылку-приглашение – преподаватель появится здесь после регистрации." /> : (
         <div className="grid gap-3 md:grid-cols-2">
           {data.tutors.map((t) => (
             <div key={t.id} className="card !p-5">
@@ -178,7 +178,7 @@ export function AdminPage() {
         <Panel title="Обратная связь" icon={Users} className="lg:col-span-2">
           {!feedback.data ? <Loading /> : !feedback.data.feedback.length ? <p className="text-sm text-ink-mute">Сообщений пока нет.</p> : (
             <ul className="grid max-h-96 gap-2 overflow-y-auto">{feedback.data.feedback.map((x) => (
-              <li key={x.id} className="rounded-2xl border border-line p-3 text-sm"><b>{FB[x.kind] || x.kind}</b> · {x.name || "—"} ({x.role || "—"}) · {fmtDate(x.created_at)}<p className="mt-1 whitespace-pre-wrap text-ink-soft">{x.text}</p></li>))}</ul>
+              <li key={x.id} className="rounded-2xl border border-line p-3 text-sm"><b>{FB[x.kind] || (x.kind || "").replace("help:", "🆘 ")}</b> · {x.name || "–"} ({x.role || "не вошёл"}){x.contact ? ` · ${x.contact}` : ""} · {fmtDate(x.created_at)}<p className="mt-1 whitespace-pre-wrap text-ink-soft">{x.text}</p></li>))}</ul>
           )}
         </Panel>
         <Panel title="Отзывы" icon={Star}>

@@ -9,12 +9,12 @@
     POST /v1/lessons/{id}/messages         {"speaker_id", "speaker_name", "role", "text"}
     POST /v1/lessons/{id}/finish           {"use_llm": true}
     GET  /v1/lessons/{id}/report           ?format=json|text|markdown|student|parent|parent_markdown
-    POST /v1/lessons/{id}/notes            {"text", "author_id", "author_name"} — заметка преподавателя для родителей
+    POST /v1/lessons/{id}/notes            {"text", "author_id", "author_name"} – заметка преподавателя для родителей
     POST /v1/analyze                       {"transcript", "title", "student_id", "use_llm", "save"}
     GET  /v1/students/{id}/words           ?date=today|YYYY-MM-DD
     GET  /v1/incidents                     ?lesson_id=&user_id=&limit=
-    POST /v1/lessons/{id}/audio            тело — аудио (wav/ogg/webm/mp3/m4a), ?speaker_id=&speaker_name=&role=
-    POST /v1/analyze/audio                 тело — запись урока целиком, ?title=&student_id=&use_llm=&save=
+    POST /v1/lessons/{id}/audio            тело – аудио (wav/ogg/webm/mp3/m4a), ?speaker_id=&speaker_name=&role=
+    POST /v1/analyze/audio                 тело – запись урока целиком, ?title=&student_id=&use_llm=&save=
 
 Авторизация: заголовок ``Authorization: Bearer <TUTOR_API_TOKEN>``.
 """
@@ -73,7 +73,7 @@ def _opt_str(body: dict[str, Any], key: str) -> str | None:
 
 
 class Api:
-    """Маршрутизация без привязки к HTTP-серверу — удобно тестировать."""
+    """Маршрутизация без привязки к HTTP-серверу – удобно тестировать."""
 
     ROUTES = [
         ("GET", re.compile(r"^/health$"), "health"),
@@ -251,7 +251,7 @@ class Api:
 
 
 def _redact_transcript(transcript: str, violations: list[dict[str, Any]]) -> str:
-    """Расшифровка для ответа API — без фрагментов с контактами."""
+    """Расшифровка для ответа API – без фрагментов с контактами."""
     lines = transcript.split("\n")
     for v in violations:
         for idx in [v["index"], *v.get("related_indexes", [])]:
@@ -301,7 +301,7 @@ def make_handler(api: Api, website: Website | None = None) -> type[BaseHTTPReque
             try:
                 parsed = urlparse(self.path)
                 if website is not None and Website.handles(parsed.path):
-                    # «pair:…» в адресе браузер кодирует как pair%3A… — раскодируем до разбора маршрутов
+                    # «pair:…» в адресе браузер кодирует как pair%3A… – раскодируем до разбора маршрутов
                     self._site(method, unquote(parsed.path), parsed.query)
                     return
                 body: dict[str, Any] = {}
@@ -347,7 +347,7 @@ def make_handler(api: Api, website: Website | None = None) -> type[BaseHTTPReque
 def make_server(assistant: TutorAssistant, host: str, port: int) -> ThreadingHTTPServer:
     """HTTP-сервер: сайт школы, личный кабинет и API платформы."""
     if not assistant.settings.api_token:
-        log.warning("TUTOR_API_TOKEN не задан — API доступен без авторизации. Задайте токен перед запуском в сети.")
+        log.warning("TUTOR_API_TOKEN не задан – API доступен без авторизации. Задайте токен перед запуском в сети.")
     return ThreadingHTTPServer((host, port), make_handler(Api(assistant), Website(Portal(assistant))))
 
 

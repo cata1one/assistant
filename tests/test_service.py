@@ -47,7 +47,7 @@ def test_live_lesson_full_flow(assistant: TutorAssistant):
 
     # После урока: словарь ученика и запросы по ключевым словам
     today = assistant.handle_text_query("Новые слова сегодня?", chat_id="chat1")
-    assert "apple — яблоко" in today and "pear — груша" in today
+    assert "apple – яблоко" in today and "pear – груша" in today
     assert "apple" in assistant.handle_text_query("новые слова", chat_id="chat1")
     assert "Ваш словарь" in assistant.handle_text_query("мой словарь", chat_id="chat1")
     assert "Тест" in assistant.handle_text_query("тест", chat_id="chat1")
@@ -167,7 +167,7 @@ def test_words_today_after_new_lesson_started(assistant: TutorAssistant):
     say("t1", "Новые слова: rain — дождь")
     assistant.finish_lesson(lid)
     assistant.start_lesson(chat_id="chat1", tutor_id="t1")
-    assert "rain — дождь" in assistant.handle_text_query("новые слова сегодня", chat_id="chat1")
+    assert "rain – дождь" in assistant.handle_text_query("новые слова сегодня", chat_id="chat1")
     assert "rain" in assistant.handle_text_query("новые слова", chat_id="chat1")
     assert "rain" in assistant.handle_text_query("мой словарь", chat_id="chat1")
 

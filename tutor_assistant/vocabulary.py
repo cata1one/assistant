@@ -2,11 +2,11 @@
 
 Три источника, в порядке надёжности:
 
-1. Объявленный список — «Новые слова сегодня: apple — яблоко, pear — груша»,
+1. Объявленный список – «Новые слова сегодня: apple – яблоко, pear – груша»,
    «Запишите слова:» и следующие за этим строки-пункты, «New words: …».
-2. Пары в речи преподавателя — «apple переводится как яблоко»,
-   «яблоко по-английски apple», «слово brave — смелый».
-3. Автопоиск — слова изучаемого языка в речи преподавателя, которых нет в
+2. Пары в речи преподавателя – «apple переводится как яблоко»,
+   «яблоко по-английски apple», «слово brave – смелый».
+3. Автопоиск – слова изучаемого языка в речи преподавателя, которых нет в
    словаре ученика и в списке самых частотных слов (кандидаты, «звучали на уроке»).
 """
 
@@ -28,7 +28,7 @@ ANNOUNCE_RE = re.compile(
     r"\s*(?P<sep>[:\-—–]|\n)\s*(?P<list>.*)",
     re.IGNORECASE | re.DOTALL,
 )
-# «Запишите новые слова.» — объявление, а сам список придёт следующими сообщениями.
+# «Запишите новые слова.» – объявление, а сам список придёт следующими сообщениями.
 ANNOUNCE_NO_LIST_RE = re.compile(
     r"(?:запиши(?:те)?|выпиши(?:те)?|записываем|выписываем)\s+(?:себе\s+)?(?:новые\s+)?слова\b"
     r"|(?:вот|теперь)\s+новые\s+слова\b|(?:let'?s\s+)?write\s+down\s+(?:the\s+)?(?:new\s+)?words"
@@ -42,7 +42,7 @@ _PAIR_SEP_RE = re.compile(r"\s*(?:—|–|=|->|→|:)\s*|\s+-\s+")
 _PAREN_RE = re.compile(r"^(?P<a>[^()]+?)\s*\((?P<b>[^)]+)\)\s*$")
 
 _FREE_PAIR_PATTERNS = [
-    # apple переводится как яблоко / apple означает яблоко / apple — это яблоко
+    # apple переводится как яблоко / apple означает яблоко / apple – это яблоко
     re.compile(r"(?P<w>[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*(?:\s+[A-Za-zÀ-ÿ'’\-]+){0,3})\s*(?:—|–|-)?\s*"
                r"(?:переводится\s+как|означает|значит|это\s+значит|—\s*это|–\s*это|-\s*это|это)\s+"
                r"[«\"]?(?P<t>[а-яёА-ЯЁ][а-яёА-ЯЁ\-]*(?:\s+[а-яёА-ЯЁ\-]+){0,3})"),
@@ -51,13 +51,13 @@ _FREE_PAIR_PATTERNS = [
                r"(?:по-английски|по-немецки|по-французски|по-испански|по-итальянски|на\s+английском|на\s+немецком"
                r"|на\s+французском|на\s+испанском|на\s+итальянском)\s+(?:будет\s+|—\s+|звучит\s+как\s+)?"
                r"[«\"]?(?P<w>[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*(?:\s+[A-Za-zÀ-ÿ'’\-]+){0,3})"),
-    # слово brave — смелый
+    # слово brave – смелый
     re.compile(r"слов[оа]\s+[«\"]?(?P<w>[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*(?:\s+[A-Za-zÀ-ÿ'’\-]+){0,2})[»\"]?\s*(?:—|–|-|:)\s*"
                r"(?:это\s+)?[«\"]?(?P<t>[а-яёА-ЯЁ][а-яёА-ЯЁ\-]*(?:\s+[а-яёА-ЯЁ\-]+){0,3})"),
 ]
 _RU_STOP_TAIL = {"а", "но", "и", "или", "то", "да", "же", "ли", "вот", "так", "это", "потому", "что", "когда", "если"}
 
-# Самые частотные слова: служебные и базовые — не считаем «новыми».
+# Самые частотные слова: служебные и базовые – не считаем «новыми».
 STOPWORDS = {
     "en": set("""
 a about above after again against all almost also always am an and any are aren't around as ask at away back be
@@ -86,7 +86,7 @@ están no sí de del al en con por para muy bien también que quien qué cómo d
 per sì no molto bene anche che chi cosa come dove quando perché""".split()),
 }
 
-# Грамматические термины и самые базовые слова уровня A1 — не «новая лексика».
+# Грамматические термины и самые базовые слова уровня A1 – не «новая лексика».
 STOPWORDS["en"] |= set("""
 present past future perfect simple continuous progressive tense tenses verb verbs noun nouns adjective adverb
 pronoun preposition article articles form forms participle infinitive gerund passive active voice modal
@@ -121,7 +121,7 @@ def _lemma_en(word: str) -> str:
 
 
 def parse_item(raw: str) -> VocabItem | None:
-    """«apple [ˈæpl] — яблоко», «яблоко — apple», «to run (бегать)», «apple»."""
+    """«apple [ˈæpl] – яблоко», «яблоко – apple», «to run (бегать)», «apple»."""
     text = _BULLET_RE.sub("", raw.strip())
     text = _clean(text)
     if not text or len(text) > 120:
@@ -131,7 +131,7 @@ def parse_item(raw: str) -> VocabItem | None:
     if m:
         transcription = m.group(1)
         text = text[: m.start()] + " " + text[m.end():]
-        text = re.sub(r"(?:\s*(?:—|–|=|:|\s-\s)\s*){2,}", " — ", text)
+        text = re.sub(r"(?:\s*(?:—|–|=|:|\s-\s)\s*){2,}", " – ", text)
         text = _clean(text).strip(" —–-")
 
     word, translation = text, None
@@ -144,7 +144,7 @@ def parse_item(raw: str) -> VocabItem | None:
             word, translation = pm.group("a"), pm.group("b")
     word, translation = _clean(word), _clean(translation) if translation else None
 
-    # Иностранное слово — слева. Если слева кириллица, а справа латиница — меняем местами.
+    # Иностранное слово – слева. Если слева кириллица, а справа латиница – меняем местами.
     if translation and has_cyrillic(word) and not has_latin(word) and has_latin(translation):
         word, translation = translation, word
     if not word or (has_cyrillic(word) and not has_latin(word)):
@@ -164,7 +164,7 @@ def split_list(list_text: str) -> list[str]:
         for chunk in re.split(r"\s*;\s*", line):
             pieces = [p for p in re.split(r"\s*,\s*", chunk) if p.strip()]
             for piece in pieces:
-                # «run — бегать, бежать»: кусок без латиницы — дополнительный перевод предыдущего слова.
+                # «run – бегать, бежать»: кусок без латиницы – дополнительный перевод предыдущего слова.
                 if items and not has_latin(piece) and has_cyrillic(piece) and _PAIR_SEP_RE.search(items[-1]):
                     items[-1] += ", " + piece
                 else:
@@ -189,7 +189,7 @@ def is_list_line(text: str) -> bool:
 def extract_announced(text: str) -> tuple[list[VocabItem], bool]:
     """Слова из объявления в одной реплике.
 
-    Возвращает (слова, ожидать_продолжение) — второе значение True, если
+    Возвращает (слова, ожидать_продолжение) – второе значение True, если
     объявлен список, но сами слова придут в следующих репликах.
     """
     m = ANNOUNCE_RE.search(text or "")

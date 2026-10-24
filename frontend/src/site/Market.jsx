@@ -41,7 +41,7 @@ function Respond({ r, onDone }) {
   return (
     <form onSubmit={send} className="mt-4 grid gap-3 rounded-2xl bg-cream p-4">
       <textarea className="field min-h-[90px]" required maxLength={1000} value={message} onChange={(e) => setMessage(e.target.value)}
-        placeholder="Как будете заниматься, опыт с похожими задачами. Без контактов — общение через платформу." aria-label="Сообщение ученику" />
+        placeholder="Как будете заниматься, опыт с похожими задачами. Без контактов – общение через платформу." aria-label="Сообщение ученику" />
       <div className="flex flex-wrap items-center gap-3">
         <label className="relative">
           <input className="field num w-40 !pr-14" type="number" min={300} max={20000} step={50} required value={price}
@@ -101,7 +101,7 @@ function Board({ params, canRespond, tutor }) {
         </div>
       </div>
       {!canRespond && tutor !== false && (
-        <Notice className="mb-5">Откликаться могут преподаватели. <a className="link" href="#/register?role=tutor">Зарегистрируйтесь</a> или <a className="link" href="#/login">войдите</a> — это бесплатно.</Notice>
+        <Notice className="mb-5">Откликаться могут преподаватели. <a className="link" href="#/register?role=tutor">Зарегистрируйтесь</a> или <a className="link" href="#/login">войдите</a> – это бесплатно.</Notice>
       )}
       <ErrorBox error={error} />
       {!data ? <Loading /> : list.length ? (
@@ -121,8 +121,8 @@ export function MarketHome({ params }) {
   return (
     <>
       <Head eyebrow="Поиск" title={tab === "students" ? <>Найдите <span className="text-brand">учеников</span></> : <>Найдите <span className="text-brand">своего</span> преподавателя</>}
-        text={tab === "students" ? "Ученики описывают задачу и бюджет — вы откликаетесь со своей ценой. Без комиссии за поиск и без рекламы."
-          : "Опишите цель и бюджет — преподаватели предложат свою цену и подход. Бесплатно, а ваш телефон преподаватели не видят."}>
+        text={tab === "students" ? "Ученики описывают задачу и бюджет – вы откликаетесь со своей ценой. Без комиссии за поиск и без рекламы."
+          : "Опишите цель и бюджет – преподаватели предложат свою цену и подход. Бесплатно, а ваш телефон преподаватели не видят."}>
         <div className="mt-6"><Tabs label="Кого ищу" value={tab} onChange={setTab}
           items={[{ id: "teacher", title: "Ищу преподавателя" }, { id: "students", title: "Ищу учеников" }]} /></div>
       </Head>
@@ -131,7 +131,7 @@ export function MarketHome({ params }) {
           <div className="grid gap-4 md:grid-cols-3">
             {[[Target, "Опишите задачу", "Цель, уровень, возраст, расписание и бюджет. Две минуты."],
               [HandCoins, "Получите отклики", "Преподаватели предложат цену и расскажут, как будут заниматься."],
-              [CheckCircle2, "Выберите", "Одна кнопка — и вы в общем кабинете: урок, доска, домашка, отчёты."]].map(([I, t, d], i) => (
+              [CheckCircle2, "Выберите", "Одна кнопка – и вы в общем кабинете: урок, доска, домашка, отчёты."]].map(([I, t, d], i) => (
               <div key={t} className="card">
                 <span className="grid h-10 w-10 place-items-center rounded-2xl bg-brand-soft font-display font-extrabold text-brand">{i + 1}</span>
                 <h3 className="mt-4 flex items-center gap-2 text-lg"><I size={18} className="text-brand" />{t}</h3>
@@ -189,7 +189,7 @@ export function MarketNew() {
       {!meta ? (error ? <ErrorBox error={error} /> : <Loading />) : (
         <form className="card mb-16 grid max-w-3xl gap-6" onSubmit={submit}>
           <div className="grid gap-5 md:grid-cols-[1fr_140px]">
-            <label className="label">Имя<input className="field" required maxLength={40} value={f.name} onChange={set("name")} placeholder="Только имя — его увидят преподаватели" /></label>
+            <label className="label">Имя<input className="field" required maxLength={40} value={f.name} onChange={set("name")} placeholder="Только имя – его увидят преподаватели" /></label>
             <label className="label">Возраст<input className="field num" type="number" min={4} max={99} value={f.age} onChange={set("age")} /></label>
           </div>
           <Choice label="Для кого занятия" value={f.audience} onChange={set("audience")} options={meta.audiences} />
@@ -250,7 +250,7 @@ export function MarketMy({ params }) {
       <Head eyebrow="Моя заявка" title={`${data.name}, ${data.language_ru}`} text={data.goals}>
         {params.get("new") && (
           <Notice tone="ok" className="mt-6 max-w-2xl">
-            Заявка опубликована! Сохраните эту страницу — здесь появятся отклики.
+            Заявка опубликована! Сохраните эту страницу – здесь появятся отклики.
             <button type="button" onClick={() => { copy(`${window.location.origin}/${myHref(id, key)}`); setCopied(true); }} className="ml-2 inline-flex items-center gap-1 font-semibold underline"><Copy size={13} />{copied ? "скопировано" : "скопировать ссылку"}</button>
           </Notice>
         )}
@@ -258,7 +258,7 @@ export function MarketMy({ params }) {
       {links && (
         <div className="card mb-8 border-mint">
           <h3 className="flex items-center gap-2 text-xl"><CheckCircle2 className="text-mint" /> Преподаватель выбран</h3>
-          <p className="mt-2 text-ink-soft">Зарегистрируйтесь по ссылке — и вы окажетесь в общем кабинете с преподавателем: уроки, доска, домашка, сообщения.</p>
+          <p className="mt-2 text-ink-soft">Зарегистрируйтесь по ссылке – и вы окажетесь в общем кабинете с преподавателем: уроки, доска, домашка, сообщения.</p>
           <div className="mt-4 flex flex-wrap gap-3">
             {links.site_student && <a className="btn-brand" href={links.site_student.replace(/^.*#/, "#")}>Подключиться на сайте</a>}
             {links.site_parent && <button type="button" className="btn-light" onClick={() => copy(links.site_parent)}>Скопировать ссылку для родителя</button>}

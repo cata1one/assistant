@@ -16,7 +16,7 @@ from .service import TutorAssistant
 
 
 def read_text_file(path: str) -> str:
-    """Читает файл в UTF-8, а файлы из Windows — в cp1251."""
+    """Читает файл в UTF-8, а файлы из Windows – в cp1251."""
     if path == "-":
         return sys.stdin.read()
     data = Path(path).read_bytes()
@@ -111,8 +111,8 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 CHAT_HELP = """Режим урока. Пишите реплики с префиксом:
-  t: текст   — преподаватель       s: текст — ученик
-Команды: /end — завершить урок и получить отчёт, /quit — выход.
+  t: текст   – преподаватель       s: текст – ученик
+Команды: /end – завершить урок и получить отчёт, /quit – выход.
 Запросы: «новые слова сегодня», «дз», «новые слова», «мой словарь», «тест», «конспект»."""
 
 
@@ -153,7 +153,7 @@ def cmd_chat(args: argparse.Namespace) -> int:
         if m.blocked:
             print(f"   В чате видно: {m.redacted_text}")
         if out.new_words:
-            print("   📚 Записал слова: " + ", ".join(w.word + (f" — {w.translation}" if w.translation else "")
+            print("   📚 Записал слова: " + ", ".join(w.word + (f" – {w.translation}" if w.translation else "")
                                               for w in out.new_words))
         if out.new_homework:
             print("   📝 Записал ДЗ: " + "; ".join(h.text for h in out.new_homework))
@@ -202,7 +202,7 @@ def cmd_record(args: argparse.Namespace) -> int:
         assistant = _assistant(args)
         assistant.lesson(args.lesson)  # урок должен существовать
         if not assistant.speech_available:
-            print(f"⚠️ Распознавание речи недоступно ({assistant.transcriber.last_error}) — "
+            print(f"⚠️ Распознавание речи недоступно ({assistant.transcriber.last_error}) – "
                   "запись идёт, но речь не проверяется.", file=sys.stderr)
         upload = recorder.LocalUploader(assistant, args.lesson, speaker)
 
@@ -213,7 +213,7 @@ def cmd_record(args: argparse.Namespace) -> int:
         device = int(args.device) if args.device and args.device.isdigit() else args.device
         chunks = recorder.iter_microphone_chunks(args.chunk, stop, device=device)
         signal.signal(signal.SIGINT, lambda *_: stop.set())
-        print("🔴 Запись занятия включена. Остановить — Ctrl+C (после окончания урока).", file=sys.stderr)
+        print("🔴 Запись занятия включена. Остановить – Ctrl+C (после окончания урока).", file=sys.stderr)
     try:
         violations = recorder.run_recording(chunks, upload)
     except RuntimeError as exc:
@@ -240,7 +240,7 @@ def cmd_incidents(args: argparse.Namespace) -> int:
     if not rows:
         print("Нарушений нет.")
     for r in rows:
-        print(f"#{r['id']} {r['created_at']} урок {r['lesson_id']} — {r['user_name'] or r['user_id']} ({r['role']}): "
+        print(f"#{r['id']} {r['created_at']} урок {r['lesson_id']} – {r['user_name'] or r['user_id']} ({r['role']}): "
               f"{r['summary']} [{r['severity']}/{r['action']}]\n   {r['original_text']}")
     return 0
 
@@ -306,7 +306,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     r = sub.add_parser("record", help="запись занятия с микрофона с проверкой речи в реальном времени")
     r.add_argument("--lesson", help="id урока")
-    r.add_argument("--api", help="адрес HTTP API школы, например https://school.example/api (без него — локально)")
+    r.add_argument("--api", help="адрес HTTP API школы, например https://school.example/api (без него – локально)")
     r.add_argument("--token", help="токен API (по умолчанию TUTOR_API_TOKEN)")
     r.add_argument("--role", default="tutor", choices=["tutor", "student"], help="чей это микрофон")
     r.add_argument("--name", help="имя говорящего")
