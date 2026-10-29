@@ -185,109 +185,16 @@ export function StudentsPage() {
 const KIND_ICON = { file: File, video: Clapperboard, link: Link2 };
 const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(n / 1024))} КБ`);
 
-export async function uploadFile(file, { shared } = {}) {
+export async function uploadFile(file, { shared, folder } = {}) {
   const headers = { "Content-Type": file.type || "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), Accept: "application/json" };
   const token = getToken();
   if (token) headers["X-Access-Token"] = token;
   if (shared) headers["X-Shared"] = "1";
+  if (folder) headers["X-Folder"] = encodeURIComponent(folder);
   const r = await fetch("/site/v1/materials/upload", { method: "POST", headers, body: file, credentials: "same-origin" });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) { const e = new Error(`${file.name}: ${data.error || r.status}`); e.status = r.status; throw e; }
   return data;
-}
-
-export function MaterialsPage() {
-  const { account, role } = useSession();
-  const { data, error, reload } = useApi("/site/v1/materials");
-  const [q, setQ] = useState("");
-  const [drag, setDrag] = useState(false);
-  const [progress, setProgress] = useState(null);
-  const [errors, setErrors] = useState([]);
-  const [link, setLink] = useState({ url: "", title: "" });
-  const [preview, setPreview] = useState(null);
-  const input = useRef(null);
-  const inSchool = !!account?.org && role === "tutor";
-  const [shared, setShared] = useState(false);
-
-  const upload = async (files) => {
-    const list = [...files];
-    const errs = [];
-    for (let i = 0; i < list.length; i += 1) {
-      setProgress(`Загружаем ${i + 1} из ${list.length}: ${list[i].name}`);
-      try { await uploadFile(list[i], { shared }); } catch (e) { errs.push(e.message); }
-    }
-    setProgress(null); setErrors(errs); reload();
-  };
-  const addLink = async (e) => {
-    e.preventDefault();
-    try { await request("POST", "/site/v1/materials", { ...link, shared }); setLink({ url: "", title: "" }); reload(); } catch (x) { setErrors([x.message]); }
-  };
-  const remove = async (m) => {
-    if (!window.confirm(`Удалить «${m.title}»?`)) return;
-    await request("POST", `/site/v1/materials/${m.id}/delete`, {}).catch((x) => setErrors([x.message]));
-    reload();
-  };
-  const needle = q.trim().toLowerCase();
-  const list = (data?.materials || []).filter((m) => !needle || m.title.toLowerCase().includes(needle));
-  return (
-    <>
-      <PageTitle title="Материалы" text={role === "school" ? "Общая база школы – её видят все ваши преподаватели." : "Ваша база: файлы, ссылки и видео. Всё это можно вывести на доску во время урока."} />
-      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
-          onDrop={(e) => { e.preventDefault(); setDrag(false); upload(e.dataTransfer.files); }}
-          className={`card grid place-items-center border-2 border-dashed !py-10 text-center transition ${drag ? "border-brand bg-brand-tint" : "border-line"}`}>
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-soft text-brand"><Upload size={24} /></span>
-          <p className="mt-3 font-bold">Перетащите файлы сюда – можно сразу пачкой</p>
-          <p className="mt-1 max-w-md text-sm text-ink-mute">PDF, картинки, презентации, документы, аудио и видео до 25 МБ. Переезжаете с ProgressMe? Скачайте свои материалы файлами и перетащите их все разом.</p>
-          <input ref={input} type="file" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ""; }} />
-          <button type="button" className="btn-brand mt-4" onClick={() => input.current?.click()}>Выбрать файлы</button>
-          {progress && <p className="mt-3 text-sm text-brand">{progress}</p>}
-        </div>
-        <form onSubmit={addLink} className="card grid content-start gap-3">
-          <h2 className="text-lg">Ссылка или видео</h2>
-          <p className="-mt-1 text-sm text-ink-mute">VK Видео, YouTube и Rutube откроются прямо на доске – без демонстрации экрана.</p>
-          <input className="field" type="url" required placeholder="https://vk.com/video…" value={link.url} onChange={(e) => setLink({ ...link, url: e.target.value })} aria-label="Ссылка" />
-          <input className="field" maxLength={120} placeholder="Название (необязательно)" value={link.title} onChange={(e) => setLink({ ...link, title: e.target.value })} aria-label="Название" />
-          {inSchool && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} /> Добавлять в общую базу школы</label>}
-          <button type="submit" className="btn-light w-fit"><Plus size={16} /> Добавить</button>
-        </form>
-      </div>
-      {errors.length > 0 && <Notice tone="bad" className="mt-4">{errors.map((x) => <div key={x}>{x}</div>)}</Notice>}
-      <div className="mb-4 mt-8 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl">Все материалы {data && <span className="num text-ink-mute">{data.materials.length}</span>}</h2>
-        <label className="relative w-full max-w-xs"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-mute" /><input className="field !pl-11" placeholder="Поиск" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Поиск материалов" /></label>
-      </div>
-      <ErrorBox error={error} />
-      {!data ? <Loading /> : !list.length ? <Empty icon={FileStack} title={needle ? "Ничего не нашлось" : "Материалов пока нет"} text="Загрузите файлы или добавьте ссылку на видео." /> : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((m) => {
-            const I = KIND_ICON[m.kind] || File;
-            const img = m.kind === "file" && m.mime?.startsWith("image/");
-            return (
-              <div key={m.id} className="card flex flex-col !p-4">
-                <button type="button" onClick={() => setPreview(m)} className="mb-3 grid h-28 place-items-center overflow-hidden rounded-2xl bg-cream">
-                  {img ? <img src={m.url} alt="" loading="lazy" className="h-full w-full object-cover" /> : <I size={30} className="text-brand" />}
-                </button>
-                <p className="line-clamp-2 font-semibold">{m.title}</p>
-                <p className="mt-0.5 text-xs text-ink-mute">{m.kind === "video" ? "видео" : m.kind === "link" ? "ссылка" : fmtSize(m.size)}{m.shared ? " · база школы" : ""} · {shortDate(m.created_at)}</p>
-                <div className="mt-auto flex gap-1 pt-3">
-                  <a className="btn-ghost btn-sm" href={m.url} target="_blank" rel="noopener">Открыть</a>
-                  {(m.mine || role === "school") && <button type="button" className="btn-ghost btn-sm ml-auto !px-2" onClick={() => remove(m)} aria-label={`Удалить ${m.title}`}><Trash2 size={14} /></button>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.title || ""} wide>
-        {preview?.embed ? <iframe title={preview.title} src={preview.embed} className="aspect-video w-full rounded-2xl" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />
-          : preview?.mime?.startsWith("image/") ? <img src={preview.url} alt={preview.title} className="max-h-[70vh] w-full rounded-2xl object-contain" />
-            : preview?.mime === "application/pdf" ? <iframe title={preview.title} src={preview.url} className="h-[70vh] w-full rounded-2xl border border-line" />
-              : preview && <a className="btn-brand" href={preview.url} target="_blank" rel="noopener">Открыть файл</a>}
-      </Modal>
-    </>
-  );
 }
 
 // == Тариф ======================================================================================

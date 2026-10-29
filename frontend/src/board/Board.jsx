@@ -62,7 +62,7 @@ const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, active
     return (
       <div data-oid={o.oid} className={`${cls} ${isNote ? "board-note p-4" : ""}`}
         style={{ ...style, background: isNote ? o.color : "transparent", color: isNote ? "#1E2235" : o.color, fontSize: o.size,
-          lineHeight: 1.25, fontWeight: isNote ? 600 : 500, fontFamily: "Manrope Variable, sans-serif" }}>
+          lineHeight: 1.25, fontWeight: isNote ? 600 : 500, fontFamily: "Onest Variable, sans-serif" }}>
         {editing ? (
           <textarea autoFocus defaultValue={o.text} onBlur={(e) => onEditDone(o, e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); e.stopPropagation(); }}

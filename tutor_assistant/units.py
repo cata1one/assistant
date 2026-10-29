@@ -347,9 +347,30 @@ class Units:
         acc = self._owner(viewer)
         rows = self.storage.units_for(acc["id"], acc.get("org_id"))
         return {"units": [self._public(u, acc) for u in rows],
-                "library": [{k: u[k] for k in ("id", "title", "language", "level", "tags")} | {"blocks": u["blocks"]}
-                            for u in LIBRARY],
+                "library": [self._library_card(u) for u in LIBRARY],
                 "ai": self.ai.provider}
+
+    @staticmethod
+    def _library_card(u: dict[str, Any]) -> dict[str, Any]:
+        """Карточка курса: без правильных ответов, чтобы ученик мог пройти занятие сам."""
+        return {k: u.get(k) for k in ("id", "title", "language", "level", "tags", "summary")} | {
+            "blocks": [{"type": b["type"]} for b in u["blocks"]], "preview": student_view(u)}
+
+    def library_view(self, viewer: Any) -> dict[str, Any]:
+        """Курсы Bright для всех: преподаватель смотрит и берёт себе, ученик занимается сам."""
+        from .library import LIBRARY
+
+        self.portal.accesses(viewer)  # только для вошедших
+        return {"library": [self._library_card(u) for u in LIBRARY]}
+
+    def library_check(self, viewer: Any, lib_id: str, body: Any) -> dict[str, Any]:
+        from .library import LIBRARY
+
+        self.portal.accesses(viewer)
+        u = next((x for x in LIBRARY if x["id"] == lib_id), None)
+        if not u:
+            raise PortalError(404, "занятие не найдено")
+        return grade(u, (body or {}).get("answers") if isinstance(body, dict) else None)
 
     def get(self, viewer: Any, unit_id: str) -> dict[str, Any]:
         return self._public(self.accessible(viewer, unit_id), self._owner(viewer))

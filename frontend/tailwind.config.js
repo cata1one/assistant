@@ -1,45 +1,47 @@
-/** Дизайн-система Bright: светлая, тёплая, «жидкое стекло». Study — синий, Teach — коралловый. */
+/**
+ * Дизайн-система Bright: бумага, чернила и один тёплый акцент (жёлтый).
+ * Цвет роли (коралловый у преподавателя, синий у ученика) – только в мелочах: активный пункт меню, ссылки, отметки.
+ */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        cream: "#FAF7F2",
-        // Цвет текущего продукта: для учеников (синий) или преподавателей (коралловый) — через data-brand на <html>
+        cream: "#F4F3EF",
+        paper: "#FAFAF8",
         brand: {
           DEFAULT: "rgb(var(--brand) / <alpha-value>)",
           deep: "rgb(var(--brand-deep) / <alpha-value>)",
           soft: "rgb(var(--brand-soft) / <alpha-value>)",
           tint: "rgb(var(--brand-tint) / <alpha-value>)",
         },
-        ink: { DEFAULT: "#1E2235", soft: "#4B5068", mute: "#7A7F96" },
-        line: "#E9E4DC",
-        study: { DEFAULT: "#3D63F5", deep: "#2A47C9", soft: "#E3E9FF", tint: "#F1F4FF" },
-        teach: { DEFAULT: "#F2643D", deep: "#D44A24", soft: "#FFE4DA", tint: "#FFF4EF" },
-        sun: { DEFAULT: "#FFC24B", soft: "#FFF1CF" },
-        mint: { DEFAULT: "#22B07D", soft: "#DDF5EB" },
-        lilac: { DEFAULT: "#8B7CF6", soft: "#ECE9FF" },
+        ink: { DEFAULT: "#17171A", soft: "#4A4A52", mute: "#85858D" },
+        line: "#E7E5DF",
+        study: { DEFAULT: "#2B59E8", deep: "#1E44C0", soft: "#E2E9FD", tint: "#F3F6FE" },
+        teach: { DEFAULT: "#E4572E", deep: "#C2421D", soft: "#FCE6DE", tint: "#FEF4F0" },
+        sun: { DEFAULT: "#FFD43B", soft: "#FFF4C7" },
+        mint: { DEFAULT: "#1F9D63", soft: "#E3F4EA" },
+        lilac: { DEFAULT: "#6E5BD8", soft: "#EEEBFB" },
       },
       fontFamily: {
-        display: ['"Manrope Variable"', "system-ui", "sans-serif"],
-        sans: ['"Inter Variable"', "system-ui", "sans-serif"],
+        display: ['"Onest Variable"', "system-ui", "sans-serif"],
+        sans: ['"Onest Variable"', "system-ui", "sans-serif"],
       },
-      borderRadius: { "4xl": "2rem" },
+      borderRadius: { xl: "10px", "2xl": "12px", "3xl": "16px", "4xl": "20px" },
       boxShadow: {
-        soft: "0 1px 2px rgba(30,34,53,.04), 0 8px 24px -12px rgba(30,34,53,.14)",
-        lift: "0 2px 6px rgba(30,34,53,.05), 0 22px 48px -22px rgba(30,34,53,.28)",
-        "study-glow": "0 14px 34px -14px rgba(61,99,245,.55)",
-        "teach-glow": "0 14px 34px -14px rgba(242,100,61,.55)",
+        soft: "0 1px 2px rgba(23,23,26,.05)",
+        lift: "0 2px 6px rgba(23,23,26,.06), 0 16px 40px -16px rgba(23,23,26,.28)",
+        "study-glow": "0 1px 2px rgba(23,23,26,.05)",
+        "teach-glow": "0 1px 2px rgba(23,23,26,.05)",
       },
       keyframes: {
-        float: { "0%,100%": { transform: "translateY(0)" }, "50%": { transform: "translateY(-6px)" } },
-        marquee: { from: { transform: "translateX(0)" }, to: { transform: "translateX(-50%)" } },
-        fadeup: { from: { opacity: 0, transform: "translateY(14px)" }, to: { opacity: 1, transform: "none" } },
+        fadeup: { from: { opacity: 0, transform: "translateY(8px)" }, to: { opacity: 1, transform: "none" } },
+        pulse2: { "0%,100%": { opacity: 1 }, "50%": { opacity: 0.35 } },
       },
       animation: {
-        float: "float 4s ease-in-out infinite",
-        marquee: "marquee 50s linear infinite",
-        fadeup: "fadeup .5s cubic-bezier(.22,1,.36,1) both",
+        fadeup: "fadeup .35s cubic-bezier(.22,1,.36,1) both",
+        float: "none",
+        marquee: "none",
       },
     },
   },

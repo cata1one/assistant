@@ -41,6 +41,8 @@ from .spark import Spark
 from .units import Units, student_view
 from .yookassa import PlanPayments
 
+mimetypes.add_type("text/javascript", ".mjs")  # модуль-воркер pdf.js: браузер проверяет тип
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 WEB_DIR = Path(__file__).with_name("web")
 MAX_SITE_BODY = 1024 * 1024
 MAX_ROOM_AUDIO = 26 * 1024 * 1024  # фрагмент записи урока или файл материала
@@ -183,6 +185,8 @@ class Website:
         ("POST", re.compile(r"^/site/v1/units$"), "unit_create", True),
         ("POST", re.compile(r"^/site/v1/units/generate$"), "unit_generate", True),
         ("POST", re.compile(r"^/site/v1/units/library/(?P<lib>[\w-]+)$"), "unit_copy", True),
+        ("GET", re.compile(r"^/site/v1/library$"), "library", True),
+        ("POST", re.compile(r"^/site/v1/library/(?P<lib>[\w-]+)/check$"), "library_check", True),
         ("GET", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)$"), "unit_get", True),
         ("POST", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)$"), "unit_update", True),
         ("POST", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)/delete$"), "unit_delete", True),
@@ -598,6 +602,12 @@ class Website:
                                                                      self.portal.settings.target_language))
         return {"ok": tr is not None, "text": tr.text if tr else None, "language": tr.language if tr else None,
                 "seconds": round(time.monotonic() - started, 1), "error": error}
+
+    def library(self, viewer: Any, **_: Any) -> Any:
+        return self.units_service.library_view(viewer)
+
+    def library_check(self, viewer: Any, lib: str, body: Any, **_: Any) -> Any:
+        return self.units_service.library_check(viewer, lib, body)
 
     def public_config(self, **_: Any) -> Any:
         st = self.portal.settings

@@ -163,10 +163,13 @@ function CreateModal({ ai, onClose }) {
   );
 }
 
-export function UnitsPage() {
+export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
   const { role } = useSession();
   const { data, error, reload } = useApi("/site/v1/units");
-  const [tab, setTab] = useState("mine");
+  const [ownTab, setTab] = useState("mine");
+  const tab = fixedTab || ownTab;
+  const [lang, setLang] = useState("all");
+  const [tag, setTag] = useState("all");
   const [create, setCreate] = useState(false);
   const [assign, setAssign] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -179,15 +182,20 @@ export function UnitsPage() {
     await request("POST", `/site/v1/units/${u.id}/delete`, {}).catch(setErr); reload();
   };
   const card = (u, lib) => (
-    <div key={u.id} className="card flex flex-col !p-5">
-      <div className="flex flex-wrap gap-1.5">{u.level && <span className="chip chip-brand">{u.level}</span>}{(u.tags || []).map((t) => <span key={t} className="chip">{t}</span>)}{u.shared && <span className="chip">база школы</span>}</div>
-      <h3 className="mt-3 text-lg">{u.title}</h3>
-      <p className="mt-1 text-xs text-ink-mute">{[...new Set(u.blocks.map((b) => KIND_SHORT[b.type]))].join(" · ")}</p>
-      <div className="mt-auto flex flex-wrap gap-1.5 pt-4">
+    <div key={u.id} className="panel group flex flex-col p-4 transition hover:border-ink/25">
+      <div className="flex flex-wrap gap-1">
+        {u.level && <span className="chip !bg-ink !text-white">{u.level}</span>}
+        {(u.tags || []).slice(0, 2).map((t) => <span key={t} className="chip">{t}</span>)}
+        {u.shared && <span className="chip">база школы</span>}
+      </div>
+      <h3 className="mt-2.5 text-[15px] font-semibold leading-snug">{u.title}</h3>
+      {u.summary && <p className="mt-1 line-clamp-2 text-[13px] text-ink-mute">{u.summary}</p>}
+      <p className="mt-1.5 text-xs text-ink-mute">{u.blocks.length} {u.blocks.length === 1 ? "задание" : u.blocks.length < 5 ? "задания" : "заданий"} · {[...new Set(u.blocks.map((b) => KIND_SHORT[b.type]))].slice(0, 4).join(", ")}</p>
+      <div className="mt-auto flex flex-wrap gap-1.5 pt-3.5">
         {lib ? (
           <>
             <button type="button" className="btn-light btn-sm" onClick={() => setPreview(u)}><Eye size={14} /> Посмотреть</button>
-            <button type="button" className="btn-brand btn-sm" onClick={() => copyLib(u)}><Copy size={14} /> Взять себе</button>
+            {role !== "student" && <button type="button" className="btn-brand btn-sm" onClick={() => copyLib(u)}><Copy size={14} /> Взять себе</button>}
           </>
         ) : (
           <>
@@ -199,29 +207,47 @@ export function UnitsPage() {
       </div>
     </div>
   );
+  const library = data?.library || [];
+  const langs = [...new Set(library.map((u) => u.language).filter(Boolean))];
+  const tags = [...new Set(library.flatMap((u) => u.tags || []))];
+  const libList = library.filter((u) => (lang === "all" || u.language === lang) && (tag === "all" || (u.tags || []).includes(tag)));
+  const LANG_TITLE = Object.fromEntries(LANGS.map((l) => [l.id, `${l.flag} ${l.title}`]));
+  const chip = (active) => `chip !px-2.5 !py-1 !text-[13px] ${active ? "!bg-ink !text-white" : ""}`;
   return (
     <>
-      <PageTitle title="Занятия" text="Интерактивные уроки: вставить слова, пары, тесты, аудирование. Выдавайте их как домашнее задание – ответы проверяются сами."
-        actions={<button type="button" className="btn-brand" onClick={() => setCreate(true)}><Plus size={16} /> Создать занятие</button>} />
-      <div className="mb-5"><Tabs label="Занятия" value={tab} onChange={setTab} items={[{ id: "mine", title: "Мои занятия" }, { id: "library", title: "Готовые: IELTS, HSK, грамматика" }]} /></div>
+      {!embedded && <PageTitle title="Занятия" text="Интерактивные уроки: вставить слова, пары, тесты, аудирование. Выдавайте их как домашнее задание – ответы проверяются сами." />}
+      {!fixedTab && <div className="mb-5"><Tabs label="Занятия" value={tab} onChange={setTab} items={[{ id: "mine", title: "Мои занятия" }, { id: "library", title: "Курсы Bright" }]} /></div>}
       <ErrorBox error={error || err} />
       {!data ? <Loading /> : tab === "mine" ? (
-        !data.units.length ? <Empty icon={Layers} title="Занятий пока нет" text="Создайте занятие с ИИ или из своих слов – или возьмите готовое из библиотеки." action={<button type="button" className="btn-light" onClick={() => setTab("library")}>Открыть библиотеку</button>} />
-          : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.units.map((u) => card(u, false))}</div>
-      ) : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.library.map((u) => card(u, true))}</div>}
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <button type="button" className="btn-brand" onClick={() => setCreate(true)}><Plus size={16} /> Создать занятие</button>
+            <span className="text-[13px] text-ink-mute">{data.ai ? "С ИИ по теме или из ваших слов и текста" : "Из ваших слов и текста: задания соберутся сами"}</span>
+          </div>
+          {!data.units.length ? <Empty icon={Layers} title="Своих занятий пока нет" text="Создайте занятие за минуту или возьмите готовое из курсов Bright и поменяйте под ученика." />
+            : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.units.map((u) => card(u, false))}</div>}
+        </>
+      ) : (
+        <>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            <button type="button" className={chip(lang === "all")} onClick={() => setLang("all")}>Все языки</button>
+            {langs.map((l) => <button key={l} type="button" className={chip(lang === l)} onClick={() => setLang(l)}>{LANG_TITLE[l] || l}</button>)}
+          </div>
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            <button type="button" className={chip(tag === "all")} onClick={() => setTag("all")}>Все темы</button>
+            {tags.map((t) => <button key={t} type="button" className={chip(tag === t)} onClick={() => setTag(t)}>{t}</button>)}
+          </div>
+          <p className="mb-3 text-[13px] text-ink-mute">Занятий: {libList.length}. Все тексты и задания написаны для Bright.</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{libList.map((u) => card(u, true))}</div>
+        </>
+      )}
       {create && <CreateModal ai={data?.ai} onClose={() => setCreate(false)} />}
       {assign && <AssignModal unit={assign} onClose={() => setAssign(null)} />}
       <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.title || ""} wide>
         {preview && (
-          <div className="grid gap-3">
-            {preview.blocks.map((b, i) => (
-              <div key={i} className="rounded-2xl border border-line p-3 text-sm">
-                <p className="text-xs font-bold uppercase tracking-wide text-brand">{TYPES[b.type]}</p>
-                <p className="font-semibold">{b.title}</p>
-                <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-ink-soft">{b.body || b.text || b.script || b.prompt || (b.items || []).map((w) => w.word).join(", ") || (b.pairs || []).map((p) => p[0]).join(", ") || (b.questions || []).map((q) => q.q).join(" · ")}</p>
-              </div>
-            ))}
-            <button type="button" className="btn-brand w-fit" onClick={() => copyLib(preview)}><Copy size={14} /> Взять себе и изменить</button>
+          <div className="grid gap-4">
+            <UnitPlayer unit={preview} preview />
+            {role !== "student" && <button type="button" className="btn-brand w-fit" onClick={() => copyLib(preview)}><Copy size={14} /> Взять себе и изменить</button>}
           </div>
         )}
       </Modal>
