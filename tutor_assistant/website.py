@@ -189,6 +189,7 @@ class Website:
         ("GET", re.compile(r"^/site/v1/library$"), "library", True),
         ("POST", re.compile(r"^/site/v1/library/(?P<lib>[\w-]+)/check$"), "library_check", True),
         ("GET", re.compile(r"^/site/v1/library/book/(?P<book>[\w-]+)$"), "library_book", True),
+        ("GET", re.compile(r"^/site/v1/library/unit/(?P<lib>[\w-]+)$"), "library_unit", True),
         ("GET", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)$"), "unit_get", True),
         ("POST", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)$"), "unit_update", True),
         ("POST", re.compile(r"^/site/v1/units/(?P<id>[0-9a-f]+)/delete$"), "unit_delete", True),
@@ -618,6 +619,9 @@ class Website:
 
     def library(self, viewer: Any, **_: Any) -> Any:
         return self.units_service.library_view(viewer)
+
+    def library_unit(self, viewer: Any, lib: str, **_: Any) -> Any:
+        return self.units_service.library_unit(viewer, lib)
 
     def library_book(self, viewer: Any, book: str, **_: Any) -> Any:
         return self.units_service.library_book(viewer, book)

@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import gzip
 import hmac
 import json
 import logging
@@ -281,13 +282,21 @@ def make_handler(api: Api, website: Website | None = None) -> type[BaseHTTPReque
                 raw = self.rfile.read(length) if length else b""
             q = {k: v[-1] for k, v in parse_qs(query).items()}
             resp = website.handle(method, path, q, raw, self.headers, self._client_ip())
+            body = resp.body
+            gz = (len(body) > 1400 and "gzip" in (self.headers.get("Accept-Encoding") or "")
+                  and (resp.content_type.startswith(("application/json", "text/", "application/javascript", "image/svg"))))
+            if gz:  # JSON и скрипты ужимаются в 4–8 раз: заметно на слабом интернете
+                body = gzip.compress(body, compresslevel=5)
             self.send_response(resp.status)
             self.send_header("Content-Type", resp.content_type)
-            self.send_header("Content-Length", str(len(resp.body)))
+            self.send_header("Content-Length", str(len(body)))
+            if gz:
+                self.send_header("Content-Encoding", "gzip")
+                self.send_header("Vary", "Accept-Encoding")
             for k, v in resp.headers.items():
                 self.send_header(k, v)
             self.end_headers()
-            self.wfile.write(resp.body)
+            self.wfile.write(body)
 
         def _send(self, status: HTTPStatus, payload: Any) -> None:
             data = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")

@@ -342,19 +342,27 @@ class Units:
         return u
 
     def list(self, viewer: Any) -> dict[str, Any]:
-        from .library import LIBRARY
-
         acc = self._owner(viewer)
         rows = self.storage.units_for(acc["id"], acc.get("org_id"))
-        return {"units": [self._public(u, acc) for u in rows],
-                "library": [self._library_card(u) for u in LIBRARY],
-                "ai": self.ai.provider}
+        return {"units": [self._public(u, acc) for u in rows], "ai": self.ai.provider}
 
     @staticmethod
-    def _library_card(u: dict[str, Any]) -> dict[str, Any]:
-        """Карточка курса: без правильных ответов, чтобы ученик мог пройти занятие сам."""
-        return {k: u.get(k) for k in ("id", "title", "language", "level", "tags", "summary")} | {
-            "blocks": [{"type": b["type"]} for b in u["blocks"]], "preview": student_view(u)}
+    def _library_card(u: dict[str, Any], preview: bool = False) -> dict[str, Any]:
+        """Карточка курса. Список лёгкий; занятие без правильных ответов (preview) отдаётся по одному запросу."""
+        card = {k: u.get(k) for k in ("id", "title", "language", "level", "tags", "summary")} | {
+            "blocks": [{"type": b["type"]} for b in u["blocks"]]}
+        if preview:
+            card["preview"] = student_view(u)
+        return card
+
+    def library_unit(self, viewer: Any, lib_id: str) -> dict[str, Any]:
+        from .library import library_unit
+
+        self.portal.accesses(viewer)
+        u = library_unit(lib_id)
+        if not u:
+            raise PortalError(404, "занятие не найдено")
+        return self._library_card(u, preview=True)
 
     def library_view(self, viewer: Any) -> dict[str, Any]:
         """Курсы Bright для всех: преподаватель смотрит и берёт себе, ученик занимается сам."""

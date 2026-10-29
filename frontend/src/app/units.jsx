@@ -180,6 +180,9 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
   const [book, setBook] = useState(null);
   const shelf = useApi(tab === "library" ? "/site/v1/library" : null, [tab]);
   const [err, setErr] = useState(null);
+  const open = async (u) => { // тяжёлое занятие подгружается только при открытии
+    try { setPreview(await request("GET", `/site/v1/library/unit/${u.id}`)); } catch (x) { setErr(x); }
+  };
   const copyLib = async (u) => {
     try { const c = await request("POST", `/site/v1/units/library/${u.id}`, {}); window.location.hash = `#/app/units/${c.id}`; } catch (x) { setErr(x); }
   };
@@ -200,7 +203,7 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
       <div className="mt-auto flex flex-wrap gap-1.5 pt-3.5">
         {lib ? (
           <>
-            <button type="button" className="btn-light btn-sm" onClick={() => setPreview(u)}><Eye size={14} /> Посмотреть</button>
+            <button type="button" className="btn-light btn-sm" onClick={() => open(u)}><Eye size={14} /> Посмотреть</button>
             {role !== "student" && <button type="button" className="btn-brand btn-sm" onClick={() => copyLib(u)}><Copy size={14} /> Взять себе</button>}
           </>
         ) : (
@@ -213,7 +216,7 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
       </div>
     </div>
   );
-  const library = data?.library || [];
+  const library = shelf.data?.library || [];
   const langs = [...new Set(library.map((u) => u.language).filter(Boolean))];
   const tags = [...new Set(library.flatMap((u) => u.tags || []))];
   const libList = library.filter((u) => (lang === "all" || u.language === lang) && (tag === "all" || (u.tags || []).includes(tag)));

@@ -213,3 +213,17 @@ def test_books_cover_library_and_hide_answers_from_students(env):
     s = units.library_book(student, "en-a1")
     assert not s["teacher"] and not any("answer" in q for u in s["units"] for b in u["blocks"] if b["type"] == "choice" for q in b["questions"])
     assert len(s["units"]) == 8
+
+
+def test_library_list_is_light_and_preview_hides_answers(env):
+    import json
+
+    from tutor_assistant.library import LIBRARY
+    from tutor_assistant.units import Units
+    tutor, student, chat = pair(env)
+    units = Units(env["l"])
+    lst = units.library_view(student)
+    assert len(lst["library"]) == len(LIBRARY) and "preview" not in lst["library"][0]
+    assert len(json.dumps(lst)) < 60_000  # раньше были сотни килобайт
+    card = units.library_unit(student, "lib-en-a1-to-be")
+    assert card["preview"]["blocks"] and not any("answer" in q for b in card["preview"]["blocks"] if b["type"] == "choice" for q in b["questions"])

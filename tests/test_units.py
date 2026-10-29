@@ -142,7 +142,7 @@ def test_offline_generator():
 def test_units_flow(env):
     u, lrn = env["u"], env["l"]
     lst = u.list(env["tutor"])
-    assert lst["units"] == [] and len(lst["library"]) == len(LIBRARY) and lst["ai"] is None
+    assert lst["units"] == [] and "library" not in lst and lst["ai"] is None  # библиотека – отдельным лёгким запросом
     copied = u.copy_library(env["tutor"], "lib-hsk1-greetings")
     assert copied["source"] == "library" and copied["mine"]
     draft = u.generate(env["tutor"], {"topic": "Еда", "words": "apple — яблоко\nbread — хлеб"})

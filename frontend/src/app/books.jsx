@@ -79,10 +79,10 @@ export function BookView({ bookId, onBack, onAssign }) {
   // Для «Пройти» нужен вид ученика: у преподавателя берём его из общей библиотеки
   const start = async (u) => {
     if (studentView(u)) { setPlay({ id: u.id, preview: u }); return; }
-    try { const lib = await request("GET", "/site/v1/library"); const card = lib.library.find((x) => x.id === u.id); setPlay({ id: u.id, preview: card.preview }); } catch (x) { setErr(x); }
+    try { const card = await request("GET", `/site/v1/library/unit/${u.id}`); setPlay({ id: u.id, preview: card.preview }); } catch (x) { setErr(x); }
   };
   const peek = async (u) => {
-    try { const lib = await request("GET", "/site/v1/library"); const card = lib.library.find((x) => x.id === u.id); setLook({ id: u.id, title: u.title, preview: card.preview }); } catch (x) { setErr(x); }
+    try { const card = await request("GET", `/site/v1/library/unit/${u.id}`); setLook({ id: u.id, title: u.title, preview: card.preview }); } catch (x) { setErr(x); }
   };
   return (
     <>
