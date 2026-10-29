@@ -39,7 +39,7 @@ function toEdit(b) {
   const e = { ...b };
   if (b.type === "words") e.itemsText = (b.items || []).map((w) => (w.translation ? `${w.word} – ${w.translation}` : w.word)).join("\n");
   if (b.type === "match") e.pairsText = (b.pairs || []).map((p) => `${p[0]} – ${p[1]}`).join("\n");
-  if (b.type === "choice" || b.type === "listening") e.qText = questionsToText(b.questions);
+  if (b.type === "choice" || b.type === "listening" || b.type === "video") e.qText = questionsToText(b.questions);
   return e;
 }
 
@@ -52,7 +52,7 @@ function fromEdit(e) {
   if (e.type === "choice") b.questions = textToQuestions(e.qText || "");
   if (e.type === "listening") Object.assign(b, { script: e.script || "", lang: e.lang || "en-US", audio: e.audio || null, questions: textToQuestions(e.qText || "") });
   if (e.type === "write") b.prompt = e.prompt || "";
-  if (e.type === "video") b.url = e.url || "";
+  if (e.type === "video") Object.assign(b, { url: e.url || "", questions: textToQuestions(e.qText || "") });
   return b;
 }
 
@@ -95,7 +95,13 @@ function BlockEditor({ b, onChange, audios }) {
         </>
       )}
       {b.type === "write" && area("prompt", "Напишите 5 предложений о…", 3)}
-      {b.type === "video" && <input className="field" type="url" value={b.url || ""} onChange={set("url")} placeholder="https://vk.com/video… или YouTube, Rutube" aria-label="Ссылка на видео" />}
+      {b.type === "video" && (
+        <>
+          <input className="field" type="url" value={b.url || ""} onChange={set("url")} placeholder="https://vk.com/video… или YouTube, Rutube" aria-label="Ссылка на видео" />
+          {area("qText", "Вопросы на понимание речи (необязательно):\nО чём говорит девушка?\n*О поездке\nО работе\nО погоде", 6)}
+          <p className="text-xs text-ink-mute">Ученик посмотрит видео и ответит на вопросы. Правильный вариант отметьте «*», вопросы разделяйте пустой строкой.</p>
+        </>
+      )}
     </div>
   );
 }

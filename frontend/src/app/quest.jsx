@@ -32,8 +32,11 @@ const SOUND = {
   tap: () => tone([[660, 0.05, "sine", 0.05]]),
 };
 
-const PRAISE = ["Отлично!", "Верно!", "Так держать!", "Супер!", "Блестяще!", "Именно так!", "Молодец!"];
+const PRAISE = ["Отлично!", "Верно!", "Так держать!", "Супер!", "Блестяще!", "Именно так!", "Молодец!", "Класс!", "Вот это да!", "Умница!"];
+const CALM = ["Хорошо, что прочитали!", "Отлично, идём дальше!", "Молодец, это важно!", "Так держать!", "Прекрасно!"];
+const OOPS = ["Почти получилось!", "Ничего страшного, так и учатся!", "Ошибка – это шаг вперёд!", "Запомним и вернёмся к этому."];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const praise = (streak) => (streak >= 5 ? `${streak} подряд – огонь!` : streak >= 3 ? `${streak} верных подряд!` : pick(PRAISE));
 
 // -- разбор занятия на шаги ---------------------------------------------------------------------------
 /** Текст с пропусками → предложения: в каждом шаге одно предложение и его пропуски. */
@@ -58,7 +61,10 @@ function buildSteps(unit) {
   unit.blocks.forEach((b, i) => {
     if (b.type === "words" && b.items?.length) steps.push({ kind: "words", i, b });
     else if (b.type === "text" && b.body) steps.push({ kind: "text", i, b });
-    else if (b.type === "video" && b.embed) steps.push({ kind: "video", i, b });
+    else if (b.type === "video" && b.embed) {
+      steps.push({ kind: "video", i, b });
+      (b.questions || []).forEach((q, qi) => steps.push({ kind: "choice", i, qi, q, b, watch: true }));
+    }
     else if (b.type === "write") steps.push({ kind: "write", i, b });
     else if (b.type === "match" && b.left?.length) steps.push({ kind: "match", i, b });
     else if (b.type === "choice") b.questions.forEach((q, qi) => steps.push({ kind: "choice", i, qi, q, b }));
@@ -185,9 +191,11 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
 
   const doCheck = async () => {
     if (!s || busy) return;
-    if (["words", "text", "video", "write"].includes(s.kind)) {
+    if (["words", "text", "video", "write"].includes(s.kind)) { // и без проверки задание заканчивается похвалой
       if (s.kind === "write") remember(s, (f) => ({ ...f, [s.i]: answers[s.i] }));
-      next(); return;
+      setXp((x) => x + 3); play("ok");
+      setFeedback({ ok: true, text: s.kind === "write" ? "Ответ отправлен – молодец!" : pick(CALM) });
+      return;
     }
     const isFirst = !firstSeen.current.has(s.n);
     setBusy(true); setError(null);
@@ -200,12 +208,12 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
       const answer = s.line.map((x) => (x.gap !== undefined ? r.gap_answers?.[x.gap] : x.text)).join("").trim();
       remember(s, (f) => withGaps(f, s, (() => { const a = [...getGaps(f, s)]; s.gaps.forEach((g) => { a[g] = getGaps(answers, s)[g]; }); return a; })()));
       graded1(ok, isFirst);
-      setFeedback({ ok, text: ok ? pick(PRAISE) : "Правильный ответ:", answer: ok ? null : answer });
+      setFeedback({ ok, text: ok ? praise(streak + 1) : pick(OOPS), answer: ok ? null : answer, label: ok ? null : "Правильный ответ:" });
     } else if (s.kind === "choice") {
       const ok = !!r.questions?.[s.qi];
       remember(s, (f) => withQs(f, s, (() => { const a = [...getQs(f, s)]; a[s.qi] = getQs(answers, s)[s.qi]; return a; })()));
       graded1(ok, isFirst);
-      setFeedback({ ok, text: ok ? pick(PRAISE) : "Правильный ответ:", answer: ok ? null : s.q.options[r.question_answers?.[s.qi]] });
+      setFeedback({ ok, text: ok ? praise(streak + 1) : pick(OOPS), answer: ok ? null : s.q.options[r.question_answers?.[s.qi]], label: ok ? null : "Правильный ответ:" });
     }
   };
 
@@ -287,6 +295,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
         </div>
 
         {s.listen && <ListenButtons b={s.b} />}
+        {s.watch && <p className="mb-3 rounded-xl bg-cream px-3 py-2 text-sm text-ink-soft">Вопрос по видео. Если не уверены – пересмотрите его ещё раз.</p>}
 
         {s.kind === "words" && (
           <div className="grid gap-2.5 sm:grid-cols-2">
@@ -294,12 +303,12 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
               <button key={w.word} type="button" onClick={() => speak(w.word.replace(/\s*\(.*\)$/, ""), lang)}
                 className="flex items-center gap-3 rounded-2xl border-2 border-line bg-white px-4 py-3 text-left shadow-[0_3px_0_#E7E5DF] transition active:translate-y-0.5 active:shadow-none">
                 <Volume2 size={18} className="shrink-0 text-study" />
-                <span className="min-w-0"><span className="block text-[17px] font-bold">{w.word}</span>{w.translation && <span className="text-sm text-ink-mute">{w.translation}</span>}</span>
+                <span className="min-w-0"><span dir="auto" className="block text-[17px] font-bold">{w.word}</span>{w.translation && <span className="text-sm text-ink-mute">{w.translation}</span>}</span>
               </button>
             ))}
           </div>
         )}
-        {s.kind === "text" && <div className="whitespace-pre-wrap rounded-2xl bg-cream p-5 text-[16px] leading-relaxed">{s.b.body}</div>}
+        {s.kind === "text" && <div dir="auto" className="whitespace-pre-wrap rounded-2xl bg-cream p-5 text-[16px] leading-relaxed">{s.b.body}</div>}
         {s.kind === "video" && <iframe title={s.b.title || "Видео"} src={s.b.embed} className="aspect-video w-full rounded-2xl" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />}
         {s.kind === "write" && (
           <>
@@ -314,7 +323,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
         )}
         {s.kind === "choice" && (
           <>
-            <p className="mb-4 text-xl font-semibold leading-snug">{s.q.q}</p>
+            <p dir="auto" className="mb-4 text-xl font-semibold leading-snug">{s.q.q}</p>
             <div className="grid gap-2.5">
               {s.q.options.map((o, j) => {
                 const picked = getQs(answers, s)[s.qi] === j;
@@ -330,7 +339,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
         )}
         {s.kind === "gap" && (
           <>
-            <p className="text-[20px] leading-[2.6]">
+            <p dir="auto" className="text-[20px] leading-[2.6]">
               {s.line.map((x, k) => (x.gap === undefined ? <span key={k}>{x.text}</span> : (
                 s.b.bank ? (
                   <button key={k} type="button" disabled={!!feedback} onClick={() => { const a = [...gapVals]; a[x.gap] = ""; setAnswers(withGaps(answers, s, a)); }}
@@ -358,7 +367,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
         {feedback && (
           <div className="mb-3">
             <p className={`text-xl font-bold ${feedback.ok ? "text-[#146b4c]" : "text-teach-deep"}`}>{feedback.text}</p>
-            {feedback.answer && <p className="mt-0.5 text-[17px] text-teach-deep">{feedback.answer}</p>}
+            {feedback.answer && <p className="mt-0.5 text-[17px] text-teach-deep">{feedback.label} <b>{feedback.answer}</b></p>}
           </div>
         )}
         {feedback ? (
@@ -366,7 +375,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
         ) : (
           <button type="button" onClick={doCheck} disabled={!ready || busy || s.kind === "match"}
             className="w-full rounded-2xl bg-ink py-3.5 text-[17px] font-bold text-white shadow-[0_4px_0_#000] transition active:translate-y-1 active:shadow-none disabled:bg-line disabled:text-ink-mute disabled:shadow-none">
-            {["words", "text", "video"].includes(s.kind) ? "Понятно, дальше" : s.kind === "match" ? "Соберите все пары" : s.kind === "write" ? "Готово" : busy ? "Проверяем…" : "Проверить"}
+            {["words", "text", "video"].includes(s.kind) ? "Понятно" : s.kind === "match" ? "Соберите все пары" : s.kind === "write" ? "Готово" : busy ? "Проверяем…" : "Проверить"}
           </button>
         )}
       </div>

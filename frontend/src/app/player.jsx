@@ -164,7 +164,12 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
               <p className="mt-1 text-xs text-ink-mute">Этот ответ проверит преподаватель.</p>
             </>
           )}
-          {b.type === "video" && <iframe title={b.title || "Видео"} src={b.embed} className="aspect-video w-full rounded-2xl" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />}
+          {b.type === "video" && (
+            <>
+              <iframe title={b.title || "Видео"} src={b.embed} className="aspect-video w-full rounded-2xl" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />
+              {b.questions?.length > 0 && <div className="mt-4"><Questions questions={b.questions} value={answers[i]} onChange={(v) => set(i, v)} result={r(i)?.questions} answers={r(i)?.question_answers} /></div>}
+            </>
+          )}
         </section>
       ))}
       <ErrorBox error={error} />

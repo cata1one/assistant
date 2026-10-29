@@ -100,6 +100,7 @@ def validate_blocks(raw: Any) -> list[dict[str, Any]]:
         else:  # video
             url = _s(b.get("url"), 500)
             block["url"], block["embed"] = url, video_embed(url)
+            block["questions"] = _questions(b.get("questions"))  # понимание речи: вопросы после просмотра
             ok = bool(block["embed"])
         if ok:
             blocks.append(block)
@@ -146,6 +147,8 @@ def student_view(unit: dict[str, Any]) -> dict[str, Any]:
             v["questions"] = [{"q": q["q"], "options": q["options"]} for q in b["questions"]]
         else:
             v.update({k: b[k] for k in ("body", "items", "prompt", "url", "embed") if k in b})
+            if b["type"] == "video":
+                v["questions"] = [{"q": q["q"], "options": q["options"]} for q in b.get("questions", [])]
         blocks.append(v)
     return {"id": unit["id"], "title": unit["title"], "language": unit.get("language"), "level": unit.get("level"),
             "blocks": blocks}
@@ -185,6 +188,8 @@ def grade(unit: dict[str, Any], answers: Any) -> dict[str, Any]:
                             for i2, p in enumerate(b["pairs"])]
             res["pair_answers"] = [p[1] for p in b["pairs"]]
         elif b["type"] == "choice":
+            res["questions"], res["question_answers"] = _choice_result(b["questions"], given)
+        elif b["type"] == "video" and b.get("questions"):
             res["questions"], res["question_answers"] = _choice_result(b["questions"], given)
         elif b["type"] == "write":
             res["text"] = _s(given, 3000) if isinstance(given, str) else ""

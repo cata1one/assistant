@@ -64,12 +64,13 @@ def unit(uid: str, title: str, language: str, level: str, tags: list[str], summa
             "blocks": list(blocks)}
 
 
+from .library_arabic import ARABIC  # noqa: E402
 from .library_en import ENGLISH  # noqa: E402 – содержимое использует помощники выше
 from .library_exams import EXAMS  # noqa: E402
 from .library_more import MORE  # noqa: E402
 from .library_world import WORLD  # noqa: E402
 
-LIBRARY: list[dict[str, Any]] = [*ENGLISH, *EXAMS, *WORLD, *MORE]
+LIBRARY: list[dict[str, Any]] = [*ENGLISH, *EXAMS, *WORLD, *MORE, *ARABIC]
 
 # Учебники Bright: уроки, собранные по порядку в курс. cover – эмодзи для объёмной обложки (Fluent 3D).
 BOOKS: list[dict[str, Any]] = [
@@ -109,9 +110,13 @@ BOOKS: list[dict[str, Any]] = [
     {"id": "it-pt", "title": "Italiano e Português A1", "language": "it", "level": "A1", "cover": "🍕", "color": "#E3F4EA",
      "about": "Знакомство и настоящее время в итальянском и португальском.",
      "units": ["lib-it-a1-intro", "lib-it-a1-presente", "lib-pt-a1-intro", "lib-pt-a1-presente"]},
-    {"id": "first-words", "title": "Первые слова: арабский, греческий, сербский, хинди", "language": "ar", "level": "A0",
-     "cover": "🌍", "color": "#EEEBFB", "about": "Приветствия и первые фразы на четырёх языках.",
-     "units": ["lib-ar-first", "lib-el-first", "lib-sr-first", "lib-hi-first"]},
+    {"id": "arabic", "title": "Арабский с нуля", "language": "ar", "level": "A0–A1", "cover": "🕌", "color": "#E3F4EA",
+     "about": "Алфавит за три урока, приветствия, местоимения, числа, семья, кафе, дни недели и дорога.",
+     "units": ["lib-ar-first", "lib-ar-letters-1", "lib-ar-letters-2", "lib-ar-letters-3", "lib-ar-greetings",
+               "lib-ar-pronouns", "lib-ar-numbers", "lib-ar-family", "lib-ar-cafe", "lib-ar-days", "lib-ar-city"]},
+    {"id": "first-words", "title": "Первые слова: греческий, сербский, хинди", "language": "el", "level": "A0",
+     "cover": "🌍", "color": "#EEEBFB", "about": "Приветствия и первые фразы на трёх языках.",
+     "units": ["lib-el-first", "lib-sr-first", "lib-hi-first"]},
 ]
 
 

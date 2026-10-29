@@ -224,6 +224,6 @@ def test_library_list_is_light_and_preview_hides_answers(env):
     units = Units(env["l"])
     lst = units.library_view(student)
     assert len(lst["library"]) == len(LIBRARY) and "preview" not in lst["library"][0]
-    assert len(json.dumps(lst)) < 60_000  # раньше были сотни килобайт
+    assert len(json.dumps(lst)) < 90_000  # раньше было 220 КБ на 43 урока; без превью список лёгкий
     card = units.library_unit(student, "lib-en-a1-to-be")
     assert card["preview"]["blocks"] and not any("answer" in q for b in card["preview"]["blocks"] if b["type"] == "choice" for q in b["questions"])
