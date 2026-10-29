@@ -66,8 +66,8 @@ def unit(uid: str, title: str, language: str, level: str, tags: list[str], summa
 
 from .library_en import ENGLISH  # noqa: E402 – содержимое использует помощники выше
 from .library_exams import EXAMS  # noqa: E402
-from .library_world import WORLD  # noqa: E402
 from .library_more import MORE  # noqa: E402
+from .library_world import WORLD  # noqa: E402
 
 LIBRARY: list[dict[str, Any]] = [*ENGLISH, *EXAMS, *WORLD, *MORE]
 
