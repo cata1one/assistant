@@ -1,13 +1,14 @@
 import {
-  ArrowDown, ArrowLeft, ArrowUp, BookOpenCheck, Copy, Eye, Layers, Pencil, Plus, Send, Sparkles, Trash2, Wand2,
+  ArrowDown, ArrowLeft, ArrowUp, BookOpenCheck, Copy, Eye, FileText, Layers, Pencil, Plus, Send, Sparkles, Trash2, Wand2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Tabs } from "../ui/kit.jsx";
 import { LANGS, ttsOf } from "../lib/langs.js";
 import { useApi } from "./common.jsx";
 import Iskorka from "./Iskorka.jsx";
+import PdfImport from "./pdfimport.jsx";
 import UnitPlayer from "./player.jsx";
 import Quest from "./quest.jsx";
 import { BookShelf, BookView } from "./books.jsx";
@@ -57,16 +58,28 @@ function fromEdit(e) {
 }
 
 function BlockEditor({ b, onChange, audios }) {
+  const [pdf, setPdf] = useState(false);
+  const field = useRef(null);
+  const hide = () => { // выделенное слово или фразу превращает в [ответ]
+    const el = field.current;
+    if (!el || el.selectionStart === el.selectionEnd) return;
+    const t = b.text || "";
+    onChange({ ...b, text: `${t.slice(0, el.selectionStart)}[${t.slice(el.selectionStart, el.selectionEnd)}]${t.slice(el.selectionEnd)}` });
+  };
   const set = (k) => (ev) => onChange({ ...b, [k]: ev.target.type === "checkbox" ? ev.target.checked : ev.target.value });
   const area = (k, ph, rows = 4) => <textarea className="field font-normal" rows={rows} value={b[k] || ""} onChange={set(k)} placeholder={ph} />;
   return (
     <div className="grid gap-3">
       <input className="field" value={b.title || ""} onChange={set("title")} placeholder="Заголовок задания" aria-label="Заголовок" />
-      {b.type === "text" && area("body", "Текст, правило или инструкция", 6)}
+      {b.type === "text" && <>{area("body", "Текст, правило или инструкция", 6)}<button type="button" className="btn-light btn-sm w-fit" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button></>}
       {b.type === "words" && <>{area("itemsText", "kitchen – кухня\nwardrobe – шкаф", 5)}<p className="text-xs text-ink-mute">При выдаче занятия эти слова сразу попадут в карточки ученика.</p></>}
       {b.type === "gap" && (
         <>
-          {area("text", "I [have been] to London. She [has|'s] got a cat.", 6)}
+          <textarea ref={field} className="field font-normal" rows={6} dir="auto" value={b.text || ""} onChange={set("text")} placeholder="I [have been] to London. She [has|'s] got a cat." />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-light btn-sm" onClick={hide} title="Выделите слово в тексте и нажмите"><Eye size={14} /> Скрыть выделенное в [ ]</button>
+            <button type="button" className="btn-light btn-sm" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button>
+          </div>
           <p className="text-xs text-ink-mute">Правильный ответ – в квадратных скобках. Несколько верных вариантов – через «|»: [have been|'ve been].</p>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!b.bank} onChange={set("bank")} /> Показать слова для вставки (банк слов)</label>
         </>
@@ -94,6 +107,7 @@ function BlockEditor({ b, onChange, audios }) {
           <p className="text-xs text-ink-mute">Вопрос, под ним варианты; правильный отметьте звёздочкой «*». Вопросы разделяйте пустой строкой.</p>
         </>
       )}
+      <PdfImport open={pdf} onClose={() => setPdf(false)} onInsert={(t) => onChange(b.type === "text" ? { ...b, body: `${b.body ? `${b.body}\n\n` : ""}${t}` } : { ...b, text: `${b.text ? `${b.text}\n\n` : ""}${t}` })} />
       {b.type === "write" && area("prompt", "Напишите 5 предложений о…", 3)}
       {b.type === "video" && (
         <>
@@ -138,6 +152,7 @@ function AssignModal({ unit, onClose }) {
 }
 
 function CreateModal({ ai, onClose }) {
+  const [pdf, setPdf] = useState(false);
   const [f, setF] = useState({ topic: "", language: "en", level: "A2", words: "", text: "", wishes: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -159,7 +174,8 @@ function CreateModal({ ai, onClose }) {
         </div>
         <label className="label">Слова (необязательно)<textarea className="field font-normal" rows={4} value={f.words} onChange={set("words")} placeholder={"luggage – багаж\nboarding pass – посадочный талон"} /></label>
         <label className="label">Свой текст или упражнение (необязательно)<textarea className="field font-normal" rows={4} value={f.text} onChange={set("text")} placeholder={"Вставьте текст. Правильные ответы пишите в [квадратных скобках]: I [have been] to London. Ученик увидит пропуски, ответы видны только вам."} /></label>
-        <p className="-mt-1 text-xs text-ink-mute">Скобки не расставили – не страшно: пропуски сделаем из ваших слов.</p>
+        <div className="-mt-1 flex flex-wrap items-center gap-3"><button type="button" className="btn-light btn-sm" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button><p className="text-xs text-ink-mute">Скобки не расставили – не страшно: пропуски сделаем из ваших слов.</p></div>
+        <PdfImport open={pdf} onClose={() => setPdf(false)} onInsert={(t) => setF((x) => ({ ...x, text: `${x.text ? `${x.text}\n\n` : ""}${t}`.slice(0, 5000) }))} />
         {ai && <input className="field" value={f.wishes} onChange={set("wishes")} maxLength={1000} placeholder="Пожелания для ИИ: «для подростка, больше говорения»" aria-label="Пожелания" />}
         <ErrorBox error={error} />
         <div className="flex flex-wrap gap-2">

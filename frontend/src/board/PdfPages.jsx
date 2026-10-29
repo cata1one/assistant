@@ -17,6 +17,30 @@ function loadPdfjs() {
   return pdfjsPromise;
 }
 
+/** Текст страниц PDF (только у «живых» PDF; у сканов текста нет). source – File или адрес файла. */
+export async function extractPdfText(source, from, to, onPage) {
+  const pdfjs = await loadPdfjs();
+  const data = source instanceof Blob ? { data: new Uint8Array(await source.arrayBuffer()) } : { url: source, withCredentials: true };
+  const doc = await pdfjs.getDocument({ ...data, isEvalSupported: false }).promise;
+  const last = Math.min(to || doc.numPages, doc.numPages);
+  const pages = [];
+  for (let n = Math.max(1, from || 1); n <= last; n++) {
+    const content = await (await doc.getPage(n)).getTextContent();
+    const lines = [];
+    let y = null, line = "";
+    for (const it of content.items) {
+      if (!("str" in it)) continue;
+      const cy = Math.round(it.transform[5] / 3); // строки одного уровня склеиваем
+      if (y !== null && cy !== y) { lines.push(line); line = ""; }
+      y = cy; line += it.str + (it.hasEOL ? "\n" : "");
+    }
+    lines.push(line);
+    pages.push(lines.join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim());
+    onPage?.(n, last);
+  }
+  return { text: pages.filter(Boolean).join("\n\n"), total: doc.numPages };
+}
+
 const memory = {}; // последняя открытая страница каждого файла: учебник открывается там, где остановились
 const remember = (url) => { try { return Number(localStorage.getItem(`bright-pdf-page:${url}`)) || memory[url] || 1; } catch { return memory[url] || 1; } };
 const store = (url, n) => { memory[url] = n; try { localStorage.setItem(`bright-pdf-page:${url}`, String(n)); } catch { /* нет хранилища */ } };
