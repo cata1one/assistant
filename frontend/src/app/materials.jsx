@@ -1,13 +1,24 @@
 import { BookOpen, Clapperboard, File, FileText, FolderOpen, Image, Link2, Plus, Search, Trash2, Upload } from "lucide-react";
 import { lazy, Suspense, useRef, useState } from "react";
-import { request } from "../lib/api.js";
+import { getToken, request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Tabs } from "../ui/kit.jsx";
 import { shortDate, useApi } from "./common.jsx";
-import { uploadFile } from "./tutor.jsx";
 import { UnitsPage } from "./units.jsx";
 
 const PdfPages = lazy(() => import("../board/PdfPages.jsx"));
+
+export async function uploadFile(file, { shared, folder } = {}) {
+  const headers = { "Content-Type": file.type || "application/octet-stream", "X-File-Name": encodeURIComponent(file.name || "file"), Accept: "application/json" };
+  const token = getToken();
+  if (token) headers["X-Access-Token"] = token;
+  if (shared) headers["X-Shared"] = "1";
+  if (folder) headers["X-Folder"] = encodeURIComponent(folder);
+  const r = await fetch("/site/v1/materials/upload", { method: "POST", headers, body: file, credentials: "same-origin" });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(`${file.name || "файл"}: ${data.error || r.status}`); e.status = r.status; throw e; }
+  return data;
+}
 
 const fmtSize = (n) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} МБ` : `${Math.max(1, Math.round(n / 1024))} КБ`);
 const kindOf = (m) => (m.kind === "video" ? "video" : m.kind === "link" ? "link" : m.mime === "application/pdf" ? "pdf" : m.mime?.startsWith("image/") ? "image" : "file");

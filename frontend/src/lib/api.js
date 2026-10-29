@@ -43,3 +43,6 @@ export async function uploadRaw(path, file, extra = {}) {
   if (!r.ok) { const e = new Error(data.error || `ошибка ${r.status}`); e.status = r.status; throw e; }
   return data;
 }
+
+/** Русское окончание по числу: plural(5, "слово", "слова", "слов"). */
+export const plural = (n, one, few, many) => (n % 10 === 1 && n % 100 !== 11 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many);

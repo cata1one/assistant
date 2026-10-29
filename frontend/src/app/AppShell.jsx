@@ -1,5 +1,5 @@
 import {
-  Activity, BookOpen, Building2, CreditCard, FileStack, Home, Layers, LogOut, Menu, MessagesSquare, NotebookPen, Search,
+  Activity, BookOpen, Building2, CreditCard, FileStack, GraduationCap, Home, Layers, LogOut, Menu, MessagesSquare, NotebookPen, Search,
   Settings, ShieldAlert, Shield, Sparkles, Users, Wallet, X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -19,7 +19,7 @@ import { AdminPage, SchoolHome, SchoolLessonsPage, SignalsPage, SystemPage, Tuto
 import { SparkPage } from "./spark.jsx";
 import { ParentHome, StudentHome, WordsHub } from "./student.jsx";
 import { BillingStatus, PlanPage, StudentsPage, TutorHome } from "./tutor.jsx";
-import { DoUnit, UnitEditor } from "./units.jsx";
+import { CoursesPage, DoUnit, UnitEditor } from "./units.jsx";
 
 /*
  * Разделы кабинета по ролям: [id, название, иконка, страница, место в нижней панели телефона (0 – только в «Ещё»), ссылка].
@@ -45,6 +45,7 @@ const NAV = {
     ["words", "Слова", Layers, WordsHub, 3],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
+    ["courses", "Курсы Bright", GraduationCap, CoursesPage, 0],
     ["spark", "Искорка", Sparkles, SparkPage, 0],
     ["find", "Найти преподавателя", Search, null, 0, "#/market"],
     ["profile", "Профиль и оформление", Settings, ProfilePage, 0],
@@ -206,7 +207,7 @@ export default function AppShell({ route }) {
         </main>
       </div>
       <TabBar items={items} current={current} unread={session.me?.unread || 0} />
-      {area !== "board" && <Help />}
+      {area !== "board" && <Help className="hidden lg:block" />}
     </div>
   );
 }

@@ -26,7 +26,7 @@ const QUICK = {
   ],
 };
 
-export default function Help() {
+export default function Help({ className = "" }) {
   const session = useSession();
   const cfg = useConfig();
   const [open, setOpen] = useState(false);
@@ -47,11 +47,11 @@ export default function Help() {
   };
 
   return (
-    <div className="fixed bottom-24 right-3 z-30 lg:bottom-5 lg:right-5">
+    <div className={`fixed bottom-5 right-4 z-30 lg:bottom-5 lg:right-5 ${className}`}>
       {open && (
-        <div role="dialog" aria-label="Помощь" className="card absolute bottom-14 right-0 w-[min(22rem,calc(100vw-1.5rem))] !p-0 shadow-lift animate-fadeup">
+        <div role="dialog" aria-label="Помощь" className="panel absolute bottom-14 right-0 w-[min(22rem,calc(100vw-2rem))] shadow-lift animate-fadeup">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <p className="font-display text-lg font-extrabold">Помощь</p>
+            <p className="text-[17px] font-semibold">Помощь</p>
             <button type="button" className="btn-ghost !p-1.5" onClick={() => setOpen(false)} aria-label="Закрыть"><X size={16} /></button>
           </div>
           <div className="max-h-[60vh] overflow-y-auto p-4">
@@ -103,7 +103,7 @@ export default function Help() {
         </div>
       )}
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Помощь"
-        className="grid h-12 w-12 place-items-center rounded-full bg-ink text-white shadow-lift transition hover:bg-ink-soft">
+        className="grid h-12 w-12 place-items-center rounded-full bg-ink text-white shadow-lift transition hover:bg-black">
         {open ? <X size={20} /> : <CircleHelp size={22} />}
       </button>
     </div>

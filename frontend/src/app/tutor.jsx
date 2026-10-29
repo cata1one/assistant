@@ -10,6 +10,7 @@ import { PERIOD_TITLE, perDay, rub } from "../lib/pricing.js";
 import { useConfig } from "../lib/config.js";
 import { ProfileAvatar } from "./decor.jsx";
 import { HolidayBanner, MoodChip } from "./extras.jsx";
+import { SparkMark } from "./spark.jsx";
 import { Avatar, copy, Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Stat } from "../ui/kit.jsx";
 import { LessonList, LiveBanner, Panel, shortDate, startLesson, useApi } from "./common.jsx";
 import { Vocab } from "./vocab.jsx";
@@ -40,28 +41,27 @@ function StartButton({ chatId, active, small }) {
   );
 }
 
-// == Главная ==================================================================================
+// == Сегодня ==================================================================================
 function Checklist({ students, lessons }) {
   const steps = [
-    ["Добавьте первого ученика", students.length > 0, "#/app/students", "К ученикам"],
-    ["Отправьте ему ссылку-приглашение", students.some((s) => s.joined), "#/app/students", "Скопировать ссылку"],
+    ["Добавьте первого ученика", students.length > 0, "#/app/students", "Добавить"],
+    ["Отправьте ему ссылку-приглашение", students.some((s) => s.joined), "#/app/students", "Скопировать"],
     ["Проведите пробный урок", lessons.some((l) => l.status === "finished"), "#/app/students", "Начать урок"],
   ];
   if (steps.every((x) => x[1])) return null;
   const next = steps.findIndex((x) => !x[1]);
   return (
-    <div className="card mb-4 !p-5">
-      <h2 className="text-lg">Три шага до первого урока</h2>
-      <ol className="mt-3 grid gap-2">
+    <Panel title="Три шага до первого урока" className="mb-4">
+      <ol className="grid gap-1.5">
         {steps.map(([t, done, href, cta], i) => (
-          <li key={t} className={`flex flex-wrap items-center gap-3 rounded-2xl px-4 py-2.5 ${i === next ? "bg-brand-tint" : "bg-cream"}`}>
-            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${done ? "bg-mint text-white" : i === next ? "bg-brand text-white" : "bg-white text-ink-mute"}`}>{done ? <Check size={14} /> : i + 1}</span>
-            <span className={`min-w-0 flex-1 text-sm ${done ? "text-ink-mute line-through" : "font-semibold"}`}>{t}</span>
+          <li key={t} className={`flex flex-wrap items-center gap-3 rounded-2xl px-3 py-2.5 ${i === next ? "bg-sun-soft" : ""}`}>
+            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${done ? "bg-mint text-white" : i === next ? "bg-ink text-white" : "bg-cream text-ink-mute"}`}>{done ? <Check size={14} /> : i + 1}</span>
+            <span className={`min-w-0 flex-1 text-[15px] ${done ? "text-ink-mute line-through" : "font-medium"}`}>{t}</span>
             {i === next && <a href={href} className="btn-brand btn-sm">{cta}</a>}
           </li>
         ))}
       </ol>
-    </div>
+    </Panel>
   );
 }
 
@@ -69,42 +69,71 @@ export function TutorHome() {
   const { account, me } = useSession();
   const { data, error } = useApi("/site/v1/students");
   const pay = useApi("/site/v1/lesson-pay").data;
+  const hw = useApi("/site/v1/homework").data?.homework || [];
   const students = data?.students || [];
   const titles = Object.fromEntries((me?.chats || []).map((c) => [c.chat_id, c.title]));
   const lessons = (me?.lessons || []).map((l) => ({ ...l, with: titles[l.chat_id] }));
+  const toCheck = hw.filter((h) => h.status === "done");
+  const review = lessons.filter((l) => l.on_review);
+  const todo = [
+    ...review.map((l) => ({ key: `r${l.id}`, text: `Проверить и отправить конспект: ${l.with || l.title}`, href: `#/lesson/${l.id}`, cta: "Открыть" })),
+    ...(toCheck.length ? [{ key: "hw", text: `Проверить домашку: ${toCheck.length}`, href: "#/app/homework", cta: "Проверить" }] : []),
+    ...(pay?.pending_total ? [{ key: "pay", text: `Подтвердить оплату: ${pay.pending_total}`, href: "#/app/pay", cta: "Посмотреть" }] : []),
+    ...(me?.unread ? [{ key: "msg", text: `Новые сообщения: ${me.unread}`, href: "#/app/messages", cta: "Ответить" }] : []),
+  ];
+  const today = new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
   return (
     <>
-      <PageTitle title={`Здравствуйте, ${(account?.name || "").split(" ")[0] || "коллега"}!`}
-        text={account?.org ? `Вы преподаёте в школе «${account.org.name}»` : "Частный репетитор: ваша переписка с учениками не фильтруется"} />
+      <PageTitle title={`Здравствуйте, ${(account?.name || "").split(" ")[0] || "коллега"}`} text={today.charAt(0).toUpperCase() + today.slice(1)}
+        actions={<a href="#/app/students" className="btn-brand"><UserPlus size={16} /> Ученик</a>} />
       <HolidayBanner />
       <LiveBanner lessons={lessons} />
-      {pay?.pending_total > 0 && (
-        <Notice tone="warn" className="mb-4">Ждут вашего подтверждения оплат: {pay.pending_total}. <a className="link" href="#/app/pay">Проверить</a></Notice>
-      )}
       {data && <Checklist students={students} lessons={lessons} />}
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <Stat value={students.length} label="учеников" />
-        <Stat value={lessons.filter((l) => l.status === "finished").length} label="уроков проведено" tone="mint" />
-        <Stat value={me?.unread || 0} label="новых сообщений" tone="sun" />
-      </div>
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-        <Panel title="Ученики" icon={Users} actions={<a href="#/app/students" className="link text-sm">Все</a>}>
-          {error ? <p className="text-sm text-ink-mute">Вы вошли через Telegram-бота. <a className="link" href="#/register?role=tutor">Зарегистрируйтесь на сайте</a>, чтобы приглашать учеников по ссылке.</p> : !data ? <Loading /> : !students.length ? (
-            <div className="text-center"><p className="text-sm text-ink-mute">Добавьте первого ученика, и он получит ссылку-приглашение.</p><a href="#/app/students" className="btn-brand mt-4"><UserPlus size={16} /> Добавить ученика</a></div>
-          ) : (
-            <ul className="grid gap-2">
-              {students.slice(0, 6).map((s) => (
-                <li key={s.pair_id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-line px-3 py-2.5">
-                  <ProfileAvatar photo={s.photo} name={s.name} size={36} />
-                  <span className="min-w-0 flex-1"><span className="block font-semibold">{s.name}</span><span className="text-xs text-ink-mute">{s.joined ? "подключён" : "ждём по ссылке"}{s.parents ? ` · родителей: ${s.parents}` : ""}</span></span>
-                  <MoodChip mood={s.mood} />
-                  {s.joined && <StartButton chatId={s.chat_id} active={s.active_lesson} small />}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-        <Panel title="Последние уроки" icon={NotebookPen}><LessonList lessons={lessons} limit={5} empty="Проведите первый урок, и конспект появится здесь." /></Panel>
+      <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+        <div className="grid content-start gap-4">
+          <Panel title="Начать урок" icon={Video} actions={<a href="#/app/students" className="text-[13px] font-medium text-ink-mute hover:text-ink">Все ученики</a>}>
+            {error ? <p className="text-sm text-ink-mute">Вы вошли через Telegram-бота. <a className="link" href="#/register?role=tutor">Зарегистрируйтесь на сайте</a>, чтобы приглашать учеников по ссылке.</p> : !data ? <Loading /> : !students.length ? (
+              <p className="py-1 text-sm text-ink-mute">Добавьте ученика: он получит ссылку и зайдёт на урок с телефона или компьютера.</p>
+            ) : (
+              <ul className="-mx-2 grid">
+                {students.slice(0, 8).map((s) => (
+                  <li key={s.pair_id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-cream">
+                    <ProfileAvatar photo={s.photo} name={s.name} size={38} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2 font-semibold">{s.name} <MoodChip mood={s.mood} /></span>
+                      <span className="block truncate text-[13px] text-ink-mute">{s.joined ? (LANGS.find((l) => l.id === s.language)?.title || "") : "ждём по ссылке"}{s.balance ? ` · оплачено: ${s.balance}` : ""}</span>
+                    </span>
+                    {s.joined && <StartButton chatId={s.chat_id} active={s.active_lesson} small />}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+          <Panel title="Последние уроки" icon={NotebookPen}><LessonList lessons={lessons} limit={5} empty="Проведите первый урок, и конспект появится здесь." /></Panel>
+        </div>
+        <div className="grid content-start gap-4">
+          <Panel title="Нужно сделать" icon={CheckCircle2}>
+            {todo.length ? (
+              <ul className="-mx-2 grid">{todo.map((t) => (
+                <li key={t.key}><a href={t.href} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-cream">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-teach" /><span className="min-w-0 flex-1 text-[15px]">{t.text}</span><span className="text-[13px] font-medium text-ink-mute">{t.cta}</span>
+                </a></li>))}
+              </ul>
+            ) : <p className="py-1 text-sm text-ink-mute">Всё сделано. Хорошего дня!</p>}
+          </Panel>
+          <div className="grid grid-cols-2 gap-3">
+            <Stat value={students.length} label="учеников" href="#/app/students" />
+            <Stat value={lessons.filter((l) => l.status === "finished").length} label="уроков проведено" href="#/app/lessons" />
+          </div>
+          <a href="#/app/spark" className="panel flex items-center gap-3 p-4 transition hover:border-ink/25">
+            <SparkMark size={40} />
+            <span className="min-w-0"><span className="block font-semibold">Искорка</span><span className="text-[13px] text-ink-mute">План урока, упражнения, письмо родителям. Можно голосом</span></span>
+          </a>
+          <a href="#/market?tab=students" className="panel flex items-center gap-3 p-4 transition hover:border-ink/25">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cream"><Search size={18} /></span>
+            <span className="min-w-0"><span className="block font-semibold">Заявки учеников</span><span className="text-[13px] text-ink-mute">Ученики ищут преподавателя: откликнитесь со своей ценой</span></span>
+          </a>
+        </div>
       </div>
     </>
   );
@@ -117,13 +146,14 @@ export function StudentsPage() {
   const [added, setAdded] = useState(null);
   const [words, setWords] = useState(null);
   const [lang, setLang] = useState("en");
+  const [adding, setAdding] = useState(false);
+  const [err, setErr] = useState(null);
   const setStudentLang = async (s, language) => {
     try { await request("POST", `/site/v1/students/${s.pair_id}/language`, { language }); reload(); } catch (x) { setErr(x); }
   };
-  const [err, setErr] = useState(null);
   const add = async (e) => {
     e.preventDefault(); setErr(null);
-    try { setAdded({ name, ...(await request("POST", "/site/v1/students", { name, language: lang })) }); setName(""); reload(); } catch (x) { setErr(x); }
+    try { setAdded({ name, ...(await request("POST", "/site/v1/students", { name, language: lang })) }); setName(""); setAdding(false); reload(); } catch (x) { setErr(x); }
   };
   const remove = async (s) => {
     if (!window.confirm(`Удалить ученика «${s.name}»? Уроки и конспекты сохранятся в архиве.`)) return;
@@ -133,44 +163,48 @@ export function StudentsPage() {
   const list = data?.students || [];
   return (
     <>
-      <PageTitle title="Ученики" text="Ученик и родитель подключаются по ссылкам. Они видят только ваше имя." />
-      <form onSubmit={add} className="card mb-4 flex flex-wrap items-end gap-3">
-        <label className="label min-w-[200px] flex-1">Имя ученика<input className="field" required maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Миша" /></label>
-        <label className="label">Язык
-          <select className="field" value={lang} onChange={(e) => setLang(e.target.value)}>{LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}</select>
-        </label>
-        <button type="submit" className="btn-brand"><UserPlus size={16} /> Добавить</button>
-        {data?.limit != null && <span className="w-full text-xs text-ink-mute">Учеников: {list.length} из {data.limit} на вашем тарифе. <a href="#/app/plan" className="link">Тарифы</a></span>}
-        {err && <div className="w-full"><ErrorBox error={err} /></div>}
-      </form>
-      <ErrorBox error={error} />
-      {!data ? <Loading /> : !list.length ? <Empty icon={Users} title="Учеников пока нет" text="Добавьте ученика – и отправьте ему ссылку-приглашение в любом мессенджере." /> : (
-        <div className="grid gap-3 md:grid-cols-2">
+      <PageTitle title="Ученики" text="Ученик и родитель подключаются по ссылкам и видят только ваше имя."
+        actions={<button type="button" className="btn-brand" onClick={() => setAdding(true)}><UserPlus size={16} /> Добавить ученика</button>} />
+      <ErrorBox error={error || err} />
+      {!data ? <Loading /> : !list.length ? (
+        <Empty icon={Users} title="Учеников пока нет" text="Добавьте ученика и отправьте ему ссылку в любом мессенджере. Регистрация у него займёт минуту."
+          action={<button type="button" className="btn-brand" onClick={() => setAdding(true)}><UserPlus size={16} /> Добавить ученика</button>} />
+      ) : (
+        <div className="panel divide-y divide-line">
           {list.map((s) => (
-            <div key={s.pair_id} className="card !p-5">
-              <div className="flex flex-wrap items-center gap-3">
-                <ProfileAvatar photo={s.photo} name={s.name} size={40} />
-                <div className="min-w-0 flex-1"><p className="font-bold">{s.name}</p><p className="text-xs text-ink-mute">{s.joined ? "подключён" : "ещё не подключился"} · родителей: {s.parents}</p><MoodChip mood={s.mood} /></div>
-                <select className="field order-last !w-auto !py-1.5 text-sm sm:order-none" value={s.language} onChange={(e) => setStudentLang(s, e.target.value)} aria-label={`Язык ученика ${s.name}`}>
+            <div key={s.pair_id} className="flex flex-wrap items-center gap-3 p-4">
+              <ProfileAvatar photo={s.photo} name={s.name} size={44} />
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-2 font-semibold">{s.name} <MoodChip mood={s.mood} /></p>
+                <p className="text-[13px] text-ink-mute">{s.joined ? "подключён" : "ещё не подключился"} · родителей: {s.parents}{s.balance ? ` · оплачено занятий: ${s.balance}` : ""}</p>
+              </div>
+              <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
+                {s.joined ? <StartButton chatId={s.chat_id} active={s.active_lesson} small /> : <CopyLink label="Ссылка ученику" url={s.invite?.url} />}
+                <CopyLink label="Родителю" url={s.parent_invite?.url} />
+                {s.joined && <button type="button" className="btn-ghost btn-sm" onClick={() => setWords(s)}>Слова</button>}
+                <select className="field !h-8 !w-auto !py-0 !text-[13px]" value={s.language} onChange={(e) => setStudentLang(s, e.target.value)} aria-label={`Язык ученика ${s.name}`}>
                   {LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}
                 </select>
-                <button type="button" className="btn-ghost !p-2" onClick={() => remove(s)} aria-label={`Удалить ${s.name}`}><Trash2 size={16} /></button>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {s.joined ? <StartButton chatId={s.chat_id} active={s.active_lesson} small /> : <CopyLink label="Ссылка для ученика" url={s.invite?.url} />}
-                <CopyLink label="Ссылка для родителя" url={s.parent_invite?.url} />
-                {s.joined && <button type="button" className="btn-ghost btn-sm" onClick={() => setWords(s)}>Слова</button>}
-                {s.joined && <a href="#/app/messages" className="btn-ghost btn-sm">Написать</a>}
+                <button type="button" className="btn-ghost btn-sm !px-2" onClick={() => remove(s)} aria-label={`Удалить ${s.name}`}><Trash2 size={15} /></button>
               </div>
             </div>
           ))}
         </div>
       )}
+      <Modal open={adding} onClose={() => setAdding(false)} title="Новый ученик">
+        <form onSubmit={add} className="grid gap-3">
+          <label className="label">Имя ученика<input className="field" required maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Миша" autoFocus /></label>
+          <label className="label">Какой язык изучает
+            <select className="field" value={lang} onChange={(e) => setLang(e.target.value)}>{LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}</select>
+          </label>
+          <button type="submit" className="btn-brand"><UserPlus size={16} /> Добавить и получить ссылку</button>
+        </form>
+      </Modal>
       <Modal open={!!words} onClose={() => setWords(null)} title={`Словарь: ${words?.name || ""}`} wide>
         {words && <Vocab chatId={words.chat_id} tutorView />}
       </Modal>
       <Modal open={!!added} onClose={() => setAdded(null)} title={`${added?.name || "Ученик"} добавлен`}>
-        <p className="text-ink-soft">Отправьте ссылки ученику и родителю – в WhatsApp, Telegram, почтой. По ссылке они зарегистрируются и попадут к вам.</p>
+        <p className="text-ink-soft">Отправьте ссылки ученику и родителю в WhatsApp, Telegram, MAX или почтой. По ссылке они зарегистрируются и сразу попадут к вам.</p>
         <div className="mt-4 grid gap-3">
           {[["Ученику", added?.invite?.url], ["Родителю (отчёты и переписка)", added?.parent_invite?.url]].map(([t, url]) => (
             <div key={t}><p className="mb-1 text-sm font-semibold">{t}</p><div className="flex gap-2"><input readOnly className="field text-sm" value={url || ""} onFocus={(e) => e.target.select()} aria-label={t} /><CopyLink label="Копировать" url={url} /></div></div>
@@ -179,22 +213,6 @@ export function StudentsPage() {
       </Modal>
     </>
   );
-}
-
-// == Материалы ===================================================================================
-const KIND_ICON = { file: File, video: Clapperboard, link: Link2 };
-const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(n / 1024))} КБ`);
-
-export async function uploadFile(file, { shared, folder } = {}) {
-  const headers = { "Content-Type": file.type || "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), Accept: "application/json" };
-  const token = getToken();
-  if (token) headers["X-Access-Token"] = token;
-  if (shared) headers["X-Shared"] = "1";
-  if (folder) headers["X-Folder"] = encodeURIComponent(folder);
-  const r = await fetch("/site/v1/materials/upload", { method: "POST", headers, body: file, credentials: "same-origin" });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(`${file.name}: ${data.error || r.status}`); e.status = r.status; throw e; }
-  return data;
 }
 
 // == Тариф ======================================================================================

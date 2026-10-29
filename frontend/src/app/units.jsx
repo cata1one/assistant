@@ -246,11 +246,53 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
       <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.title || ""} wide>
         {preview && (
           <div className="grid gap-4">
-            <UnitPlayer unit={preview} preview />
+            <UnitPlayer unit={preview.preview} submitLabel="Проверить себя"
+              onSubmit={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })} />
             {role !== "student" && <button type="button" className="btn-brand w-fit" onClick={() => copyLib(preview)}><Copy size={14} /> Взять себе и изменить</button>}
           </div>
         )}
       </Modal>
+    </>
+  );
+}
+
+/** Курсы Bright для ученика: проходить готовые занятия самому и сразу видеть ошибки. */
+export function CoursesPage() {
+  const { data, error } = useApi("/site/v1/library");
+  const [lang, setLang] = useState("all");
+  const [open, setOpen] = useState(null);
+  const LANG_TITLE = Object.fromEntries(LANGS.map((l) => [l.id, `${l.flag} ${l.title}`]));
+  const list = (data?.library || []).filter((u) => lang === "all" || u.language === lang);
+  const langs = [...new Set((data?.library || []).map((u) => u.language))];
+  const chip = (active) => `chip !px-2.5 !py-1 !text-[13px] ${active ? "!bg-ink !text-white" : ""}`;
+  if (open) {
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(null)} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-ink-mute hover:text-ink"><ArrowLeft size={14} /> Все курсы</button>
+        <PageTitle title={open.title} text={open.summary} />
+        <UnitPlayer unit={open.preview} submitLabel="Проверить себя" onSubmit={(answers) => request("POST", `/site/v1/library/${open.id}/check`, { answers })} />
+      </>
+    );
+  }
+  return (
+    <>
+      <PageTitle title="Курсы Bright" text="Занимайтесь сами между уроками: правила с примерами, задания с автопроверкой и аудирование." />
+      <ErrorBox error={error} />
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        <button type="button" className={chip(lang === "all")} onClick={() => setLang("all")}>Все языки</button>
+        {langs.map((l) => <button key={l} type="button" className={chip(lang === l)} onClick={() => setLang(l)}>{LANG_TITLE[l] || l}</button>)}
+      </div>
+      {!data ? <Loading /> : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {list.map((u) => (
+            <button key={u.id} type="button" onClick={() => { setOpen(u); window.scrollTo(0, 0); }} className="panel flex flex-col p-4 text-left transition hover:border-ink/25">
+              <div className="flex flex-wrap gap-1"><span className="chip !bg-ink !text-white">{u.level}</span>{(u.tags || []).slice(0, 2).map((t) => <span key={t} className="chip">{t}</span>)}</div>
+              <h3 className="mt-2.5 text-[15px] font-semibold leading-snug">{u.title}</h3>
+              <p className="mt-1 line-clamp-2 text-[13px] text-ink-mute">{u.summary}</p>
+            </button>
+          ))}
+        </div>
+      )}
     </>
   );
 }

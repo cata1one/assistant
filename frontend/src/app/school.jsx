@@ -2,7 +2,9 @@ import { CheckCircle2, ShieldAlert, ShieldCheck, Star, Users } from "lucide-reac
 import { useState } from "react";
 import { fmtDate, request } from "../lib/api.js";
 import { copy, Empty, ErrorBox, Loading, Notice, PageTitle, Stat } from "../ui/kit.jsx";
+import { sendVoice } from "../lib/voice.js";
 import { Panel, shortDate, useApi } from "./common.jsx";
+import VoiceButton from "./VoiceButton.jsx";
 
 function useSchool() {
   return useApi("/site/v1/school");
@@ -32,9 +34,9 @@ export function SchoolHome() {
       <PageTitle title={data.org.name} text="Кабинет школы: преподаватели, ученики, уроки и сигналы." />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat value={data.tutors.length} label="преподавателей" />
-        <Stat value={data.students_total} label="учеников" tone="mint" />
-        <Stat value={data.lessons.filter((l) => new Date(l.started_at).getTime() > week).length} label="уроков за неделю" tone="lilac" />
-        <Stat value={data.signals.filter((s) => new Date(s.created_at).getTime() > week).length} label="сигналов за неделю" tone="sun" />
+        <Stat value={data.students_total} label="учеников" />
+        <Stat value={data.lessons.filter((l) => new Date(l.started_at).getTime() > week).length} label="уроков за неделю" />
+        <Stat value={data.signals.filter((s) => new Date(s.created_at).getTime() > week).length} label="сигналов за неделю" accent={data.signals.some((s) => new Date(s.created_at).getTime() > week)} />
       </div>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Panel title="Пригласить преподавателя" icon={Users}>
@@ -44,13 +46,13 @@ export function SchoolHome() {
         <Panel title="Защита учеников" icon={ShieldCheck}>
           <p className="text-sm text-ink-soft">Когда включено, телефоны, ники и ссылки в переписке, речи на уроке и на доске блокируются, а вам приходит сигнал.</p>
           <button type="button" onClick={toggle} role="switch" aria-checked={data.org.filter_contacts}
-            className={`mt-4 flex items-center gap-3 rounded-full border px-4 py-2 font-semibold transition ${data.org.filter_contacts ? "border-mint bg-mint-soft text-[#146b4c]" : "border-line bg-white text-ink-soft"}`}>
+            className={`mt-4 flex items-center gap-3 rounded-xl border px-4 py-2 font-semibold transition ${data.org.filter_contacts ? "border-mint/40 bg-mint-soft text-[#13623E]" : "border-line bg-white text-ink-soft"}`}>
             <span className={`relative h-6 w-11 rounded-full transition ${data.org.filter_contacts ? "bg-mint" : "bg-line"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${data.org.filter_contacts ? "left-[22px]" : "left-0.5"}`} /></span>
             {data.org.filter_contacts ? "Фильтр контактов включён" : "Фильтр выключен"}
           </button>
           <ErrorBox error={err} />
         </Panel>
-        <Panel title="Последние сигналы" icon={ShieldAlert} actions={<a href="#/app/signals" className="link text-sm">Все</a>}>
+        <Panel title="Последние сигналы" icon={ShieldAlert} actions={<a href="#/app/signals" className="text-[13px] font-medium text-ink-mute hover:text-ink">Все</a>}>
           <Signals list={data.signals.slice(0, 4)} />
         </Panel>
         <Panel title="Последние уроки" icon={CheckCircle2}><SchoolLessonList list={data.lessons.slice(0, 6)} /></Panel>
@@ -222,6 +224,51 @@ export function AdminPage() {
         )}
       </div>
       <Notice className="mt-6">Сигналы о нарушениях приходят администратору в Telegram.</Notice>
+    </>
+  );
+}
+
+/** Состояние сервера: что работает, что нет и что сделать. Без этого «не работает расшифровка» – гадание. */
+export function SystemPage() {
+  const { data, error, reload } = useApi("/site/v1/admin/system");
+  const [test, setTest] = useState(null);
+  const run = async (blob) => setTest(await sendVoice("/site/v1/admin/stt-test", blob));
+  if (error) return <ErrorBox error={error} />;
+  if (!data) return <Loading />;
+  const row = (ok, title, text, fix) => (
+    <li className="flex gap-3 py-3">
+      <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${ok ? "bg-mint" : "bg-teach"}`} />
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">{title}</span>
+        <span className="block text-sm text-ink-mute">{text}</span>
+        {!ok && fix && <code className="mt-1 block whitespace-pre-wrap rounded-xl bg-cream px-3 py-2 text-[12px] text-ink-soft">{fix}</code>}
+      </span>
+    </li>
+  );
+  return (
+    <>
+      <PageTitle title="Система" text="Что работает на сервере. Если где-то красная точка, ниже написано, что сделать." actions={<button type="button" className="btn-light" onClick={reload}>Обновить</button>} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Проверки">
+          <ul className="divide-y divide-line">
+            {row(data.https, "Защищённый адрес (https)", data.site_url || "адрес сайта не задан", "Без https браузер не даёт микрофон и камеру: не работают уроки, голосовые и расшифровка.\nbash /opt/better-study/deploy/set-domain.sh brightplatform.online")}
+            {row(data.speech.available, "Распознавание речи", data.speech.available ? `модель ${data.speech.model}${data.speech.loaded ? ", загружена" : ", загрузится при первой записи"}` : data.speech.error || "выключено", "bash /opt/better-study/deploy/update.sh   (установит распознавание, если хватает памяти)")}
+            {row(!!data.ai.provider, "ИИ (Искорка, конспекты, занятия)", data.ai.provider ? `${data.ai.model || data.ai.provider}${data.ai.error ? `, ошибка: ${data.ai.error}` : ""}` : "не включён", "bash /opt/better-study/deploy/enable-ai.sh   (бесплатная Ollama на сервере, нужно от 8 ГБ памяти)")}
+            {row(data.mail, "Почта", data.mail ? "письма уходят" : "письма не отправляются", "В /opt/better-study/.env заполните TUTOR_SMTP_HOST, TUTOR_SMTP_USER, TUTOR_SMTP_PASSWORD")}
+            {row(data.payments, "Оплата ЮKassa", data.payments ? "подключена" : "не подключена", "В .env заполните YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY")}
+            {row(data.telegram, "Telegram-бот", data.bot ? `@${data.bot}` : "не настроен", "В .env заполните TELEGRAM_BOT_TOKEN и TUTOR_BOT_USERNAME")}
+          </ul>
+        </Panel>
+        <Panel title="Проверить распознавание голосом">
+          <p className="text-sm text-ink-mute">Нажмите на микрофон, скажите пару фраз по-русски и по-английски, отправьте. Увидите текст и сколько секунд сервер думал.</p>
+          <div className="relative mt-4 flex items-center gap-2"><VoiceButton onSend={run} max={30} /><span className="text-sm text-ink-mute">до 30 секунд</span></div>
+          {test && (
+            <Notice tone={test.ok ? "ok" : "bad"} className="mt-4">
+              {test.ok ? <>Распознано за {test.seconds} с ({test.language}): «{test.text || "тишина"}»</> : <>Не работает: {test.error}</>}
+            </Notice>
+          )}
+        </Panel>
+      </div>
     </>
   );
 }

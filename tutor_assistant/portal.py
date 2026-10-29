@@ -45,7 +45,7 @@ APPLICATIONS_PER_HOUR = 5  # с одного IP
 BOARD_ITEM_LIMIT = 50000
 BOARD_KINDS = ("stroke", "shape", "text", "erase", "clear", "obj", "del")
 # Доска v2: объекты с id, которые можно двигать, менять и удалять (последняя версия объекта побеждает)
-OBJ_TYPES = ("stroke", "shape", "text", "note", "sticker", "image", "video", "file", "link")
+OBJ_TYPES = ("stroke", "shape", "text", "note", "sticker", "image", "video", "file", "link", "card", "table", "timer")
 OID_RE = re.compile(r"^[\w-]{4,32}$")
 FILE_SRC_RE = re.compile(r"^/site/v1/files/[0-9a-f]{24}$")
 STICKER_RE = re.compile(r"^[\w-]{1,40}$")
@@ -262,6 +262,8 @@ class Portal:
                 "status": lesson["status"], "started_at": lesson["started_at"],
                 "has_report": report is not None,
                 "words": len(report.vocabulary) if report else 0,
+                "on_review": report is not None and by_chat[lesson["chat_id"]].role == TUTOR
+                and not self.storage.report_published(lesson["id"]),
             })
         teacher = self.storage.get_teacher(viewer.user_id)
         is_tutor = any(a.role == TUTOR for a in accesses)
@@ -287,7 +289,8 @@ class Portal:
             return {**base, "report": student_view(report)}
         if access.role == PARENT:
             return {**base, "report": parent_view(report)}
-        return {**base, "report": report.model_dump(), "text": render.render_report(report)}
+        return {**base, "report": report.model_dump(), "text": render.render_report(report),
+                "student_report": student_view(report), "parent_report": parent_view(report)}
 
     def _lesson_access(self, viewer: Viewer, lesson_id: str) -> tuple[dict[str, Any], Access]:
         lesson = self.storage.get_lesson(lesson_id)
@@ -568,8 +571,9 @@ def _color(v: Any) -> str:
 
 
 def _obj_text(data: dict[str, Any]) -> str | None:
-    parts = [data.get(k) for k in ("text", "title") if isinstance(data.get(k), str)]
-    return " ".join(parts) or None
+    parts = [data.get(k) for k in ("text", "title", "front", "back", "label") if isinstance(data.get(k), str)]
+    parts += [c for row in data.get("cells") or [] for c in row if isinstance(c, str)]
+    return " ".join(p for p in parts if p) or None
 
 
 def _validate_obj(data: Any) -> dict[str, Any]:
@@ -631,6 +635,29 @@ def _validate_obj(data: Any) -> dict[str, Any]:
             x, y = min(0.98, max(0.0, crop[0])), min(0.98, max(0.0, crop[1]))
             w, h = min(1 - x, max(0.02, crop[2])), min(1 - y, max(0.02, crop[3]))
             out["crop"] = [round(x, 4), round(y, 4), round(w, 4), round(h, 4)]
+    elif typ == "card":  # карточка слова: слово на лицевой стороне, перевод на обороте, переворачивают все
+        for side in ("front", "back"):
+            v = data.get(side, "")
+            if not isinstance(v, str) or len(v) > 200:
+                raise PortalError(400, "карточка: до 200 символов на сторону")
+            out[side] = v
+        out["flipped"] = bool(data.get("flipped"))
+        out["color"] = _color(data.get("color", "#FFF4C7"))
+    elif typ == "table":  # таблица для спряжений, слов и правил
+        cells = data.get("cells")
+        if not isinstance(cells, list) or not 1 <= len(cells) <= 12 or not all(
+                isinstance(r, list) and 1 <= len(r) <= 8 for r in cells):
+            raise PortalError(400, "таблица: до 12 строк и 8 столбцов")
+        width = max(len(r) for r in cells)
+        out["cells"] = [[(c if isinstance(c, str) else "")[:120] for c in r] + [""] * (width - len(r)) for r in cells]
+        out["head"] = bool(data.get("head", True))
+    elif typ == "timer":  # общий таймер: время старта видят все участники
+        out["seconds"] = int(_num(data.get("seconds", 120), 5, 3600))
+        started = data.get("started")
+        out["started"] = int(_num(started, 0, 1e14)) if started else None
+        out["left"] = int(_num(data.get("left", out["seconds"]), 0, 3600))
+        label = data.get("label", "")
+        out["label"] = label[:60] if isinstance(label, str) else ""
     elif typ in ("video", "link"):
         from .learning import video_embed
 

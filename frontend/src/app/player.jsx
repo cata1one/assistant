@@ -110,13 +110,13 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
   return (
     <div className="grid gap-4">
       {result && result.total > 0 && (
-        <div className={`card flex items-center gap-4 ${result.score === result.total ? "!bg-mint-soft" : "!bg-brand-tint"}`}>
-          <span className="num font-display text-4xl font-extrabold">{result.score}/{result.total}</span>
+        <div className={`panel flex items-center gap-4 p-5 ${result.score === result.total ? "!bg-mint-soft" : "!bg-sun-soft"}`}>
+          <span className="num font-display text-4xl font-bold">{result.score}/{result.total}</span>
           <span>{result.score === result.total ? "Всё верно – отлично!" : "Правильные ответы показаны зелёным."}</span>
         </div>
       )}
       {unit.blocks.map((b, i) => (
-        <section key={i} className="card">
+        <section key={i} className="panel p-5">
           {b.title && <h2 className="mb-3 text-lg">{b.title}</h2>}
           {b.type === "text" && <p className="whitespace-pre-wrap text-ink-soft">{b.body}</p>}
           {b.type === "words" && (
@@ -140,7 +140,7 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
                     <select className={`field !py-2 ${r(i) ? (ok ? "!border-mint" : "!border-teach") : ""}`} disabled={!!result} value={(answers[i] || [])[j] || ""}
                       onChange={(e) => { const n = [...(answers[i] || [])]; n[j] = e.target.value; set(i, n); }} aria-label={`Пара для ${l}`}>
                       <option value="">– выберите –</option>
-                      {b.right.map((x) => <option key={x} value={x}>{x}</option>)}
+                      {[...new Set(b.right)].map((x) => <option key={x} value={x}>{x}</option>)}
                     </select>
                     {r(i) && !ok && <span className="text-sm font-semibold text-[#146b4c] sm:col-start-2">{r(i).pair_answers[j]}</span>}
                   </div>

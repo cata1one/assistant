@@ -1,11 +1,13 @@
 import {
-  ArrowUpRight, Crop as CropIcon, Circle, Eraser, FileText, Film, FolderOpen, Hand, Highlighter, ImagePlus, Link2, Maximize, Minus,
-  MousePointer2, Pencil, Plus, Smile, Square, StickyNote, Trash2, Type, Undo2,
+  ArrowUpRight, Crop as CropIcon, Circle, Columns3, Eraser, FileText, Film, FolderOpen, Hand, Highlighter, ImagePlus, Layers, Link2,
+  Maximize, Minus, MousePointer2, Pause, Pencil, Play, Plus, RotateCcw, Rows3, Smile, Square, StickyNote, Table, Timer, Trash2, Type, Undo2,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getToken, request } from "../lib/api.js";
 import { Modal } from "../ui/kit.jsx";
 import CropDialog from "./Crop.jsx";
+
+const PdfPages = lazy(() => import("./PdfPages.jsx"));
 import { PACKS, stickerById } from "./stickers.js";
 
 /*
@@ -14,9 +16,9 @@ import { PACKS, stickerById } from "./stickers.js";
  * На общей доске операции уходят на сервер, а новые приходят опросом раз в ~1 секунду.
  */
 
-const COLORS = ["#1E2235", "#3D63F5", "#F2643D", "#22B07D", "#FFC24B", "#8B7CF6", "#E5484D"];
+const COLORS = ["#17171A", "#2B59E8", "#E4572E", "#1F9D63", "#F5B400", "#6E5BD8", "#D93B3B"];
 const NOTE_COLORS = ["#FDE68A", "#FBCFE8", "#BFDBFE", "#BBF7D0", "#FED7AA", "#DDD6FE"];
-const LOCAL_KEY = "better-board-local-v2";
+const LOCAL_KEY = "better-board-local-v2"; // старое имя ключа: личные доски у пользователей не пропадают
 const oidGen = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
 const TOOLS = [
@@ -27,7 +29,7 @@ const TOOLS = [
 ];
 
 // -- отрисовка объектов --------------------------------------------------------------------------
-const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, activeVideo, setActiveVideo }) {
+const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, activeVideo, setActiveVideo, onAction }) {
   // Слои задаются порядком в разметке (объекты отсортированы по z), поэтому z-index не нужен
   const style = { left: o.x, top: o.y, width: o.w, height: o.h };
   const cls = `board-obj ${selected ? "selected" : ""}`;
@@ -108,6 +110,36 @@ const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, active
       </div>
     );
   }
+  if (o.type === "card") {
+    return (
+      <div data-oid={o.oid} className={`${cls} board-note flex flex-col items-center justify-center p-4 text-center`} style={{ ...style, background: o.flipped ? "#FFFFFF" : o.color }}>
+        {editing ? (
+          <CardEditor o={o} onDone={onEditDone} />
+        ) : (
+          <>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-mute">{o.flipped ? "перевод" : "слово"}</span>
+            <span className="mt-1 break-words font-semibold leading-tight" style={{ fontSize: Math.max(14, Math.min(o.w, o.h) / 6) }}>{(o.flipped ? o.back : o.front) || "Двойной клик, чтобы вписать"}</span>
+            <button type="button" data-play="1" onPointerDown={(e) => e.stopPropagation()} onClick={() => onAction?.({ ...o, flipped: !o.flipped })}
+              className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-white/80 text-ink-soft shadow-soft hover:text-ink" aria-label="Перевернуть карточку"><RotateCcw size={15} /></button>
+          </>
+        )}
+      </div>
+    );
+  }
+  if (o.type === "table") {
+    return (
+      <div data-oid={o.oid} className={`${cls} overflow-hidden rounded-lg border border-ink/20 bg-white`} style={style}>
+        {editing ? <TableEditor o={o} onDone={onEditDone} /> : (
+          <table className="h-full w-full table-fixed border-collapse text-[15px]">
+            <tbody>{o.cells.map((r, i) => (
+              <tr key={i}>{r.map((c, j) => <td key={j} className={`border border-ink/15 px-2 py-1 align-middle ${i === 0 && o.head ? "bg-cream font-semibold" : ""}`}>{c}</td>)}</tr>
+            ))}</tbody>
+          </table>
+        )}
+      </div>
+    );
+  }
+  if (o.type === "timer") return <TimerView o={o} cls={cls} style={style} onAction={onAction} />;
   // файл и ссылка – карточки
   const Icon = o.type === "file" ? FileText : Link2;
   return (
@@ -120,6 +152,60 @@ const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, active
     </div>
   );
 });
+
+function CardEditor({ o, onDone }) {
+  const [f, setF] = useState({ front: o.front || "", back: o.back || "" });
+  return (
+    <div className="grid w-full gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
+      <input autoFocus className="field !py-1.5 text-sm" placeholder="Слово" value={f.front} maxLength={200} onChange={(e) => setF({ ...f, front: e.target.value })} onKeyDown={(e) => e.stopPropagation()} />
+      <input className="field !py-1.5 text-sm" placeholder="Перевод" value={f.back} maxLength={200} onChange={(e) => setF({ ...f, back: e.target.value })} onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") onDone(o, f); }} />
+      <button type="button" className="btn-brand btn-sm" onClick={() => onDone(o, f)}>Готово</button>
+    </div>
+  );
+}
+
+function TableEditor({ o, onDone }) {
+  const [cells, setCells] = useState(o.cells);
+  const set = (i, j, v) => setCells((c) => c.map((r, a) => (a === i ? r.map((x, b) => (b === j ? v : x)) : r)));
+  return (
+    <div className="flex h-full flex-col" onPointerDown={(e) => e.stopPropagation()}>
+      <table className="w-full flex-1 table-fixed border-collapse"><tbody>{cells.map((r, i) => (
+        <tr key={i}>{r.map((c, j) => <td key={j} className="border border-ink/15 p-0"><input value={c} maxLength={120} onChange={(e) => set(i, j, e.target.value)} onKeyDown={(e) => e.stopPropagation()}
+          className={`w-full bg-transparent px-2 py-1 text-[15px] outline-none focus:bg-sun-soft ${i === 0 && o.head ? "font-semibold" : ""}`} autoFocus={i === 0 && j === 0} /></td>)}</tr>
+      ))}</tbody></table>
+      <div className="flex gap-1 border-t border-line bg-cream p-1">
+        <button type="button" className="btn-ghost btn-sm !px-2" title="Добавить строку" onClick={() => setCells((c) => (c.length < 12 ? [...c, c[0].map(() => "")] : c))}><Rows3 size={14} />+</button>
+        <button type="button" className="btn-ghost btn-sm !px-2" title="Добавить столбец" onClick={() => setCells((c) => (c[0].length < 8 ? c.map((r) => [...r, ""]) : c))}><Columns3 size={14} />+</button>
+        <button type="button" className="btn-ghost btn-sm !px-2" title="Убрать строку" onClick={() => setCells((c) => (c.length > 1 ? c.slice(0, -1) : c))}><Rows3 size={14} />−</button>
+        <button type="button" className="btn-ghost btn-sm !px-2" title="Убрать столбец" onClick={() => setCells((c) => (c[0].length > 1 ? c.map((r) => r.slice(0, -1)) : c))}><Columns3 size={14} />−</button>
+        <button type="button" className="btn-brand btn-sm ml-auto" onClick={() => onDone(o, { cells })}>Готово</button>
+      </div>
+    </div>
+  );
+}
+
+/** Общий таймер на задание: запускает любой участник, время одинаковое у всех. */
+function TimerView({ o, cls, style, onAction }) {
+  const [, tick] = useState(0);
+  useEffect(() => { if (!o.started) return undefined; const t = setInterval(() => tick((x) => x + 1), 500); return () => clearInterval(t); }, [o.started]);
+  const left = o.started ? Math.max(0, o.left - Math.floor((Date.now() - o.started) / 1000)) : o.left;
+  const done = o.started && left === 0;
+  const fmt = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+  const act = (patch) => onAction?.({ ...o, ...patch });
+  const stop = (e) => e.stopPropagation();
+  return (
+    <div data-oid={o.oid} className={`${cls} flex flex-col items-center justify-center rounded-2xl border-2 ${done ? "border-teach bg-teach-tint" : "border-ink bg-white"}`} style={style}>
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-mute">{o.label || "Таймер"}</span>
+      <span className="num font-bold leading-none" style={{ fontSize: Math.min(o.w / 3.2, o.h / 2.2) }}>{done ? "Время!" : fmt}</span>
+      <span className="mt-2 flex gap-1" data-play="1">
+        {!o.started || done ? <button type="button" data-play="1" onPointerDown={stop} onClick={() => act({ started: Date.now(), left: done ? o.seconds : o.left })} className="grid h-8 w-8 place-items-center rounded-full bg-ink text-white" aria-label="Старт"><Play size={14} /></button>
+          : <button type="button" data-play="1" onPointerDown={stop} onClick={() => act({ started: null, left })} className="grid h-8 w-8 place-items-center rounded-full bg-ink text-white" aria-label="Пауза"><Pause size={14} /></button>}
+        <button type="button" data-play="1" onPointerDown={stop} onClick={() => act({ started: null, left: o.seconds })} className="grid h-8 w-8 place-items-center rounded-full bg-cream text-ink" aria-label="Сначала"><RotateCcw size={14} /></button>
+        {[60, 180, 300].map((sec) => <button key={sec} type="button" data-play="1" onPointerDown={stop} onClick={() => act({ seconds: sec, left: sec, started: null })} className="h-8 rounded-full bg-cream px-2 text-xs font-semibold">{sec / 60}м</button>)}
+      </span>
+    </div>
+  );
+}
 
 // -- сама доска --------------------------------------------------------------------------------------
 export default function Board({ boardId = null, canClear = false, canUpload = false, height = "70vh" }) {
@@ -143,6 +229,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   const [draft, setDraft] = useState(null); // рисуемая линия или фигура
   const [live, setLive] = useState(null); // перемещаемый объект
   const [panel, setPanel] = useState(null); // stickers | materials | video
+  const [pdfOpen, setPdfOpen] = useState(null); // PDF учебника: выбор страницы для доски
   const [activeVideo, setActiveVideo] = useState(null);
   const [status, setStatus] = useState("");
   const history = useRef([]);
@@ -379,11 +466,13 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   const onDoubleClick = (e) => {
     const el = e.target.closest?.("[data-oid]");
     const o = el && objsRef.current.get(el.dataset.oid);
-    if (o && (o.type === "text" || o.type === "note")) { setSelected(o.oid); setEditing(o.oid); }
+    if (o && ["text", "note", "card", "table"].includes(o.type)) { setSelected(o.oid); setEditing(o.oid); }
   };
 
-  const onEditDone = useCallback((o, text) => {
+  const onEditDone = useCallback((o, value) => {
     setEditing(null);
+    if (typeof value === "object") { put({ ...o, ...value }); return; } // карточка или таблица
+    const text = value;
     if (!text.trim() && !objsRef.current.get(o.oid)?.text) { applyOps([{ kind: "del", data: { oid: o.oid } }]); return; }
     if (text !== o.text || !history.current.some((h) => h.oid === o.oid)) put({ ...o, text });
   }, [applyOps, put]);
@@ -407,17 +496,30 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   // -- вставка ------------------------------------------------------------------------------------
   const place = (o) => { const [cx, cy] = center(); put({ oid: oidGen(), z: topZ(), x: cx - o.w / 2, y: cy - o.h / 2, ...o }); setTool("select"); };
   const addSticker = (s) => { place({ type: "sticker", sticker: s.id, w: 130, h: 130 }); setPanel(null); };
+  const addCard = () => { const [cx, cy] = center(); const o = { oid: oidGen(), type: "card", x: cx - 110, y: cy - 70, w: 220, h: 140, z: topZ(), front: "", back: "", flipped: false, color: "#FFF4C7" }; applyOps([{ kind: "obj", data: o }]); setSelected(o.oid); setEditing(o.oid); setTool("select"); };
+  const addTable = () => { const [cx, cy] = center(); const o = { oid: oidGen(), type: "table", x: cx - 200, y: cy - 80, w: 400, h: 160, z: topZ(), head: true, cells: [["I", "you", "he / she"], ["am", "are", "is"], ["", "", ""]] }; applyOps([{ kind: "obj", data: o }]); setSelected(o.oid); setEditing(o.oid); setTool("select"); };
+  const addTimer = () => place({ type: "timer", w: 240, h: 150, seconds: 120, left: 120, started: null, label: "Время на задание" });
+  const pagePicked = async (blob, page) => {
+    const name = `${pdfOpen.title.replace(/\.pdf$/i, "")}, стр. ${page}.jpg`;
+    const r = await fetch("/site/v1/materials/upload", { method: "POST", body: blob, headers: {
+      "Content-Type": "image/jpeg", "X-File-Name": encodeURIComponent(name), "X-Folder": encodeURIComponent("Страницы учебников"), "X-Access-Token": getToken() || "" } });
+    const m = await r.json();
+    if (!r.ok) throw new Error(m.error || "не получилось");
+    placeImage(m.url, m.title, 720);
+    setPdfOpen(null);
+  };
   const addMaterial = (m) => {
     if (m.kind === "video") place({ type: "video", url: m.url, title: m.title, w: 480, h: 310 });
     else if (m.kind === "link") place({ type: "link", url: m.url, title: m.title, w: 300, h: 84 });
     else if (m.mime?.startsWith("image/")) placeImage(m.url, m.title);
+    else if (m.mime === "application/pdf") { setPdfOpen(m); setPanel(null); return; } // учебник: выбрать страницу
     else place({ type: "file", src: m.url, title: m.title, w: 300, h: 84 });
     setPanel(null);
   };
-  const placeImage = (src, title) => {
+  const placeImage = (src, title, max = 520) => {
     const img = new Image();
     img.onload = () => {
-      const k = Math.min(1, 520 / Math.max(img.width, img.height));
+      const k = Math.min(1, max / Math.max(img.width, img.height));
       place({ type: "image", src, title, w: Math.round(img.width * k), h: Math.round(img.height * k) });
     };
     img.src = src;
@@ -438,10 +540,13 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
     const list = [...objsRef.current.values()];
     if (!list.length) { setView({ x: 80, y: 60, z: 1 }); return; }
     const r = vp.current.getBoundingClientRect();
+    // Поля: слева панель инструментов, сверху палитра – содержимое не должно уходить под них
+    const pl = 76, pt = 64, pr = 24, pb = 56;
     const x1 = Math.min(...list.map((o) => o.x)), y1 = Math.min(...list.map((o) => o.y));
     const x2 = Math.max(...list.map((o) => o.x + o.w)), y2 = Math.max(...list.map((o) => o.y + o.h));
-    const z = Math.min(2, Math.max(0.15, Math.min((r.width - 80) / (x2 - x1 || 1), (r.height - 80) / (y2 - y1 || 1))));
-    setView({ z, x: 40 - x1 * z + (r.width - 80 - (x2 - x1) * z) / 2, y: 40 - y1 * z + (r.height - 80 - (y2 - y1) * z) / 2 });
+    const aw = r.width - pl - pr, ah = r.height - pt - pb;
+    const z = Math.min(2, Math.max(0.15, Math.min(aw / (x2 - x1 || 1), ah / (y2 - y1 || 1))));
+    setView({ z, x: pl - x1 * z + (aw - (x2 - x1) * z) / 2, y: pt - y1 * z + (ah - (y2 - y1) * z) / 2 });
   };
 
   const ordered = useMemo(() => [...objs.values()].sort((a, b) => (a.z || 0) - (b.z || 0)), [objs]);
@@ -456,7 +561,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
         <div className="board-world" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
           {ordered.map((o) => (live?.oid === o.oid ? null : (
             <ObjView key={o.oid} o={o} selected={selected === o.oid} editing={editing === o.oid} onEditDone={onEditDone}
-              activeVideo={activeVideo} setActiveVideo={setActiveVideo} />
+              activeVideo={activeVideo} setActiveVideo={setActiveVideo} onAction={put} />
           )))}
           {live && <ObjView o={live} selected activeVideo={activeVideo} setActiveVideo={setActiveVideo} />}
           {sel && tool === "select" && !editing && sel.type !== "stroke" && !(sel.type === "shape" && sel.points) && (
@@ -484,22 +589,25 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
       <div className="glass absolute left-2 top-1/2 flex max-h-[calc(100%-1.5rem)] -translate-y-1/2 flex-col gap-1 overflow-y-auto rounded-2xl p-1.5 sm:left-3" style={{ touchAction: "pan-y" }} role="toolbar" aria-label="Инструменты доски">
         {TOOLS.map(([id, Icon, title]) => (
           <button key={id} type="button" title={title} aria-label={title} aria-pressed={tool === id} onClick={() => { picked.current = true; setTool(id); }}
-            className={`grid h-9 w-9 place-items-center rounded-xl transition ${tool === id ? "bg-brand text-white" : "text-ink-soft hover:bg-white"}`}>
+            className={`grid h-9 w-9 place-items-center rounded-xl transition ${tool === id ? "bg-ink text-white" : "text-ink-soft hover:bg-cream"}`}>
             <Icon size={18} />
           </button>
         ))}
         <span className="mx-2 my-1 h-px bg-line" />
-        <button type="button" title="Стикеры" aria-label="Стикеры" onClick={() => setPanel(panel === "stickers" ? null : "stickers")} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-white"><Smile size={18} /></button>
+        <button type="button" title="Карточка слова" aria-label="Карточка слова" onClick={addCard} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Layers size={18} /></button>
+        <button type="button" title="Таблица" aria-label="Таблица" onClick={addTable} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Table size={18} /></button>
+        <button type="button" title="Таймер" aria-label="Таймер" onClick={addTimer} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Timer size={18} /></button>
+        <button type="button" title="Стикеры" aria-label="Стикеры" onClick={() => setPanel(panel === "stickers" ? null : "stickers")} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Smile size={18} /></button>
         {canUpload && (
           <>
-            <label title="Картинка с компьютера" className="grid h-9 w-9 cursor-pointer place-items-center rounded-xl text-ink-soft hover:bg-white">
+            <label title="Картинка с компьютера" className="grid h-9 w-9 cursor-pointer place-items-center rounded-xl text-ink-soft hover:bg-cream">
               <ImagePlus size={18} /><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => uploadImage(e.target.files?.[0])} />
             </label>
-            <button type="button" title="Из материалов" aria-label="Из материалов" onClick={() => setPanel("materials")} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-white"><FolderOpen size={18} /></button>
+            <button type="button" title="Из материалов" aria-label="Из материалов" onClick={() => setPanel("materials")} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-cream"><FolderOpen size={18} /></button>
           </>
         )}
-        <button type="button" title="Видео VK, YouTube, Rutube" aria-label="Видео" onClick={() => setPanel("video")} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-white"><Film size={18} /></button>
-        <button type="button" title="Отменить (Ctrl+Z)" aria-label="Отменить" onClick={undo} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-white"><Undo2 size={18} /></button>
+        <button type="button" title="Видео VK, YouTube, Rutube" aria-label="Видео" onClick={() => setPanel("video")} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Film size={18} /></button>
+        <button type="button" title="Отменить (Ctrl+Z)" aria-label="Отменить" onClick={undo} className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Undo2 size={18} /></button>
       </div>
 
       {/* Цвет и толщина – сверху */}
@@ -521,15 +629,18 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
 
       {/* Масштаб – справа снизу */}
       <div className="glass absolute bottom-3 right-3 flex items-center gap-1 rounded-full px-1.5 py-1">
-        <button type="button" aria-label="Уменьшить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-white" onClick={() => { const r = vp.current.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); }}><Minus size={16} /></button>
+        <button type="button" aria-label="Уменьшить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={() => { const r = vp.current.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); }}><Minus size={16} /></button>
         <span className="num w-12 text-center text-xs font-semibold">{Math.round(view.z * 100)}%</span>
-        <button type="button" aria-label="Увеличить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-white" onClick={() => { const r = vp.current.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); }}><Plus size={16} /></button>
-        <button type="button" aria-label="Показать всё" title="Показать всё" className="grid h-8 w-8 place-items-center rounded-full hover:bg-white" onClick={fit}><Maximize size={15} /></button>
+        <button type="button" aria-label="Увеличить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={() => { const r = vp.current.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); }}><Plus size={16} /></button>
+        <button type="button" aria-label="Показать всё" title="Показать всё" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={fit}><Maximize size={15} /></button>
       </div>
       {status && <div className="glass absolute bottom-3 left-16 rounded-full px-4 py-1.5 text-xs font-semibold text-ink-soft">{status}</div>}
 
       {panel === "stickers" && <StickerPanel onPick={addSticker} onClose={() => setPanel(null)} />}
       <MaterialsPicker open={panel === "materials"} onClose={() => setPanel(null)} onPick={addMaterial} />
+      <Modal open={!!pdfOpen} onClose={() => setPdfOpen(null)} title={pdfOpen?.title || ""} wide>
+        {pdfOpen && <Suspense fallback={<p className="muted">Открываем…</p>}><PdfPages url={pdfOpen.url} title={pdfOpen.title} onPick={pagePicked} height="62vh" /></Suspense>}
+      </Modal>
       <VideoDialog open={panel === "video"} onClose={() => setPanel(null)} onAdd={(url, title) => { place({ type: "video", url, title, w: 480, h: 310 }); setPanel(null); }} />
       {cropping && (
         <CropDialog src={cropping.src} crop={cropping.crop} onClose={() => setCropping(null)} onApply={(crop) => {
@@ -559,7 +670,7 @@ function StickerPanel({ onPick, onClose }) {
       <div className="grid max-h-64 grid-cols-5 gap-2 overflow-y-auto">
         {PACKS[pack].map((s) => (
           <button key={s.id} type="button" onClick={() => onPick(s)} title="Добавить на доску"
-            className="grid aspect-square place-items-center rounded-2xl bg-white/80 p-1.5 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft">
+            className="grid aspect-square place-items-center rounded-2xl bg-white/80 p-1.5 transition hover:-translate-y-0.5 hover:bg-cream hover:shadow-soft">
             {s.emoji ? <span className="text-3xl leading-none">{s.emoji}</span> : <img alt="" src={s.src} className="h-full w-full object-contain" />}
           </button>
         ))}

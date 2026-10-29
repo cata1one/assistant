@@ -1,13 +1,13 @@
 import { Check, Wallet, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { request } from "../lib/api.js";
+import { plural, request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Notice, PageTitle } from "../ui/kit.jsx";
 import { Panel, useApi } from "./common.jsx";
 
 const PACKS = [1, 4, 5, 8, 10];
 const REMIND = [["off", "Не напоминать"], ["before", "Когда начался урок, а занятий на балансе нет"], ["after", "Когда урок закончился, а занятий не осталось"]];
-const lessons = (n) => (n % 10 === 1 && n % 100 !== 11 ? "занятие" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "занятия" : "занятий");
+const lessons = (n) => plural(n, "занятие", "занятия", "занятий");
 const rub = (n) => `${Number(n).toLocaleString("ru-RU")} ₽`;
 
 // == Ученик: оплатить и сообщить =====================================================================

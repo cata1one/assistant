@@ -44,20 +44,18 @@ export function ProfileAvatar({ prefs, photo, name, size = 40 }) {
   return <Avatar name={name} size={size} />;
 }
 
-/** Шапка главной ученика: аватар-стикер, девиз и наклейки. */
-export function DecorHeader({ prefs, name }) {
-  if (!prefs?.avatar && !prefs?.photo && !prefs?.stickers?.length && !prefs?.motto) {
-    return <a href="#/app/profile#decor" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-brand"><Palette size={16} /> Украсить свой кабинет</a>;
-  }
+/** Шапка главной ученика: приветствие, своя картинка или стикер, девиз и наклейки. */
+export function DecorHeader({ prefs, name, greeting, sub }) {
+  const decorated = prefs?.avatar || prefs?.photo || prefs?.stickers?.length || prefs?.motto;
   return (
-    <div className="card mb-5 flex flex-wrap items-center gap-4 !p-5">
-      {(prefs.photo || prefs.avatar) && (prefs.photo ? <ProfileAvatar prefs={prefs} name={name} size={72} /> : <Sticker id={prefs.avatar} size={72} className="drop-shadow" />)}
+    <div className="mb-5 flex flex-wrap items-center gap-4">
+      <ProfileAvatar prefs={prefs} name={name} size={56} />
       <div className="min-w-0 flex-1">
-        <p className="font-display text-xl font-extrabold">{name}</p>
-        {prefs.motto && <p className="text-ink-soft">{prefs.motto}</p>}
+        <h1 className="text-[1.6rem] md:text-[2rem]">{greeting || name}</h1>
+        {prefs?.motto ? <p className="text-[15px] text-ink-soft">«{prefs.motto}»</p> : sub && <p className="text-[15px] text-ink-mute">{sub}</p>}
       </div>
-      <div className="flex flex-wrap gap-1.5">{(prefs.stickers || []).map((id, i) => <Sticker key={i} id={id} size={40} className={i % 2 ? "rotate-6" : "-rotate-6"} />)}</div>
-      <a href="#/app/profile#decor" className="btn-ghost btn-sm" aria-label="Изменить оформление"><Palette size={15} /></a>
+      {prefs?.stickers?.length > 0 && <div className="flex flex-wrap gap-1">{prefs.stickers.map((id, i) => <Sticker key={i} id={id} size={36} className={i % 2 ? "rotate-6" : "-rotate-6"} />)}</div>}
+      <a href="#/app/profile#decor" className="btn-light btn-sm"><Palette size={15} />{decorated ? "" : " Украсить"}</a>
     </div>
   );
 }
@@ -77,8 +75,8 @@ export function DecorSettings() {
     try { await request("POST", "/site/v1/account/prefs", f); setMsg("Сохранено. Загляните на главную"); session.reload(); } catch (x) { setError(x); }
   };
   return (
-    <div id="decor" className="card grid gap-4">
-      <h2 className="flex items-center gap-2 text-lg"><Palette size={18} className="text-brand" /> Оформление кабинета</h2>
+    <div id="decor" className="panel grid gap-4 p-5">
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-normal"><Palette size={17} className="text-ink-mute" /> Оформление кабинета</h2>
       <div>
         <p className="mb-2 text-sm font-semibold">Фон</p>
         <div className="flex flex-wrap gap-2">

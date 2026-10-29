@@ -1,10 +1,10 @@
 import {
-  ArrowLeft, BookOpen, CheckCircle2, Lightbulb, MessageSquareQuote, NotebookPen, Repeat, Ruler, Sparkles, TriangleAlert, Trophy,
+  ArrowLeft, BookOpen, CheckCircle2, Copy, Lightbulb, MessageSquareQuote, NotebookPen, Repeat, Ruler, Sparkles, TriangleAlert, Trophy,
   Wrench, XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fmtDate, request } from "../lib/api.js";
-import { Bullets, ErrorBox, Loading, Notice, PageTitle } from "../ui/kit.jsx";
+import { Bullets, ErrorBox, Loading, Notice, PageTitle, Tabs } from "../ui/kit.jsx";
 import { Flashcard, Panel, useApi } from "./common.jsx";
 
 function Test({ test, lessonId }) {
@@ -56,57 +56,68 @@ function Test({ test, lessonId }) {
 const Back = () => <a href="#/app/lessons" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-ink-mute hover:text-ink"><ArrowLeft size={14} /> Все уроки</a>;
 
 function Student({ res, id }) {
-  const r = res.report;
-  const hw = [...r.homework_teacher, ...r.homework_generated].map((t) => `${t.source === "teacher" ? "От преподавателя: " : "Дополнительно: "}${t.text}`);
   return (
     <>
       <Back />
-      <PageTitle title={r.topic || res.title || "Конспект урока"} text={`${fmtDate(res.started_at)} · ${res.with}`} />
-      <div className="grid gap-4">
-        <Panel title="Главное" icon={BookOpen}>{r.summary && <p className="mb-3 text-ink-soft">{r.summary}</p>}<Bullets items={r.key_points} /></Panel>
-        {r.rules.length > 0 && (
-          <Panel title="Правила" icon={Ruler}>
-            <div className="grid gap-5">{r.rules.map((rule) => <div key={rule.title}><p className="font-bold">{rule.title}</p><p className="mb-2 mt-1 text-ink-soft">{rule.explanation}</p><Bullets items={rule.examples} /></div>)}</div>
-          </Panel>
-        )}
-        {r.corrections.length > 0 && (
-          <Panel title="Работа над ошибками" icon={Wrench}>
-            <ul className="grid gap-2">{r.corrections.map((c, i) => <li key={i}><s className="text-teach-deep/70">{c.wrong}</s> → <b className="text-[#146b4c]">{c.correct}</b>{c.note ? <span className="text-ink-mute"> – {c.note}</span> : null}</li>)}</ul>
-          </Panel>
-        )}
-        {r.review_items.length > 0 && <Panel title="Что повторить" icon={Repeat}><Bullets items={r.review_items} /></Panel>}
-        {r.vocabulary.length > 0 && (
-          <Panel title="Новые слова" icon={Sparkles} actions={<a href="#/app/cards" className="btn-brand btn-sm">Учить карточками</a>}>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">{r.vocabulary.map((w) => <Flashcard key={w.word} w={w} />)}</div>
-          </Panel>
-        )}
-        {r.test.length > 0 && <Test test={r.test} lessonId={id} />}
-        {hw.length > 0 && <Panel title="Домашнее задание" icon={NotebookPen}><Bullets items={hw} /></Panel>}
-      </div>
+      <PageTitle title={res.report.topic || res.title || "Конспект урока"} text={`${fmtDate(res.started_at)} · ${res.with}`} />
+      <StudentBody r={res.report} id={id} />
     </>
+  );
+}
+
+function StudentBody({ r, id }) {
+  const hw = [...r.homework_teacher, ...r.homework_generated].map((t) => `${t.source === "teacher" ? "От преподавателя: " : "Дополнительно: "}${t.text}`);
+  return (
+    <div className="grid gap-4">
+      <Panel title="Главное" icon={BookOpen}>{r.summary && <p className="mb-3 text-ink-soft">{r.summary}</p>}<Bullets items={r.key_points} /></Panel>
+      {r.rules.length > 0 && (
+        <Panel title="Правила" icon={Ruler}>
+          <div className="grid gap-5">{r.rules.map((rule) => <div key={rule.title}><p className="font-bold">{rule.title}</p><p className="mb-2 mt-1 text-ink-soft">{rule.explanation}</p><Bullets items={rule.examples} /></div>)}</div>
+        </Panel>
+      )}
+      {r.corrections.length > 0 && (
+        <Panel title="Работа над ошибками" icon={Wrench}>
+          <ul className="grid gap-2">{r.corrections.map((c, i) => <li key={i}><s className="text-teach-deep/70">{c.wrong}</s> → <b className="text-[#146b4c]">{c.correct}</b>{c.note ? <span className="text-ink-mute"> – {c.note}</span> : null}</li>)}</ul>
+        </Panel>
+      )}
+      {r.review_items.length > 0 && <Panel title="Что повторить" icon={Repeat}><Bullets items={r.review_items} /></Panel>}
+      {r.vocabulary.length > 0 && (
+        <Panel title="Новые слова" icon={Sparkles} actions={<a href="#/app/cards" className="btn-brand btn-sm">Учить карточками</a>}>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">{r.vocabulary.map((w) => <Flashcard key={w.word} w={w} />)}</div>
+        </Panel>
+      )}
+      {r.test.length > 0 && <Test test={r.test} lessonId={id} />}
+      {hw.length > 0 && <Panel title="Домашнее задание" icon={NotebookPen}><Bullets items={hw} /></Panel>}
+    </div>
   );
 }
 
 function Parent({ res }) {
   const r = res.report;
-  const p = r.parent;
   return (
     <>
       <Back />
-      <PageTitle title="Отчёт об уроке" text={[fmtDate(res.started_at), p.student_name, r.topic].filter(Boolean).join(" · ")} />
-      <div className="grid gap-4 md:grid-cols-2">
-        <Panel title="Как прошёл урок" icon={BookOpen} className="md:col-span-2">
-          {p.summary && <p className="text-ink-soft">{p.summary}</p>}
-          {p.activity && <p className="mt-2 text-sm text-ink-mute">Активность: {p.activity}</p>}
-        </Panel>
-        {p.achievements.length > 0 && <Panel title="Успехи" icon={Trophy}><Bullets items={p.achievements} /></Panel>}
-        {p.attention.length > 0 && <Panel title="На что обратить внимание" icon={TriangleAlert}><Bullets items={p.attention} /></Panel>}
-        {p.teacher_remarks.length > 0 && <Panel title="Замечания преподавателя" icon={MessageSquareQuote}><Bullets items={p.teacher_remarks} /></Panel>}
-        <Panel title="Домашнее задание" icon={NotebookPen}><p className="mb-3 text-sm">Прошлое ДЗ: <b>{r.homework_status_ru}</b></p><Bullets items={r.homework} /></Panel>
-        {r.words.length > 0 && <Panel title="Новые слова" icon={Sparkles}><div className="flex flex-wrap gap-2">{r.words.map((w) => <span key={w} className="chip">{w}</span>)}</div></Panel>}
-        {p.recommendations.length > 0 && <Panel title="Как помочь дома" icon={Lightbulb}><Bullets items={p.recommendations} /></Panel>}
-      </div>
+      <PageTitle title="Отчёт об уроке" text={[fmtDate(res.started_at), r.parent.student_name, r.topic].filter(Boolean).join(" · ")} />
+      <ParentBody r={r} />
     </>
+  );
+}
+
+function ParentBody({ r }) {
+  const p = r.parent;
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Panel title="Как прошёл урок" icon={BookOpen} className="md:col-span-2">
+        {p.summary && <p className="text-ink-soft">{p.summary}</p>}
+        {p.activity && <p className="mt-2 text-sm text-ink-mute">Активность: {p.activity}</p>}
+      </Panel>
+      {p.achievements.length > 0 && <Panel title="Успехи" icon={Trophy}><Bullets items={p.achievements} /></Panel>}
+      {p.attention.length > 0 && <Panel title="На что обратить внимание" icon={TriangleAlert}><Bullets items={p.attention} /></Panel>}
+      {p.teacher_remarks.length > 0 && <Panel title="Замечания преподавателя" icon={MessageSquareQuote}><Bullets items={p.teacher_remarks} /></Panel>}
+      <Panel title="Домашнее задание" icon={NotebookPen}><p className="mb-3 text-sm">Прошлое ДЗ: <b>{r.homework_status_ru}</b></p><Bullets items={r.homework} /></Panel>
+      {r.words.length > 0 && <Panel title="Новые слова" icon={Sparkles}><div className="flex flex-wrap gap-2">{r.words.map((w) => <span key={w} className="chip">{w}</span>)}</div></Panel>}
+      {p.recommendations.length > 0 && <Panel title="Как помочь дома" icon={Lightbulb}><Bullets items={p.recommendations} /></Panel>}
+    </div>
   );
 }
 
@@ -214,6 +225,29 @@ function EditReport({ res, onSaved }) {
   );
 }
 
+/** Преподаватель видит конспект глазами ученика и родителя, а текстом – чтобы скопировать в мессенджер. */
+function TutorView({ res, id }) {
+  const [tab, setTab] = useState("student");
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(res.text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* буфер недоступен */ }
+  };
+  const tabs = [{ id: "student", title: "Ученик видит" }, res.parent_report && { id: "parent", title: "Родитель видит" }, { id: "text", title: "Текстом" }].filter(Boolean);
+  return (
+    <div className="mb-4">
+      <Tabs items={tabs} value={tab} onChange={setTab} label="Вид конспекта" className="mb-4" />
+      {tab === "student" && res.student_report && <StudentBody r={res.student_report} id={id} />}
+      {tab === "parent" && res.parent_report && <ParentBody r={res.parent_report} />}
+      {(tab === "text" || !res.student_report) && (
+        <div className="card">
+          <div className="mb-3 flex justify-end"><button type="button" className="btn-ghost btn-sm" onClick={copy}><Copy size={14} /> {copied ? "Скопировано" : "Копировать"}</button></div>
+          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-soft">{res.text}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Lesson({ id }) {
   const { data: res, error, reload } = useApi(`/site/v1/lessons/${encodeURIComponent(id)}`, [id]);
   const [editing, setEditing] = useState(false);
@@ -239,7 +273,7 @@ export default function Lesson({ id }) {
       {res.role === "tutor" && res.published === false && <PublishBar id={id} onDone={reload} pending={res.generated_by === "pending"} />}
       <PageTitle title={res.report.topic || res.title || "Урок"} text={`${fmtDate(res.started_at)} · ${res.with}`}
         actions={res.role === "tutor" && <button type="button" className="btn-brand" onClick={() => setEditing(true)}>Редактировать отчёт</button>} />
-      <pre className="card whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-soft">{res.text}</pre>
+      <TutorView res={res} id={id} />
       {res.role === "tutor" && <Exercises id={id} />}
     </>
   );

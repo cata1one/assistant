@@ -29,9 +29,9 @@ export function MoodCard() {
     try { await request("POST", "/site/v1/account/prefs", { mood_private: !priv }); session.reload(); } catch (x) { setError(x); }
   };
   return (
-    <div className="card !p-5">
+    <div className="panel p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg">Как заряд сегодня?</h2>
+        <h2 className="text-[15px] font-semibold tracking-normal">Как заряд сегодня?</h2>
         <span className="text-xs text-ink-mute">По желанию</span>
       </div>
       <div className="mt-3 grid grid-cols-5 gap-1.5">
@@ -73,14 +73,14 @@ export function HolidayBanner({ student }) {
   const sticker = { newyear: "ny-tree", christmas: "ch-bell", valentine: "vd-rose", feb23: "f23-star", mar8: "m8-bouquet", maslenitsa: "ms-pancakes",
     easter: "ea-egg", knowledge: "kn-bell", teacher: "sc-apple", halloween: "hw-pumpkin", cny: "cny-lantern" }[h.id.split("-")[0]];
   return (
-    <div className="card mb-5 flex flex-wrap items-center gap-4 !border-sun/50 !bg-sun-soft/60 !p-4">
-      {sticker ? <Sticker id={sticker} size={52} /> : <PartyPopper className="text-brand" size={32} />}
-      <div className="min-w-0 flex-1">
-        <p className="font-display text-lg font-extrabold">{h.title}</p>
-        <p className="text-sm text-ink-soft">{h.text}{!student && ` Стикеры «${h.pack}» уже ждут на доске.`}</p>
+    <div className="panel relative mb-5 flex flex-wrap items-center gap-x-4 gap-y-3 !border-sun !bg-sun-soft p-4 pr-12">
+      {sticker ? <Sticker id={sticker} size={48} /> : <PartyPopper size={30} />}
+      <div className="min-w-[180px] flex-1">
+        <p className="text-[17px] font-semibold">{h.title}</p>
+        <p className="text-sm text-ink-soft">{student ? h.text : `Праздничные стикеры «${h.pack}» уже на доске: нажмите «Стикеры».`}</p>
       </div>
       {student && <button type="button" className="btn-brand btn-sm" onClick={dress}>Нарядить кабинет</button>}
-      <button type="button" className="btn-ghost !p-2" onClick={close} aria-label="Скрыть"><X size={16} /></button>
+      <button type="button" className="btn-ghost absolute right-2 top-2 !h-8 !w-8 !p-0" onClick={close} aria-label="Скрыть"><X size={16} /></button>
       {error && <div className="w-full"><ErrorBox error={error} /></div>}
     </div>
   );
@@ -119,10 +119,10 @@ export function PhotoSettings() {
     try { await request("POST", "/site/v1/account/prefs", { photo: null }); await session.reload(); } catch (x) { setError(x); }
   };
   return (
-    <div className="card flex flex-wrap items-center gap-4">
+    <div className="panel flex flex-wrap items-center gap-4 p-5">
       <ProfileAvatar prefs={acc?.prefs} name={acc?.name} size={72} />
       <div className="min-w-0 flex-1">
-        <h2 className="text-lg">Моя картинка</h2>
+        <h2 className="text-[15px] font-semibold tracking-normal">Моя картинка</h2>
         <p className="text-sm text-ink-mute">Любое фото или рисунок. Обрежем по центру в круг. Видна вам и вашему преподавателю или ученикам.</p>
       </div>
       <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={pick} />
@@ -142,8 +142,8 @@ export function ReviewSetting() {
     try { await request("POST", "/site/v1/account/prefs", { review_reports: !on }); session.reload(); } catch (x) { setError(x); }
   };
   return (
-    <div className="card">
-      <h2 className="text-lg">Конспект после урока</h2>
+    <div className="panel p-5">
+      <h2 className="text-[15px] font-semibold tracking-normal">Конспект после урока</h2>
       <label className="mt-3 flex items-start gap-3 text-sm text-ink-soft">
         <input type="checkbox" className="mt-1 h-4 w-4 accent-[rgb(var(--brand))]" checked={on} onChange={toggle} />
         <span>Проверять конспект перед отправкой. Ученик и родители получат его, только когда вы нажмёте «Отправить». Пока он у вас, слова не попадают в карточки ученика.</span>
