@@ -37,6 +37,7 @@ from .community import Community
 from .learning import Learning
 from .lesson_pay import LessonPay
 from .portal import Portal, PortalError
+from .spark import Spark
 from .units import Units, student_view
 from .yookassa import PlanPayments
 
@@ -73,6 +74,12 @@ def json_response(status: HTTPStatus | int, payload: Any) -> Response:
 class Website:
     ROUTES = [
         ("GET", re.compile(r"^/site/v1/config$"), "public_config", False),
+        ("GET", re.compile(r"^/site/v1/spark$"), "spark_history", True),
+        ("POST", re.compile(r"^/site/v1/spark$"), "spark_ask", True),
+        ("POST", re.compile(r"^/site/v1/spark/voice$"), "spark_voice", True),
+        ("POST", re.compile(r"^/site/v1/spark/clear$"), "spark_clear", True),
+        ("GET", re.compile(r"^/site/v1/admin/system$"), "admin_system", True),
+        ("POST", re.compile(r"^/site/v1/admin/stt-test$"), "admin_stt_test", True),
         ("GET", re.compile(r"^/site/v1/catalog$"), "catalog", False),
         ("POST", re.compile(r"^/site/v1/applications$"), "apply", False),
         ("GET", re.compile(r"^/site/v1/me$"), "me", True),
@@ -97,6 +104,7 @@ class Website:
         ("GET", re.compile(r"^/site/v1/chats$"), "chats", True),
         ("GET", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp|ps):[0-9a-f]+(?::[\w-]+)?)/messages$"), "chat_messages", True),
         ("POST", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp|ps):[0-9a-f]+(?::[\w-]+)?)/messages$"), "chat_send", True),
+        ("POST", re.compile(r"^/site/v1/chats/(?P<chat>(?:pair|pp|ps):[0-9a-f]+(?::[\w-]+)?)/voice$"), "chat_voice", True),
         # отзывы
         ("GET", re.compile(r"^/site/v1/reviews$"), "reviews", False),
         ("POST", re.compile(r"^/site/v1/reviews$"), "review_submit", True),
@@ -182,7 +190,8 @@ class Website:
         ("GET", re.compile(r"^/site/v1/cards$"), "cards", True),
         ("POST", re.compile(r"^/site/v1/cards/review$"), "cards_review", True),
     ]
-    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload|account/photo|homework/\d+/attach)$")  # тело – файл, а не JSON
+    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload|account/photo|homework/\d+/attach"
+                             r"|chats/[\w:-]+/voice|spark/voice|admin/stt-test)$")  # тело – файл, а не JSON
     FILE_RE = re.compile(r"^/site/v1/files/(?P<id>[0-9a-f]{24})$")
 
     def __init__(self, portal: Portal, web_dir: Path = WEB_DIR, classroom: Classroom | None = None):
@@ -194,6 +203,7 @@ class Website:
         self.learning = Learning(portal)
         self.units_service = Units(self.learning)
         self.plan_pay = PlanPayments(portal)
+        self.spark = Spark(portal, self.learning, self.accounts)
         self.lesson_pay = LessonPay(portal)
         self.classroom.pay = self.lesson_pay
 
@@ -540,6 +550,54 @@ class Website:
 
     def auth_reset(self, body: Any, ip: str | None, **_: Any) -> Any:
         return self.accounts.reset_password(body, ip)
+
+    def chat_voice(self, viewer: Any, chat: str, raw: bytes, headers: Any, **_: Any) -> Any:
+        mime = (headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        return self.community.send_voice(viewer, chat, raw, mime,
+                                         lambda data, m: self.learning.save_audio(viewer.user_id, data, m))
+
+    def spark_history(self, viewer: Any, **_: Any) -> Any:
+        return self.spark.history(viewer)
+
+    def spark_ask(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.spark.ask(viewer, body)
+
+    def spark_voice(self, viewer: Any, raw: bytes, **_: Any) -> Any:
+        return self.spark.ask_voice(viewer, raw)
+
+    def spark_clear(self, viewer: Any, **_: Any) -> Any:
+        return self.spark.clear(viewer)
+
+    def admin_system(self, viewer: Any, **_: Any) -> Any:
+        """Что работает на сервере: распознавание речи, ИИ, почта, оплата, https – чтобы не гадать, почему что-то молчит."""
+        if not viewer.admin:
+            raise PortalError(403, "доступно администратору платформы")
+        st, a = self.portal.settings, self.portal.assistant
+        tr = a.transcriber
+        return {
+            "site_url": st.site_url, "https": st.site_url.startswith("https://"),
+            "speech": {"available": a.speech_available, "mode": st.stt_mode, "model": st.stt_model,
+                       "error": getattr(tr, "last_error", None),
+                       "loaded": getattr(tr, "_model", None) is not None},
+            "ai": {"provider": self.spark.ai.provider, "model": st.ai_model or (st.llm_model if self.spark.ai.provider else None),
+                   "url": st.ai_url or None, "error": self.spark.ai.last_error},
+            "mail": self.portal.mailer.configured, "payments": self.plan_pay.enabled,
+            "telegram": bool(st.telegram_token), "bot": st.bot_username or None,
+        }
+
+    def admin_stt_test(self, viewer: Any, raw: bytes, **_: Any) -> Any:
+        """Проверка распознавания: администратор говорит несколько секунд в микрофон и видит результат и время."""
+        import time
+
+        if not viewer.admin:
+            raise PortalError(403, "доступно администратору платформы")
+        if not raw:
+            raise PortalError(400, "пустая запись")
+        started = time.monotonic()
+        tr, error = self.portal.assistant.transcribe(raw, languages=(self.portal.settings.native_language,
+                                                                     self.portal.settings.target_language))
+        return {"ok": tr is not None, "text": tr.text if tr else None, "language": tr.language if tr else None,
+                "seconds": round(time.monotonic() - started, 1), "error": error}
 
     def public_config(self, **_: Any) -> Any:
         st = self.portal.settings

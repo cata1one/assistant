@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import json
 import logging
 import secrets
@@ -384,10 +385,12 @@ class TutorAssistant:
     def speech_available(self) -> bool:
         return self.transcriber.available
 
-    def transcribe(self, audio: AudioInput) -> tuple[Transcription | None, str | None]:
+    def transcribe(self, audio: AudioInput, languages: tuple[str, ...] | None = None) -> tuple[Transcription | None, str | None]:
         if not self.transcriber.available:
             return None, self.transcriber.last_error or "распознавание речи недоступно"
         try:
+            if languages and "allowed" in inspect.signature(self.transcriber.transcribe).parameters:
+                return self.transcriber.transcribe(audio, allowed=languages), None
             return self.transcriber.transcribe(audio), None
         except Exception as exc:
             log.exception("Ошибка распознавания речи")
@@ -400,8 +403,9 @@ class TutorAssistant:
 
         ``recording=True`` – фрагмент непрерывной записи урока (отмечается для контроля перерывов).
         """
-        self.lesson(lesson_id)
-        transcription, error = self.transcribe(audio)
+        lesson = self.lesson(lesson_id)
+        langs = tuple(dict.fromkeys([self.settings.native_language, self.lesson_language(lesson)]))
+        transcription, error = self.transcribe(audio, languages=langs)
         if recording:
             self.storage.touch_recording(lesson_id, transcription.duration if transcription else audio_duration(audio))
         if transcription is None:

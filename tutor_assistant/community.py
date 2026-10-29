@@ -37,6 +37,7 @@ BUDGETS = {
 }
 REQUESTS_PER_DAY = 3  # с одного IP
 MAX_CHAT_TEXT = 4000
+MAX_VOICE = 5 * 1024 * 1024  # голосовое до ~5 минут
 TEACHER_STATUSES = ("pending", "approved", "rejected")
 REVIEW_STATUSES = ("pending", "approved", "rejected")
 
@@ -199,7 +200,8 @@ class Community:
         if rows and t.can_write:
             self.storage.mark_read(chat_id, viewer.user_id, rows[-1]["id"])
         return {"chat_id": chat_id, "role": t.role, "with": t.title, "can_write": t.can_write,
-                "messages": [{k: r[k] for k in ("id", "role", "author", "text", "source", "blocked", "created_at")}
+                "messages": [{**{k: r[k] for k in ("id", "role", "author", "text", "source", "blocked", "created_at")},
+                              "audio": f"/site/v1/files/{r['audio']}" if r.get("audio") and not r["blocked"] else None}
                              for r in rows]}
 
     def send(self, viewer: Viewer, chat_id: str, body: Any) -> dict[str, Any]:
@@ -209,30 +211,59 @@ class Community:
         text = body.get("text") if isinstance(body, dict) else None
         if not isinstance(text, str) or not text.strip() or len(text) > MAX_CHAT_TEXT:
             raise PortalError(400, f"текст: от 1 до {MAX_CHAT_TEXT} символов")
-        text = text.strip()
+        return self._post(viewer, t, chat_id, text.strip())
+
+    def send_voice(self, viewer: Viewer, chat_id: str, raw: bytes | None, mime: str, save_file: Any) -> dict[str, Any]:
+        """Голосовое: сохраняем звук, расшифровываем и проверяем текст так же, как обычное сообщение.
+
+        В строгих парах (школа) голосовое без расшифровки не пропускаем: проверить контакты в нём нечем.
+        """
+        t = self._thread(viewer, chat_id)
+        if not t.can_write:
+            raise PortalError(403, "школа читает переписку, но не пишет в неё")
+        if not raw or len(raw) < 200:
+            raise PortalError(400, "голосовое пустое: запишите ещё раз")
+        if len(raw) > MAX_VOICE:
+            raise PortalError(413, "голосовое слишком длинное: до 5 минут")
+        strict = self.portal.is_strict(t.pair.chat_id) and not chat_id.startswith("ps:")
+        langs = tuple(dict.fromkeys([self.settings.native_language,
+                                     self.storage.chat_language(t.pair.chat_id) or self.settings.target_language]))
+        transcription, _error = self.assistant.transcribe(raw, languages=langs)
+        text = (transcription.text if transcription else "").strip()
+        if strict and transcription is None and not self.settings.relay_unchecked_audio:
+            raise PortalError(503, "голосовые сейчас недоступны: не работает распознавание речи. Напишите текстом")
+        file_id = save_file(raw, mime)
+        return self._post(viewer, t, chat_id, text or "🎤 Голосовое сообщение", source="voice", audio=file_id,
+                          check=bool(text))
+
+    def _post(self, viewer: Viewer, t: Thread, chat_id: str, text: str, source: str = "site", audio: str | None = None,
+              check: bool = True) -> dict[str, Any]:
         pair, role, alias = t.pair, t.role, t.alias
         lesson = self.storage.active_lesson(pair.chat_id) if chat_id == pair.chat_id else None
         strict = self.portal.is_strict(pair.chat_id) and not chat_id.startswith("ps:")  # со школой можно делиться
-        if lesson:  # во время урока сообщение ученику – часть урока: слова, ДЗ, конспект
+        if lesson and check:  # во время урока сообщение ученику – часть урока: слова, ДЗ, конспект
             out = self.assistant.process_message(lesson["id"], viewer.user_id, alias, text,
                                                  role=Role.TUTOR if role == TUTOR else Role.STUDENT, moderate=strict)
             result, incident_id = out.moderation, out.incident_id
-        elif strict:  # та же проверка, что и для Telegram-моста этой пары
+        elif strict and check:  # та же проверка, что и для Telegram-моста этой пары
             result, incident_id = self.assistant.moderate_chat_message(chat_id, viewer.user_id, alias, text,
                                                                        role=role if role in (TUTOR, STUDENT) else None)
         else:  # частный репетитор: переписка с его учениками и родителями не фильтруется
             result, incident_id = self.assistant.guard.check(""), None
         stored = result.redacted_text if result.blocked else text
-        msg_id = self.storage.add_pair_message(chat_id, role, alias, stored, source="site", blocked=result.blocked)
+        msg_id = self.storage.add_pair_message(chat_id, role, alias, stored, source=source, blocked=result.blocked,
+                                               audio=audio)
         who = {"tutor": "преподаватель", "student": "ученик", "parent": "родитель"}.get(role, role)
         if result.is_violation:
-            self.portal.notify_violation(pair.chat_id, f"🚨 Нарушение #{incident_id or '—'} (переписка на сайте, "
+            self.portal.notify_violation(pair.chat_id, f"🚨 Нарушение #{incident_id or '–'} (переписка на сайте, "
                                          f"пара {pair.id}): {result.summary}\nКто: {who} «{alias}»\nТекст:\n{text[:1500]}")
         delivered = False
         if not result.blocked:
             link = f"\n\nОтветить: {self.settings.site_url}/#/app/messages" if self.settings.site_url else ""
-            delivered = self.portal.telegram(t.other_user, f"{alias}: {text}{link}")
-        return {"id": msg_id, "stored": stored, "moderation": result.to_dict(), "delivered_to_telegram": delivered}
+            prefix = "🎤 " if source == "voice" else ""
+            delivered = self.portal.telegram(t.other_user, f"{alias}: {prefix}{text}{link}")
+        return {"id": msg_id, "stored": stored, "moderation": result.to_dict(), "delivered_to_telegram": delivered,
+                "audio": f"/site/v1/files/{audio}" if audio and not result.blocked else None}
 
     # == отзывы =========================================================================
     def public_reviews(self) -> dict[str, Any]:

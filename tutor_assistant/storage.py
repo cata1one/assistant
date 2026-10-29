@@ -414,6 +414,18 @@ CREATE TABLE IF NOT EXISTS mood (
     PRIMARY KEY (account_id, day)
 );
 
+-- Помощник «Искорка»: переписка человека с ИИ внутри платформы
+CREATE TABLE IF NOT EXISTS spark_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    text TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'done',
+    voice INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_spark_user ON spark_messages(user_id, id);
+
 -- Интервальное повторение слов (карточки)
 CREATE TABLE IF NOT EXISTS srs_cards (
     owner TEXT NOT NULL,
@@ -477,6 +489,9 @@ class Storage:
             self._conn.execute("ALTER TABLE pairs ADD COLUMN language TEXT")
         if "balance" not in cols:  # оплаченные и ещё не проведённые занятия
             self._conn.execute("ALTER TABLE pairs ADD COLUMN balance INTEGER NOT NULL DEFAULT 0")
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(pair_messages)").fetchall()}
+        if "audio" not in cols:  # голосовое сообщение: id файла, текст сообщения – его расшифровка
+            self._conn.execute("ALTER TABLE pair_messages ADD COLUMN audio TEXT")
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(feedback)").fetchall()}
         if "contact" not in cols:  # почта для ответа, если человек не вошёл на сайт
             self._conn.execute("ALTER TABLE feedback ADD COLUMN contact TEXT")
@@ -932,9 +947,9 @@ class Storage:
 
     # -- чат пары -----------------------------------------------------------------------
     def add_pair_message(self, chat_id: str, role: str, author: str, text: str, source: str = "site",
-                         blocked: bool = False) -> int:
-        cur = self._exec("INSERT INTO pair_messages(chat_id, role, author, text, source, blocked, created_at)"
-                         " VALUES (?,?,?,?,?,?,?)", (chat_id, role, author, text, source, int(blocked), utcnow()))
+                         blocked: bool = False, audio: str | None = None) -> int:
+        cur = self._exec("INSERT INTO pair_messages(chat_id, role, author, text, source, blocked, created_at, audio)"
+                         " VALUES (?,?,?,?,?,?,?,?)", (chat_id, role, author, text, source, int(blocked), utcnow(), audio))
         return int(cur.lastrowid)
 
     def pair_messages(self, chat_id: str, since: int = 0, limit: int = 200) -> list[dict[str, Any]]:
@@ -1215,6 +1230,27 @@ class Storage:
         cur = self._exec("UPDATE lesson_payments SET status=?, note=?, decided_at=? WHERE id=? AND status='pending'",
                          (status, note, utcnow(), payment_id))
         return cur.rowcount > 0
+
+    # -- помощник «Искорка» ------------------------------------------------------------------------
+    def add_spark(self, user_id: str, role: str, text: str, status: str = "done", voice: bool = False) -> int:
+        cur = self._exec("INSERT INTO spark_messages(user_id, role, text, status, voice, created_at) VALUES (?,?,?,?,?,?)",
+                         (user_id, role, text, status, int(voice), utcnow()))
+        return int(cur.lastrowid)
+
+    def update_spark(self, message_id: int, text: str, status: str) -> None:
+        self._exec("UPDATE spark_messages SET text=?, status=? WHERE id=?", (text, status, message_id))
+
+    def spark_messages(self, user_id: str, limit: int = 60) -> list[dict[str, Any]]:
+        rows = self._all("SELECT * FROM spark_messages WHERE user_id=? ORDER BY id DESC LIMIT ?", (user_id, limit))
+        return rows[::-1]
+
+    def spark_count_since(self, user_id: str, since: str) -> int:
+        row = self._one("SELECT COUNT(*) AS n FROM spark_messages WHERE user_id=? AND role='user' AND created_at>=?",
+                        (user_id, since))
+        return int(row["n"]) if row else 0
+
+    def clear_spark(self, user_id: str) -> None:
+        self._exec("DELETE FROM spark_messages WHERE user_id=?", (user_id,))
 
     # -- настроение -------------------------------------------------------------------------------
     def set_mood(self, account_id: str, day: str, level: int) -> None:

@@ -29,7 +29,7 @@ from .vocabulary import extract_announced
 MAX_FILE = 25 * 1024 * 1024
 MAX_ATTACHMENT = 10 * 1024 * 1024  # фото к домашнему заданию
 ALLOWED_TYPES = {
-    "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif",
+    "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "audio/webm": ".weba",
     "application/pdf": ".pdf", "audio/mpeg": ".mp3", "audio/mp4": ".m4a", "audio/ogg": ".ogg", "audio/wav": ".wav",
     "video/mp4": ".mp4", "video/webm": ".webm",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
@@ -111,7 +111,7 @@ class Learning:
 
     def materials(self, viewer: Viewer) -> dict[str, Any]:
         acc = self._material_owner(viewer)
-        rows = [r for r in self.storage.materials_for(acc["id"], acc.get("org_id")) if r.get("folder") != "Аватар"]
+        rows = [r for r in self.storage.materials_for(acc["id"], acc.get("org_id")) if r.get("folder") not in ("Аватар", "Голосовые")]
         return {"materials": [self._public_material(r, acc) for r in rows]}
 
     def _public_material(self, r: dict[str, Any], acc: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -300,6 +300,15 @@ class Learning:
         else:
             raise PortalError(403, "нельзя изменить это задание")
         return {"id": assignment_id, "status": status}
+
+    def save_audio(self, owner_id: str, raw: bytes, mime: str) -> str:
+        """Звук голосового сообщения: файл по секретному id, как у материалов."""
+        mime = mime if mime in ("audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav") else "audio/webm"
+        file_id = secrets.token_hex(12)
+        (self.files_dir / (file_id + ALLOWED_TYPES[mime])).write_bytes(raw)
+        self.storage.add_material(id=file_id, owner_id=owner_id, title="Голосовое", kind="file", mime=mime, size=len(raw),
+                                  folder="Голосовые")
+        return file_id
 
     def upload_photo(self, viewer: Viewer, raw: bytes | None, headers: Any) -> dict[str, Any]:
         """Своя картинка профиля: ученик и преподаватель. Браузер заранее уменьшает её до небольшого квадрата."""

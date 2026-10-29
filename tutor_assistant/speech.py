@@ -111,7 +111,11 @@ class WhisperTranscriber:
             self.last_error = None
         return self._model
 
-    def transcribe(self, audio: AudioInput, language: str | None = None) -> Transcription:
+    def transcribe(self, audio: AudioInput, language: str | None = None,
+                   allowed: tuple[str, ...] | None = None) -> Transcription:
+        """allowed – языки, на которых может идти речь (русский и изучаемый). Whisper на коротких фрагментах
+        нередко «узнаёт» соседний язык (украинский вместо русского, немецкий вместо английского) и пишет
+        бессмыслицу; поэтому язык выбираем только из разрешённых."""
         source: str | BinaryIO
         if isinstance(audio, (bytes, bytearray)):
             source = io.BytesIO(bytes(audio))
@@ -121,13 +125,26 @@ class WhisperTranscriber:
             source = audio
         with self._lock:  # модель одна; запросы выполняются по очереди
             model = self._load()
-            segments_iter, info = model.transcribe(
-                source, language=language or self.language, beam_size=5, best_of=5,
+            try:
+                from faster_whisper import decode_audio
+
+                samples = decode_audio(source, sampling_rate=16000)
+            except Exception:  # noqa: BLE001 – старые версии: отдаём файл как есть
+                samples = source
+            options = dict(
+                beam_size=5, best_of=5,
                 # Тишину и вдохи отбрасываем: без этого Whisper «слышит» в паузах выдуманные фразы
                 vad_filter=True, vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 200},
                 condition_on_previous_text=False, initial_prompt=INITIAL_PROMPT,
                 temperature=(0.0, 0.2, 0.4), no_speech_threshold=0.5, compression_ratio_threshold=2.2,
             )
+            lang = language or self.language
+            segments_iter, info = model.transcribe(samples, language=lang, **options)
+            if not lang and allowed and getattr(info, "language", None) not in allowed:
+                probs = dict(getattr(info, "all_language_probs", None) or [])
+                best = max(allowed, key=lambda code: probs.get(code, 0.0))
+                if not isinstance(samples, (str, io.BytesIO)):
+                    segments_iter, info = model.transcribe(samples, language=best, **options)
             segments = [Segment(float(s.start), float(s.end), s.text.strip()) for s in segments_iter if s.text.strip()]
         return Transcription(text=" ".join(s.text for s in segments).strip(), segments=segments,
                              language=getattr(info, "language", None), duration=float(getattr(info, "duration", 0.0)))
