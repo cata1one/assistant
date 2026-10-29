@@ -7,7 +7,9 @@ import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Tabs } from "../ui/kit.jsx";
 import { LANGS, ttsOf } from "../lib/langs.js";
 import { useApi } from "./common.jsx";
+import Iskorka from "./Iskorka.jsx";
 import UnitPlayer from "./player.jsx";
+import Quest from "./quest.jsx";
 
 const TYPES = {
   text: "Текст или правило", words: "Новые слова", gap: "Вставить слова в текст", match: "Пары: слово и значение",
@@ -173,6 +175,7 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
   const [create, setCreate] = useState(false);
   const [assign, setAssign] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [quest, setQuest] = useState(false);
   const [err, setErr] = useState(null);
   const copyLib = async (u) => {
     try { const c = await request("POST", `/site/v1/units/library/${u.id}`, {}); window.location.hash = `#/app/units/${c.id}`; } catch (x) { setErr(x); }
@@ -243,11 +246,16 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
       )}
       {create && <CreateModal ai={data?.ai} onClose={() => setCreate(false)} />}
       {assign && <AssignModal unit={assign} onClose={() => setAssign(null)} />}
-      <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.title || ""} wide>
+      <Modal open={!!preview} onClose={() => { setPreview(null); setQuest(false); }} title={preview?.title || ""} wide>
         {preview && (
           <div className="grid gap-4">
-            <UnitPlayer unit={preview.preview} submitLabel="Проверить себя"
-              onSubmit={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })} />
+            {quest ? <Quest unit={preview.preview} onCheck={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })}
+              onSubmit={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })} onExit={() => setQuest(false)} />
+              : <>
+                <button type="button" onClick={() => setQuest(true)} className="w-fit rounded-2xl bg-mint px-6 py-2.5 font-bold text-white shadow-[0_3px_0_#146b4c] active:translate-y-0.5 active:shadow-none">Пройти как ученик</button>
+                <UnitPlayer unit={preview.preview} submitLabel="Проверить себя"
+                  onSubmit={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })} />
+              </>}
             {role !== "student" && <button type="button" className="btn-brand w-fit" onClick={() => copyLib(preview)}><Copy size={14} /> Взять себе и изменить</button>}
           </div>
         )}
@@ -268,9 +276,8 @@ export function CoursesPage() {
   if (open) {
     return (
       <>
-        <button type="button" onClick={() => setOpen(null)} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-ink-mute hover:text-ink"><ArrowLeft size={14} /> Все курсы</button>
-        <PageTitle title={open.title} text={open.summary} />
-        <UnitPlayer unit={open.preview} submitLabel="Проверить себя" onSubmit={(answers) => request("POST", `/site/v1/library/${open.id}/check`, { answers })} />
+        <Quest unit={open.preview} onCheck={(answers) => request("POST", `/site/v1/library/${open.id}/check`, { answers })}
+          onSubmit={(answers) => request("POST", `/site/v1/library/${open.id}/check`, { answers })} onExit={() => setOpen(null)} />
       </>
     );
   }
@@ -388,17 +395,36 @@ export function UnitEditor({ id }) {
 /** Ученик выполняет занятие из домашнего задания. */
 export function DoUnit({ hwId }) {
   const { data, error, reload } = useApi(`/site/v1/homework/${hwId}/unit`, [hwId]);
+  const [playing, setPlaying] = useState(false);
   if (error) return <ErrorBox error={error} />;
   if (!data) return <Loading />;
   const student = data.role === "student";
+  const canPlay = student && data.status !== "checked";
+  if (canPlay && playing) {
+    return (
+      <Quest unit={data.unit} title
+        onCheck={(answers) => request("POST", `/site/v1/homework/${hwId}/unit/check`, { answers })}
+        onSubmit={(answers) => request("POST", `/site/v1/homework/${hwId}/unit`, { answers })}
+        onExit={() => { setPlaying(false); reload(); }} />
+    );
+  }
+  const r = data.result;
   return (
     <>
       <a href="#/app/homework" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-ink-mute hover:text-ink"><ArrowLeft size={14} /> Домашние задания</a>
-      <PageTitle title={data.unit.title} text={student ? "Выполните задания и нажмите «Отправить» – ответы проверятся сразу." : data.result ? "Ответы ученика." : "Ученик ещё не выполнил занятие."} />
-      {(student || data.result) && (
-        <UnitPlayer unit={data.unit} result={data.result} readOnly={!student || data.status === "checked"} submitLabel="Отправить преподавателю"
-          onSubmit={async (answers) => { const r = await request("POST", `/site/v1/homework/${hwId}/unit`, { answers }); reload(); return r; }} />
+      {canPlay && (
+        <div className="panel mb-5 flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
+          <Iskorka size={84} mood={r ? "joy" : "happy"} />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[1.6rem] leading-tight">{data.unit.title}</h1>
+            <p className="mt-1 text-ink-mute">{r ? `Сделано: ${r.score} из ${r.total} с первой попытки. Можно пройти ещё раз и улучшить результат.`
+              : "Задания по одному, проверка сразу. Ошибки вернутся в конце – исправите и запомните."}</p>
+          </div>
+          <button type="button" onClick={() => setPlaying(true)} className="w-full shrink-0 rounded-2xl bg-mint px-8 py-3.5 text-[17px] font-bold text-white shadow-[0_4px_0_#146b4c] active:translate-y-1 active:shadow-none sm:w-auto">{r ? "Пройти ещё раз" : "Начать"}</button>
+        </div>
       )}
+      {!canPlay && <PageTitle title={data.unit.title} text={r ? "Ответы ученика." : "Ученик ещё не выполнил занятие."} />}
+      {r && <UnitPlayer unit={data.unit} result={r} readOnly />}
     </>
   );
 }

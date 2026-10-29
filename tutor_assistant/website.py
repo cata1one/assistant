@@ -177,6 +177,7 @@ class Website:
         ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)/attach$"), "homework_attach", True),
         ("GET", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit$"), "homework_unit", True),
         ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit$"), "homework_unit_submit", True),
+        ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit/check$"), "homework_unit_check", True),
         ("GET", re.compile(r"^/site/v1/vocab$"), "vocab", True),
         ("POST", re.compile(r"^/site/v1/vocab$"), "vocab_add", True),
         ("POST", re.compile(r"^/site/v1/vocab/delete$"), "vocab_delete", True),
@@ -505,6 +506,9 @@ class Website:
 
     def homework_unit(self, viewer: Any, id: str, **_: Any) -> Any:
         return self.units_service.homework_unit(viewer, int(id))
+
+    def homework_unit_check(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.units_service.homework_check(viewer, int(id), body)
 
     def homework_unit_submit(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
         return self.units_service.submit(viewer, int(id), body)

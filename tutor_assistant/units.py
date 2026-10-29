@@ -486,6 +486,15 @@ class Units:
         row, unit, access = self._homework_unit(viewer, assignment_id)
         return {"unit": student_view(unit), "result": row.get("result"), "role": access.role, "status": row["status"]}
 
+    def homework_check(self, viewer: Any, assignment_id: int, body: Any) -> dict[str, Any]:
+        """Проверка одного задания по ходу занятия (как в Duolingo): ничего не сохраняет, оценку ставит submit."""
+        from .relay import STUDENT
+
+        row, unit, access = self._homework_unit(viewer, assignment_id)
+        if access.role != STUDENT:
+            raise PortalError(403, "занятие выполняет ученик")
+        return grade(unit, (body or {}).get("answers") if isinstance(body, dict) else None)
+
     def submit(self, viewer: Any, assignment_id: int, body: Any) -> dict[str, Any]:
         from datetime import datetime, timezone
 

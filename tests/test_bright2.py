@@ -183,3 +183,19 @@ def test_speech_drops_hallucinations_and_passes_prompt(env):
     lesson = env["a"].start_lesson(chat_id=chat, tutor_id="t", tutor_name="Анна", student_id="s", student_name="Миша", title="Present Perfect")
     env["a"].process_audio(lesson["id"], "t", "Анна", b"x" * 400, role="tutor")
     assert "Present Perfect" in (seen.get("prompt") or "")
+
+
+def test_homework_step_check_does_not_save(env):
+    from tutor_assistant.units import Units
+    tutor, student, chat = pair(env)
+    units = Units(env["l"])
+    u = units.copy_library(tutor, "lib-en-a2-past-simple")
+    hw = env["l"].assign(tutor, {"chat_id": chat, "unit_id": u["id"]})
+    hid = hw["id"] if isinstance(hw, dict) and "id" in hw else env["l"].homework(student)["homework"][0]["id"]
+    view = units.homework_unit(student, hid)["unit"]
+    mi = next(i for i, b in enumerate(view["blocks"]) if b["type"] == "match")
+    res = units.homework_check(student, hid, {"answers": {str(mi): ["went"]}})
+    assert res["blocks"][str(mi)]["pairs"][0] is True
+    assert units.homework_unit(student, hid)["result"] is None  # проверка по ходу ничего не сохраняет
+    with pytest.raises(PortalError):
+        units.homework_check(tutor, hid, {"answers": {}})
