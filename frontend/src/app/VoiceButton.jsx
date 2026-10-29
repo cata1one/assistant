@@ -12,12 +12,14 @@ export default function VoiceButton({ onSend, disabled, max = 180 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const timer = useRef(null);
-  useEffect(() => () => { clearInterval(timer.current); rec?.cancel(); }, [rec]);
+  const live = useRef(null); // идущая запись: отменяем её, только если окно закрыли посреди записи
+  useEffect(() => () => { clearInterval(timer.current); live.current?.cancel(); }, []);
   if (!canRecord()) return null;
   const start = async () => {
     setErr(null);
     try {
       const r = await startVoice();
+      live.current = r;
       setRec(r); setSec(0);
       timer.current = setInterval(() => setSec((s) => s + 1), 1000);
     } catch {
@@ -27,6 +29,7 @@ export default function VoiceButton({ onSend, disabled, max = 180 }) {
   const stop = async (send) => {
     clearInterval(timer.current);
     const r = rec;
+    live.current = null;
     setRec(null);
     if (!send) { r.cancel(); return; }
     setBusy(true);

@@ -234,6 +234,10 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   const [status, setStatus] = useState("");
   const history = useRef([]);
   const lastId = useRef(0);
+  const follow = useRef(true); // показывать новое на доске автоматически
+  const seen = useRef(new Set());
+  const mine = useRef(new Set()); // свои объекты: из-за них вид не прыгает, пока рисуешь у края
+  const [offscreen, setOffscreen] = useState(false);
   const gesture = useRef(null);
   const pointers = useRef(new Map());
   const spaceDown = useRef(false);
@@ -282,6 +286,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   }, [objs, remote]);
 
   const send = useCallback(async (kind, data, prev) => {
+    if (data?.oid) mine.current.add(data.oid);
     applyOps([{ kind, data }]);
     if (kind !== "clear") history.current.push({ oid: data.oid, prev });
     if (!remote) return;
@@ -314,6 +319,24 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
     const r = vp.current.getBoundingClientRect(), v = viewRef.current;
     return [(r.width / 2 - v.x) / v.z, (r.height / 2 - v.y) / v.z];
   };
+  // Видимая часть холста без полей под панелями (в координатах доски)
+  const visibleRect = () => {
+    const r = vp.current.getBoundingClientRect(), v = viewRef.current;
+    return [(76 - v.x) / v.z, (64 - v.y) / v.z, (r.width - 24 - v.x) / v.z, (r.height - 56 - v.y) / v.z];
+  };
+  // Свободное место рядом с центром экрана: новые объекты не ложатся друг на друга и не прячутся под панели
+  const freeSpot = (w, h) => {
+    const [cx, cy] = center();
+    const [vx1, vy1, vx2, vy2] = visibleRect();
+    const boxes = [...objsRef.current.values()].filter((o) => o.type !== "stroke");
+    const hits = (x, y) => boxes.some((o) => x < o.x + o.w + 16 && x + w + 16 > o.x && y < o.y + o.h + 16 && y + h + 16 > o.y);
+    const inView = (x, y) => x >= vx1 && y >= vy1 && x + w <= vx2 && y + h <= vy2;
+    const cands = [];
+    for (let i = -5; i <= 5; i++) for (let j = -5; j <= 5; j++) cands.push([cx - w / 2 + i * (w + 24) / 2, cy - h / 2 + j * (h + 24) / 2]);
+    cands.sort((a, b) => Math.hypot(a[0] + w / 2 - cx, a[1] + h / 2 - cy) - Math.hypot(b[0] + w / 2 - cx, b[1] + h / 2 - cy));
+    const spot = cands.find(([x, y]) => inView(x, y) && !hits(x, y)) || cands.find(([x, y]) => !hits(x, y));
+    return spot || [cx - w / 2, cy - h / 2];
+  };
   const zoomAt = (factor, cx, cy) => setView((v) => {
     const z = Math.min(4, Math.max(0.15, v.z * factor));
     return { z, x: cx - ((cx - v.x) / v.z) * z, y: cy - ((cy - v.y) / v.z) * z };
@@ -324,6 +347,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   const onWheel = (e) => {
     e.preventDefault();
     const r = vp.current.getBoundingClientRect();
+    manual();
     if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.0022), e.clientX - r.left, e.clientY - r.top);
     else setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
   };
@@ -401,12 +425,13 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
       const [a, b] = [...pointers.current.values()];
       const d = Math.hypot(a[0] - b[0], a[1] - b[1]), mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
       const r = vp.current.getBoundingClientRect();
+      manual();
       setView((v) => ({ ...v, x: v.x + mid[0] - g.mid[0], y: v.y + mid[1] - g.mid[1] }));
       zoomAt(d / g.d, mid[0] - r.left, mid[1] - r.top);
       g.d = d; g.mid = mid;
       return;
     }
-    if (g.kind === "pan") { setView({ ...g.v, x: g.v.x + e.clientX - g.sx, y: g.v.y + e.clientY - g.sy }); return; }
+    if (g.kind === "pan") { manual(); setView({ ...g.v, x: g.v.x + e.clientX - g.sx, y: g.v.y + e.clientY - g.sy }); return; }
     const p = toWorld(e);
     if (g.kind === "erase") {
       const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.("[data-oid]");
@@ -494,10 +519,16 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
   });
 
   // -- вставка ------------------------------------------------------------------------------------
-  const place = (o) => { const [cx, cy] = center(); put({ oid: oidGen(), z: topZ(), x: cx - o.w / 2, y: cy - o.h / 2, ...o }); setTool("select"); };
+  const place = (o) => { const [x, y] = freeSpot(o.w, o.h); put({ oid: oidGen(), z: topZ(), x, y, ...o }); setTool("select"); };
+  // Карточка и таблица сразу уходят ученику, а после «Готово» обновляются
+  const placeAndEdit = (o) => {
+    const [x, y] = freeSpot(o.w, o.h);
+    const obj = { oid: oidGen(), z: topZ(), x, y, ...o };
+    put(obj); setSelected(obj.oid); setEditing(obj.oid); setTool("select");
+  };
   const addSticker = (s) => { place({ type: "sticker", sticker: s.id, w: 130, h: 130 }); setPanel(null); };
-  const addCard = () => { const [cx, cy] = center(); const o = { oid: oidGen(), type: "card", x: cx - 110, y: cy - 70, w: 220, h: 140, z: topZ(), front: "", back: "", flipped: false, color: "#FFF4C7" }; applyOps([{ kind: "obj", data: o }]); setSelected(o.oid); setEditing(o.oid); setTool("select"); };
-  const addTable = () => { const [cx, cy] = center(); const o = { oid: oidGen(), type: "table", x: cx - 200, y: cy - 80, w: 400, h: 160, z: topZ(), head: true, cells: [["I", "you", "he / she"], ["am", "are", "is"], ["", "", ""]] }; applyOps([{ kind: "obj", data: o }]); setSelected(o.oid); setEditing(o.oid); setTool("select"); };
+  const addCard = () => placeAndEdit({ type: "card", w: 220, h: 140, front: "", back: "", flipped: false, color: "#FFF4C7" });
+  const addTable = () => placeAndEdit({ type: "table", w: 400, h: 160, head: true, cells: [["I", "you", "he / she"], ["am", "are", "is"], ["", "", ""]] });
   const addTimer = () => place({ type: "timer", w: 240, h: 150, seconds: 120, left: 120, started: null, label: "Время на задание" });
   const pagePicked = async (blob, page) => {
     const name = `${pdfOpen.title.replace(/\.pdf$/i, "")}, стр. ${page}.jpg`;
@@ -536,8 +567,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
       addMaterial(m); say("");
     } catch (e) { say(`⛔ ${e.message}`); }
   };
-  const fit = () => {
-    const list = [...objsRef.current.values()];
+  const fit = (list = [...objsRef.current.values()]) => {
     if (!list.length) { setView({ x: 80, y: 60, z: 1 }); return; }
     const r = vp.current.getBoundingClientRect();
     // Поля: слева панель инструментов, сверху палитра – содержимое не должно уходить под них
@@ -548,6 +578,22 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
     const z = Math.min(2, Math.max(0.15, Math.min(aw / (x2 - x1 || 1), ah / (y2 - y1 || 1))));
     setView({ z, x: pl - x1 * z + (aw - (x2 - x1) * z) / 2, y: pt - y1 * z + (ah - (y2 - y1) * z) / 2 });
   };
+
+  // Пока человек сам не двигал холст, доска показывает всё, что на ней появилось: ученик с телефона
+  // видит заметку преподавателя, даже если она легла за краем его маленького экрана.
+  useEffect(() => {
+    const before = seen.current;
+    seen.current = new Set(objs.keys());
+    if (!vp.current || !objs.size) return;
+    const [vx1, vy1, vx2, vy2] = visibleRect();
+    const fresh = [...objs.values()].filter((o) => !before.has(o.oid) && !mine.current.has(o.oid));
+    const outside = fresh.some((o) => o.x < vx1 || o.y < vy1 || o.x + o.w > vx2 || o.y + o.h > vy2);
+    if (!outside) return;
+    if (follow.current) fit([...objs.values()]);
+    else setOffscreen(true);
+  }, [objs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const manual = () => { follow.current = false; };
+  const showAll = () => { follow.current = true; setOffscreen(false); fit(); };
 
   const ordered = useMemo(() => [...objs.values()].sort((a, b) => (a.z || 0) - (b.z || 0)), [objs]);
   const sel = selected && (live?.oid === selected ? live : objs.get(selected));
@@ -629,11 +675,16 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
 
       {/* Масштаб – справа снизу */}
       <div className="glass absolute bottom-3 right-3 flex items-center gap-1 rounded-full px-1.5 py-1">
-        <button type="button" aria-label="Уменьшить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={() => { const r = vp.current.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); }}><Minus size={16} /></button>
+        <button type="button" aria-label="Уменьшить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={() => { manual(); const r = vp.current.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); }}><Minus size={16} /></button>
         <span className="num w-12 text-center text-xs font-semibold">{Math.round(view.z * 100)}%</span>
-        <button type="button" aria-label="Увеличить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={() => { const r = vp.current.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); }}><Plus size={16} /></button>
-        <button type="button" aria-label="Показать всё" title="Показать всё" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={fit}><Maximize size={15} /></button>
+        <button type="button" aria-label="Увеличить" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={() => { manual(); const r = vp.current.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); }}><Plus size={16} /></button>
+        <button type="button" aria-label="Показать всё" title="Показать всё" className="grid h-8 w-8 place-items-center rounded-full hover:bg-cream" onClick={showAll}><Maximize size={15} /></button>
       </div>
+      {offscreen && (
+        <button type="button" onClick={showAll} className="absolute bottom-16 right-3 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-white shadow-lift">
+          Новое на доске за краем экрана · Показать
+        </button>
+      )}
       {status && <div className="glass absolute bottom-3 left-16 rounded-full px-4 py-1.5 text-xs font-semibold text-ink-soft">{status}</div>}
 
       {panel === "stickers" && <StickerPanel onPick={addSticker} onClose={() => setPanel(null)} />}

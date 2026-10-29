@@ -84,6 +84,9 @@ def test_spark_offline_and_quiz(env):
     assert "kitchen" in h["messages"][-1]["text"]
     h = env["spark"].ask_voice(student, "где домашка".encode() + PAD)
     assert h["messages"][-2]["voice"] and "Домашка" in h["messages"][-1]["text"]
+    # без ИИ вопрос о языке не путается с вопросом о разделе «Домашка»
+    h = env["spark"].ask(student, {"text": "Как сказать по-английски «я уже сделал домашку»?"})
+    assert "включит ИИ" in h["messages"][-1]["text"] and "проверь мои слова" in h["messages"][-1]["text"]
     assert env["spark"].clear(student)["messages"] == []
     with pytest.raises(PortalError):
         env["spark"].ask(student, {"text": "  "})
