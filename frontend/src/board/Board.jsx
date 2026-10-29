@@ -77,8 +77,8 @@ const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, active
     const st = stickerById(o.sticker);
     return (
       <div data-oid={o.oid} className={`${cls} grid place-items-center`} style={style}>
-        {st?.emoji ? <span style={{ fontSize: Math.min(o.w, o.h) * 0.85, lineHeight: 1 }}>{st.emoji}</span>
-          : <img alt="" draggable="false" src={st?.src || o.sticker} className="pointer-events-none h-full w-full object-contain" />}
+        {st?.src || !st?.emoji ? <img alt="" draggable="false" src={st?.src || o.sticker} className="pointer-events-none h-full w-full object-contain drop-shadow-[0_6px_10px_rgba(23,23,26,.15)]" />
+          : <span style={{ fontSize: Math.min(o.w, o.h) * 0.85, lineHeight: 1 }}>{st.emoji}</span>}
       </div>
     );
   }
@@ -526,7 +526,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
     const obj = { oid: oidGen(), z: topZ(), x, y, ...o };
     put(obj); setSelected(obj.oid); setEditing(obj.oid); setTool("select");
   };
-  const addSticker = (s) => { place({ type: "sticker", sticker: s.id, w: 130, h: 130 }); setPanel(null); };
+  const addSticker = (s) => { place({ type: "sticker", sticker: s.id, w: 140, h: 140 }); };
   const addCard = () => placeAndEdit({ type: "card", w: 220, h: 140, front: "", back: "", flipped: false, color: "#FFF4C7" });
   const addTable = () => placeAndEdit({ type: "table", w: 400, h: 160, head: true, cells: [["I", "you", "he / she"], ["am", "are", "is"], ["", "", ""]] });
   const addTimer = () => place({ type: "timer", w: 240, h: 150, seconds: 120, left: 120, started: null, label: "Время на задание" });
@@ -710,19 +710,21 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
 function StickerPanel({ onPick, onClose }) {
   const packs = Object.keys(PACKS);
   const [pack, setPack] = useState(packs[0]);
+  const face = (st, cls) => (st.src ? <img alt="" src={st.src} loading="lazy" className={`${cls} object-contain`} /> : <span className="text-3xl leading-none">{st.emoji}</span>);
   return (
-    <div className="glass absolute left-16 top-16 z-10 w-[min(420px,calc(100%-5rem))] rounded-3xl p-3" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="mb-2 flex items-center justify-between"><span className="text-sm font-bold">Стикеры</span><button type="button" className="btn-ghost btn-sm" onClick={onClose}>Закрыть</button></div>
-      <div className="mb-3 flex gap-1 overflow-x-auto pb-1">
+    <div className="glass absolute left-16 top-16 z-10 flex max-h-[calc(100%-5rem)] w-[min(500px,calc(100%-5rem))] flex-col rounded-3xl p-3 shadow-lift" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="mb-2 flex items-center justify-between"><span className="text-sm font-semibold">Стикеры · {pack}</span><button type="button" className="btn-ghost btn-sm" onClick={onClose}>Закрыть</button></div>
+      <div className="mb-2 flex gap-1 overflow-x-auto pb-1">
         {packs.map((p) => (
-          <button key={p} type="button" onClick={() => setPack(p)} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${pack === p ? "bg-ink text-white" : "bg-white text-ink-soft"}`}>{p}</button>
+          <button key={p} type="button" onClick={() => setPack(p)} title={p} aria-label={p}
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl p-1 transition ${pack === p ? "bg-ink/10 ring-2 ring-ink" : "hover:bg-cream"}`}>{face(PACKS[p][0], "h-8 w-8")}</button>
         ))}
       </div>
-      <div className="grid max-h-64 grid-cols-5 gap-2 overflow-y-auto">
-        {PACKS[pack].map((s) => (
-          <button key={s.id} type="button" onClick={() => onPick(s)} title="Добавить на доску"
-            className="grid aspect-square place-items-center rounded-2xl bg-white/80 p-1.5 transition hover:-translate-y-0.5 hover:bg-cream hover:shadow-soft">
-            {s.emoji ? <span className="text-3xl leading-none">{s.emoji}</span> : <img alt="" src={s.src} className="h-full w-full object-contain" />}
+      <div className="grid min-h-0 flex-1 grid-cols-5 gap-1.5 overflow-y-auto sm:grid-cols-6">
+        {PACKS[pack].map((st) => (
+          <button key={st.id} type="button" onClick={() => onPick(st)} title="Добавить на доску"
+            className="grid aspect-square place-items-center rounded-2xl p-1.5 transition hover:-translate-y-0.5 hover:bg-cream">
+            {face(st, "h-full w-full")}
           </button>
         ))}
       </div>

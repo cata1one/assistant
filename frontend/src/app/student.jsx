@@ -61,8 +61,8 @@ export function StudentHome() {
               <Stat value={cards?.stats.learned ?? "–"} label="слов выучено" />
               <Stat value={lessons.filter((l) => l.status === "finished").length} label="уроков" />
             </div>
-            <a href="#/app/spark" className="panel flex items-center gap-3 p-4 transition hover:border-ink/25">
-              <SparkMark size={40} />
+            <a href="#/app/spark" className="panel flex items-center gap-3 !border-sun/60 !bg-sun-soft/60 p-4 transition hover:!border-sun">
+              <SparkMark size={58} still={false} />
               <span className="min-w-0"><span className="block font-semibold">Спросить Искорку</span><span className="text-[13px] text-ink-mute">Объяснит правило, проверит слова, поболтает на языке</span></span>
             </a>
             <MoodCard />

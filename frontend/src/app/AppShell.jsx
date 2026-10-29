@@ -1,6 +1,6 @@
 import {
   Activity, BookOpen, Building2, CreditCard, FileStack, GraduationCap, Home, Layers, LogOut, Menu, MessagesSquare, NotebookPen, Search,
-  Settings, ShieldAlert, Shield, Sparkles, Users, Wallet, X,
+  Settings, ShieldAlert, Shield, Users, Wallet, X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSession } from "../lib/session.js";
@@ -17,6 +17,10 @@ import { MaterialsHub } from "./materials.jsx";
 import Room from "./Room.jsx";
 import { AdminPage, SchoolHome, SchoolLessonsPage, SignalsPage, SystemPage, TutorsPage } from "./school.jsx";
 import { SparkPage } from "./spark.jsx";
+import Iskorka from "./Iskorka.jsx";
+
+// Иконка раздела «Искорка» в меню – сама Искорка
+const IskorkaIcon = ({ size = 18 }) => <Iskorka size={size + 6} still className="-m-[3px]" />;
 import { ParentHome, StudentHome, WordsHub } from "./student.jsx";
 import { BillingStatus, PlanPage, StudentsPage, TutorHome } from "./tutor.jsx";
 import { CoursesPage, DoUnit, UnitEditor } from "./units.jsx";
@@ -33,7 +37,7 @@ const NAV = {
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["materials", "Материалы", FileStack, MaterialsHub, 0],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
-    ["spark", "Искорка", Sparkles, SparkPage, 0],
+    ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["pay", "Оплата занятий", Wallet, LessonPayPage, 0],
     ["find", "Заявки учеников", Search, null, 0, "#/market?tab=students"],
     ["plan", "Тариф", CreditCard, PlanPage, 0],
@@ -46,7 +50,7 @@ const NAV = {
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
     ["courses", "Курсы Bright", GraduationCap, CoursesPage, 0],
-    ["spark", "Искорка", Sparkles, SparkPage, 0],
+    ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["find", "Найти преподавателя", Search, null, 0, "#/market"],
     ["profile", "Профиль и оформление", Settings, ProfilePage, 0],
   ],
@@ -55,7 +59,7 @@ const NAV = {
     ["lessons", "Отчёты", BookOpen, LessonsHub, 2],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 3],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
-    ["spark", "Искорка", Sparkles, SparkPage, 0],
+    ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["profile", "Профиль", Settings, ProfilePage, 0],
   ],
   school: [
@@ -66,7 +70,7 @@ const NAV = {
     ["lessons", "Уроки", BookOpen, SchoolLessonsPage, 0],
     ["materials", "Материалы школы", FileStack, MaterialsHub, 0],
     ["pay", "Оплата занятий", Wallet, LessonPayPage, 0],
-    ["spark", "Искорка", Sparkles, SparkPage, 0],
+    ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["plan", "Тариф", CreditCard, PlanPage, 0],
     ["profile", "Профиль", Settings, ProfilePage, 0],
   ],

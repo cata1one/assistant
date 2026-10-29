@@ -45,9 +45,9 @@ export default function Landing() {
       <section className="pb-6 pt-28 md:pt-36">
         <div className="max-w-3xl animate-fadeup">
           <p className="text-sm font-medium text-ink-mute">Для репетиторов языков и небольших онлайн-школ</p>
-          <h1 className="mt-4 text-[clamp(2.5rem,6.4vw,4.6rem)] leading-[1.02]">Ведите <span className="mark">уроки</span>,<br />а не пять программ</h1>
+          <h1 className="mt-4 text-[clamp(2.5rem,6.4vw,4.6rem)] leading-[1.02]">Урок ведёте <span className="mark">вы</span>.<br />Остальное сделает Bright</h1>
           <p className="mt-6 max-w-2xl text-lg text-ink-soft md:text-xl">
-            Видеосвязь с доской, конспект и новые слова сразу после урока, домашка, оплата занятий и заявки учеников. Ученики заходят с компьютера, с телефона или из приложения.
+            Видеосвязь с доской и стикерами, конспект и слова сразу после урока, домашка, которую хочется делать, оплата занятий и новые ученики. Ученики заходят с компьютера, с телефона или из приложения.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <a href="#/register?role=tutor&start=trial" className="btn-brand btn-lg">Попробовать {PRICE.trialDays} дня бесплатно</a>

@@ -1,13 +1,18 @@
-// Стикеры доски: собственные рисунки (SVG) и тематические наборы эмодзи.
-// Картинки из Pinterest использовать нельзя – это чужие работы. Свои стикеры можно загрузить как картинку.
+// Стикеры доски: объёмные Fluent Emoji 3D от Microsoft (лицензия MIT, файлы fe-*.webp в public)
+// и собственные плашки с надписями (SVG). Картинки из Pinterest использовать нельзя – это чужие работы
+// без лицензии. Свои стикеры можно загрузить как картинку.
+import { FLUENT } from "./fluent.js";
 
 const svg = (body, vb = "0 0 100 100") =>
   `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">${body}</svg>`)}`;
 
+// Надпись-«таблетка» с объёмом: нижний край темнее, сверху блик
 const badge = (text, fill, stroke, color = "#fff", size = 15) => svg(
-  `<path d="M10 22h80l-6 14 6 14H10l6-14z" fill="${stroke}"/><rect x="14" y="16" width="72" height="40" rx="10" fill="${fill}"/>` +
-  `<text x="50" y="42" text-anchor="middle" font-family="Manrope,Arial,sans-serif" font-weight="800" font-size="${size}" fill="${color}">${text}</text>`,
-  "0 0 100 70");
+  `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>` +
+  `<rect x="6" y="15" width="88" height="42" rx="21" fill="${stroke}"/><rect x="6" y="11" width="88" height="42" rx="21" fill="${fill}"/>` +
+  `<rect x="6" y="11" width="88" height="42" rx="21" fill="url(#g)"/>` +
+  `<text x="50" y="38.5" text-anchor="middle" font-family="Arial Rounded MT Bold,Arial,sans-serif" font-weight="800" font-size="${size}" fill="${color}">${text}</text>`,
+  "0 0 100 66");
 
 const DRAWN = {
   // Хэллоуин
@@ -143,6 +148,8 @@ const DRAWN = {
 };
 
 const EMOJI = {
+  "Молодец!": ["👍", "👏", "🔥", "💯", "🏆", "🥇", "🌟", "⭐", "🎉", "🎊", "💪", "🤩", "🥳", "👑", "🚀", "💎", "🎯", "🙌", "🌈", "💖", "🦄", "😎", "🤗", "🍀"],
+  "Учёба": ["📚", "📖", "✏️", "🖊️", "📝", "🎓", "🎒", "🧠", "💡", "📌", "📎", "📏", "🔍", "⏰", "⌛", "📅", "💬", "🗣️", "🎧", "🎤", "💻", "📱", "🧮", "🔤", "❓", "❗", "✅", "❌", "🤔", "👀"],
   "Хэллоуин": ["🎃", "👻", "🦇", "🕸️", "🕷️", "🍬", "🧙", "🧛", "💀", "🌕"],
   "Новый год": ["🎄", "❄️", "☃️", "🎁", "🦌", "✨", "🎅", "🧦", "🥂", "🕯️"],
   "Китайский Новый год": ["🧧", "🏮", "🐉", "🧨", "🥟", "🍊", "🐍", "🎋", "🥢", "🍵"],
@@ -176,21 +183,30 @@ const EMOJI = {
   "Языки и страны": ["🇬🇧", "🇺🇸", "🇨🇳", "🇪🇸", "🇫🇷", "🇮🇹", "🇵🇹", "🇧🇷", "🇷🇸", "🇬🇷", "🇮🇳", "🇸🇦", "🇦🇪", "🇲🇽"],
 };
 
-const PACK_OF = { hw: "Хэллоуин", ny: "Новый год", ch: "Рождество", f23: "23 февраля", m8: "8 Марта", vd: "Валентин", ea: "Пасха",
-  ms: "Масленица", kn: "День знаний", au: "Осень", cny: "Китайский Новый год", pr: "Похвала", sc: "Школа", wx: "Погода",
-  em: "Эмоции", ck: "Проверка", gr: "Грамматика", sp: "Весна и лето", su: "Весна и лето", sx: "Космос", an: "Животные", fd: "Еда", bd: "День рождения" };
+// Надписи остаются в наборе «Надписи», нарисованные картинки заменены объёмными стикерами
+const LABELS = /^(pr-(great|excellent|welldone|jiayou|taibangle|try|muybien|tresbien|moltobene|muitobem|bravo|shabash|ahsant|super|wow|molodec|otlichno|5)|ck-|gr-)/;
 
+/** Объёмная картинка для эмодзи, если она есть в наборе Fluent. */
+export const fluentSrc = (e) => {
+  const code = [...e].map((c) => c.codePointAt(0).toString(16)).join("-");
+  const bare = code.replace(/-fe0f/g, "");
+  const hit = FLUENT.has(code) ? code : FLUENT.has(bare) ? bare : null;
+  return hit ? `/static/fe-${hit}.webp` : null;
+};
+
+const legacy = [];
 export const PACKS = (() => {
   const packs = {};
-  Object.entries(DRAWN).forEach(([id, src]) => {
-    const pack = PACK_OF[id.split("-")[0]];
-    (packs[pack] = packs[pack] || []).push({ id, src });
-  });
   Object.entries(EMOJI).forEach(([pack, list]) => {
-    list.forEach((e, i) => (packs[pack] = packs[pack] || []).push({ id: `em-${pack.length}-${i}-${[...e][0].codePointAt(0).toString(16)}`, emoji: e }));
+    list.forEach((e, i) => (packs[pack] = packs[pack] || []).push({ id: `em-${pack.length}-${i}-${[...e][0].codePointAt(0).toString(16)}`, emoji: e, src: fluentSrc(e) }));
+  });
+  Object.entries(DRAWN).forEach(([id, src]) => {
+    if (!LABELS.test(id)) { legacy.push({ id, src }); return; }
+    const pack = id.startsWith("gr-") ? "Грамматика" : id.startsWith("ck-") ? "Проверка" : "Надписи";
+    (packs[pack] = packs[pack] || []).push({ id, src });
   });
   return packs;
 })();
 
-const ALL = Object.values(PACKS).flat();
+const ALL = [...Object.values(PACKS).flat(), ...legacy];
 export const stickerById = (id) => ALL.find((s) => s.id === id);

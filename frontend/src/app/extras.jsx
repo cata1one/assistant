@@ -4,7 +4,8 @@ import { request, uploadRaw } from "../lib/api.js";
 import { currentHoliday } from "../lib/holidays.js";
 import { useSession } from "../lib/session.js";
 import { ErrorBox, Notice } from "../ui/kit.jsx";
-import { ProfileAvatar, Sticker } from "./decor.jsx";
+import { fluentSrc } from "../board/stickers.js";
+import { ProfileAvatar } from "./decor.jsx";
 
 // == Социальная батарейка ==========================================================================
 const BATTERY = [
@@ -70,11 +71,12 @@ export function HolidayBanner({ student }) {
   const dress = async () => {
     try { await request("POST", "/site/v1/account/prefs", { theme: h.theme }); session.reload(); close(); } catch (x) { setError(x); }
   };
-  const sticker = { newyear: "ny-tree", christmas: "ch-bell", valentine: "vd-rose", feb23: "f23-star", mar8: "m8-bouquet", maslenitsa: "ms-pancakes",
-    easter: "ea-egg", knowledge: "kn-bell", teacher: "sc-apple", halloween: "hw-pumpkin", cny: "cny-lantern" }[h.id.split("-")[0]];
+  const emoji = { newyear: "🎄", christmas: "🔔", valentine: "🌹", feb23: "🎖️", mar8: "💐", maslenitsa: "🥞",
+    easter: "🥚", knowledge: "📚", teacher: "🍎", halloween: "🎃", cny: "🏮" }[h.id.split("-")[0]];
+  const art = emoji && fluentSrc(emoji);
   return (
     <div className="panel relative mb-5 flex flex-wrap items-center gap-x-4 gap-y-3 !border-sun !bg-sun-soft p-4 pr-12">
-      {sticker ? <Sticker id={sticker} size={48} /> : <PartyPopper size={30} />}
+      {art ? <img src={art} alt="" width={56} height={56} className="h-14 w-14 -rotate-6 drop-shadow" /> : <PartyPopper size={30} />}
       <div className="min-w-[180px] flex-1">
         <p className="text-[17px] font-semibold">{h.title}</p>
         <p className="text-sm text-ink-soft">{student ? h.text : `Праздничные стикеры «${h.pack}» уже на доске: нажмите «Стикеры».`}</p>

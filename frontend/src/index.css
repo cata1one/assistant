@@ -66,6 +66,24 @@
 /* Нижняя панель приложения учитывает «чёлку» и полосу жестов телефона */
 .safe-bottom { padding-bottom: max(.5rem, env(safe-area-inset-bottom)); }
 
+/* Искорка: покачивание, моргание, радость */
+.isk-live .isk-body { animation: isk-float 3.2s ease-in-out infinite; }
+.isk-live svg { animation: isk-float 3.2s ease-in-out infinite; }
+.isk-live .isk-eyes { transform-box: fill-box; transform-origin: center; animation: isk-blink 4.6s infinite; }
+.isk-joy .isk-body, .isk-joy svg { animation: isk-hop .7s cubic-bezier(.3,1.6,.5,1) 2; }
+.isk-oops .isk-body, .isk-oops svg { animation: isk-shake .5s ease-in-out 1; }
+.isk-think .isk-body, .isk-think svg { animation: isk-tilt 1.6s ease-in-out infinite; }
+.isk-sparks i { position: absolute; width: 22%; height: 22%; background: radial-gradient(circle, #FFD43B 0 30%, transparent 32%),
+  conic-gradient(from 45deg, transparent 0 20%, #FFC21A 20% 30%, transparent 30% 45%, #FFC21A 45% 55%, transparent 55% 70%, #FFC21A 70% 80%, transparent 80%);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); animation: isk-pop .9s ease-out both; }
+.isk-sparks i:nth-child(2) { animation-delay: .12s; } .isk-sparks i:nth-child(3) { animation-delay: .24s; }
+@keyframes isk-float { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-5%) rotate(2deg); } }
+@keyframes isk-blink { 0%,92%,100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes isk-hop { 0%,100% { transform: translateY(0) scale(1); } 40% { transform: translateY(-14%) scale(1.06, .96); } }
+@keyframes isk-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-7%) rotate(-6deg); } 75% { transform: translateX(7%) rotate(6deg); } }
+@keyframes isk-tilt { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes isk-pop { 0% { transform: scale(0) rotate(0); opacity: 0; } 50% { opacity: 1; } 100% { transform: scale(1) rotate(90deg); opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

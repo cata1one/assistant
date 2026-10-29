@@ -125,8 +125,8 @@ export function TutorHome() {
             <Stat value={students.length} label="учеников" href="#/app/students" />
             <Stat value={lessons.filter((l) => l.status === "finished").length} label="уроков проведено" href="#/app/lessons" />
           </div>
-          <a href="#/app/spark" className="panel flex items-center gap-3 p-4 transition hover:border-ink/25">
-            <SparkMark size={40} />
+          <a href="#/app/spark" className="panel flex items-center gap-3 !border-sun/60 !bg-sun-soft/60 p-4 transition hover:!border-sun">
+            <SparkMark size={58} still={false} />
             <span className="min-w-0"><span className="block font-semibold">Искорка</span><span className="text-[13px] text-ink-mute">План урока, упражнения, письмо родителям. Можно голосом</span></span>
           </a>
           <a href="#/market?tab=students" className="panel flex items-center gap-3 p-4 transition hover:border-ink/25">
