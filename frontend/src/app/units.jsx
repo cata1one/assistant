@@ -10,6 +10,7 @@ import { useApi } from "./common.jsx";
 import Iskorka from "./Iskorka.jsx";
 import UnitPlayer from "./player.jsx";
 import Quest from "./quest.jsx";
+import { BookShelf, BookView } from "./books.jsx";
 
 const TYPES = {
   text: "Текст или правило", words: "Новые слова", gap: "Вставить слова в текст", match: "Пары: слово и значение",
@@ -176,6 +177,8 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
   const [assign, setAssign] = useState(null);
   const [preview, setPreview] = useState(null);
   const [quest, setQuest] = useState(false);
+  const [book, setBook] = useState(null);
+  const shelf = useApi(tab === "library" ? "/site/v1/library" : null, [tab]);
   const [err, setErr] = useState(null);
   const copyLib = async (u) => {
     try { const c = await request("POST", `/site/v1/units/library/${u.id}`, {}); window.location.hash = `#/app/units/${c.id}`; } catch (x) { setErr(x); }
@@ -219,7 +222,7 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
   return (
     <>
       {!embedded && <PageTitle title="Занятия" text="Интерактивные уроки: вставить слова, пары, тесты, аудирование. Выдавайте их как домашнее задание – ответы проверяются сами." />}
-      {!fixedTab && <div className="mb-5"><Tabs label="Занятия" value={tab} onChange={setTab} items={[{ id: "mine", title: "Мои занятия" }, { id: "library", title: "Курсы Bright" }]} /></div>}
+      {!fixedTab && <div className="mb-5"><Tabs label="Занятия" value={tab} onChange={setTab} items={[{ id: "mine", title: "Мои занятия" }, { id: "library", title: "Учебники Bright" }]} /></div>}
       <ErrorBox error={error || err} />
       {!data ? <Loading /> : tab === "mine" ? (
         <>
@@ -231,7 +234,10 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
             : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.units.map((u) => card(u, false))}</div>}
         </>
       ) : (
-        <>
+        book ? <BookView bookId={book} onBack={() => setBook(null)} onAssign={(u) => setAssign(u)} /> : <>
+          <h2 className="mb-3 text-xl">Учебники</h2>
+          {shelf.data ? <BookShelf books={shelf.data.books} onOpen={(b) => { setBook(b.id); window.scrollTo(0, 0); }} /> : <Loading />}
+          <h2 className="mb-3 mt-10 text-xl">Все уроки</h2>
           <div className="mb-2 flex flex-wrap gap-1.5">
             <button type="button" className={chip(lang === "all")} onClick={() => setLang("all")}>Все языки</button>
             {langs.map((l) => <button key={l} type="button" className={chip(lang === l)} onClick={() => setLang(l)}>{LANG_TITLE[l] || l}</button>)}
@@ -267,39 +273,13 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
 /** Курсы Bright для ученика: проходить готовые занятия самому и сразу видеть ошибки. */
 export function CoursesPage() {
   const { data, error } = useApi("/site/v1/library");
-  const [lang, setLang] = useState("all");
-  const [open, setOpen] = useState(null);
-  const LANG_TITLE = Object.fromEntries(LANGS.map((l) => [l.id, `${l.flag} ${l.title}`]));
-  const list = (data?.library || []).filter((u) => lang === "all" || u.language === lang);
-  const langs = [...new Set((data?.library || []).map((u) => u.language))];
-  const chip = (active) => `chip !px-2.5 !py-1 !text-[13px] ${active ? "!bg-ink !text-white" : ""}`;
-  if (open) {
-    return (
-      <>
-        <Quest unit={open.preview} onCheck={(answers) => request("POST", `/site/v1/library/${open.id}/check`, { answers })}
-          onSubmit={(answers) => request("POST", `/site/v1/library/${open.id}/check`, { answers })} onExit={() => setOpen(null)} />
-      </>
-    );
-  }
+  const [book, setBook] = useState(null);
+  if (book) return <BookView bookId={book} onBack={() => setBook(null)} />;
   return (
     <>
-      <PageTitle title="Курсы Bright" text="Занимайтесь сами между уроками: правила с примерами, задания с автопроверкой и аудирование." />
+      <PageTitle title="Учебники Bright" text="Занимайтесь сами между уроками: правило, слова, задания с проверкой сразу и аудирование." />
       <ErrorBox error={error} />
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        <button type="button" className={chip(lang === "all")} onClick={() => setLang("all")}>Все языки</button>
-        {langs.map((l) => <button key={l} type="button" className={chip(lang === l)} onClick={() => setLang(l)}>{LANG_TITLE[l] || l}</button>)}
-      </div>
-      {!data ? <Loading /> : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((u) => (
-            <button key={u.id} type="button" onClick={() => { setOpen(u); window.scrollTo(0, 0); }} className="panel flex flex-col p-4 text-left transition hover:border-ink/25">
-              <div className="flex flex-wrap gap-1"><span className="chip !bg-ink !text-white">{u.level}</span>{(u.tags || []).slice(0, 2).map((t) => <span key={t} className="chip">{t}</span>)}</div>
-              <h3 className="mt-2.5 text-[15px] font-semibold leading-snug">{u.title}</h3>
-              <p className="mt-1 line-clamp-2 text-[13px] text-ink-mute">{u.summary}</p>
-            </button>
-          ))}
-        </div>
-      )}
+      {!data ? <Loading /> : <BookShelf books={data.books} onOpen={(b) => { setBook(b.id); window.scrollTo(0, 0); }} />}
     </>
   );
 }

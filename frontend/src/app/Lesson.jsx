@@ -1,57 +1,15 @@
 import {
-  ArrowLeft, BookOpen, CheckCircle2, Copy, Lightbulb, MessageSquareQuote, NotebookPen, Repeat, Ruler, Sparkles, TriangleAlert, Trophy,
-  Wrench, XCircle,
+  ArrowLeft, BookOpen, CheckCircle2, Copy, Repeat, Trophy, Volume2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { fmtDate, request } from "../lib/api.js";
+import { fluentSrc } from "../board/stickers.js";
+import { fmtDate, plural, request } from "../lib/api.js";
+import { ttsOf } from "../lib/langs.js";
 import { Bullets, ErrorBox, Loading, Notice, PageTitle, Tabs } from "../ui/kit.jsx";
 import { Flashcard, Panel, useApi } from "./common.jsx";
-
-function Test({ test, lessonId }) {
-  const [answers, setAnswers] = useState(() => test.map(() => ""));
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const set = (i, v) => setAnswers((a) => a.map((x, j) => (j === i ? v : x)));
-  const check = async () => {
-    setError(null);
-    try { setResult(await request("POST", `/site/v1/lessons/${encodeURIComponent(lessonId)}/test`, { answers })); } catch (x) { setError(x); }
-  };
-  const verdict = (i) => result?.results.find((r) => r.index === i);
-  return (
-    <Panel title="Тест для самопроверки" icon={CheckCircle2}>
-      <div className="grid gap-3">
-        {test.map((q, i) => {
-          const v = verdict(i);
-          return (
-            <div key={i} className={`rounded-2xl border p-4 ${v ? (v.correct ? "border-mint bg-mint-soft/50" : "border-teach/40 bg-teach-tint") : "border-line"}`}>
-              <p><b>{i + 1}.</b> {q.question}</p>
-              {q.options?.length ? (
-                <div role="radiogroup" className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {q.options.map((o) => (
-                    <label key={o} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm transition ${answers[i] === o ? "border-brand bg-brand-tint" : "border-line bg-white hover:border-ink/20"}`}>
-                      <input type="radio" name={`q${i}`} value={o} checked={answers[i] === o} onChange={() => set(i, o)} />{o}
-                    </label>
-                  ))}
-                </div>
-              ) : <input className="field mt-3" aria-label={`Ответ на вопрос ${i + 1}`} value={answers[i]} onChange={(e) => set(i, e.target.value)} />}
-              {v && (
-                <p className={`mt-3 flex flex-wrap items-center gap-2 text-sm ${v.correct ? "text-[#146b4c]" : "text-teach-deep"}`}>
-                  {v.correct ? <><CheckCircle2 size={15} /> Верно</> : <><XCircle size={15} /> Правильно: {v.answer}</>}
-                  {v.explanation && <span className="text-ink-mute">– {v.explanation}</span>}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-4 flex items-center gap-4" aria-live="polite">
-        <button type="button" className="btn-brand" onClick={check}>{result ? "Проверить ещё раз" : "Проверить"}</button>
-        {result && <span className="font-display text-2xl font-extrabold">{result.score} из {result.total}</span>}
-      </div>
-      <ErrorBox error={error} />
-    </Panel>
-  );
-}
+import Iskorka from "./Iskorka.jsx";
+import { speak } from "./player.jsx";
+import Quest from "./quest.jsx";
 
 const Back = () => <a href="#/app/lessons" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-ink-mute hover:text-ink"><ArrowLeft size={14} /> Все уроки</a>;
 
@@ -65,29 +23,120 @@ function Student({ res, id }) {
   );
 }
 
+/** Тест урока в режиме Duolingo: вопросы с вариантами – плитки, без вариантов – поле ответа. */
+function lessonQuest(r, id) {
+  const choice = [], gaps = [];
+  r.test.forEach((q, k) => (q.options?.length ? choice : gaps).push(k));
+  const blocks = [];
+  if (choice.length) blocks.push({ type: "choice", title: "Проверь себя", questions: choice.map((k) => ({ q: r.test[k].question, options: r.test[k].options })) });
+  gaps.forEach((k) => blocks.push({ type: "gap", title: "Напишите ответ", parts: [`${r.test[k].question}\n`, ""], bank: false }));
+  const unit = { id: `lesson-${id}`, title: r.topic || "Тест", language: r.target_language, blocks };
+  const check = async (answers) => {
+    const list = r.test.map(() => "");
+    choice.forEach((k, j) => { const v = answers[0]?.[j]; if (v !== undefined && v !== null) list[k] = r.test[k].options[v]; });
+    gaps.forEach((k, j) => { list[k] = answers[(choice.length ? 1 : 0) + j]?.[0] || ""; });
+    const res = await request("POST", `/site/v1/lessons/${encodeURIComponent(id)}/test`, { answers: list });
+    const by = Object.fromEntries(res.results.map((x) => [x.index, x]));
+    const out = {};
+    if (choice.length) out["0"] = { questions: choice.map((k) => !!by[k]?.correct), question_answers: choice.map((k) => r.test[k].options.indexOf(by[k]?.answer)) };
+    gaps.forEach((k, j) => { out[String((choice.length ? 1 : 0) + j)] = { gaps: [!!by[k]?.correct], gap_answers: [by[k]?.answer] }; });
+    return { blocks: out, score: res.score, total: res.total };
+  };
+  return { unit, check };
+}
+
+const Art = ({ e, size = 28 }) => { const src = fluentSrc(e); return src ? <img src={src} alt="" width={size} height={size} className="shrink-0" style={{ width: size, height: size }} /> : <span style={{ fontSize: size * 0.8 }}>{e}</span>; };
+
+function Section({ art, title, children, actions, className = "" }) {
+  return (
+    <section className={`panel p-5 md:p-6 ${className}`}>
+      <div className="mb-4 flex items-center gap-3"><Art e={art} size={34} /><h2 className="flex-1 text-lg">{title}</h2>{actions}</div>
+      {children}
+    </section>
+  );
+}
+
 function StudentBody({ r, id }) {
-  const hw = [...r.homework_teacher, ...r.homework_generated].map((t) => `${t.source === "teacher" ? "От преподавателя: " : "Дополнительно: "}${t.text}`);
+  const [quest, setQuest] = useState(null);
+  const hw = [...r.homework_teacher, ...r.homework_generated];
+  const lang = ttsOf(r.target_language);
+  const stats = [["🔤", r.vocabulary.length, "новых слов"], ["📝", r.rules.length, "правил"], ["✅", r.corrections.length, "исправлений"], ["🎒", hw.length, "заданий"]].filter((x) => x[1]);
+  if (quest) return <Quest unit={quest.unit} onCheck={quest.check} onSubmit={quest.check} onExit={() => setQuest(null)} />;
   return (
     <div className="grid gap-4">
-      <Panel title="Главное" icon={BookOpen}>{r.summary && <p className="mb-3 text-ink-soft">{r.summary}</p>}<Bullets items={r.key_points} /></Panel>
+      {stats.length > 0 && (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {stats.map(([e, n, t]) => <div key={t} className="panel flex items-center gap-3 p-3.5"><Art e={e} size={36} /><span><span className="num block text-xl font-bold leading-none">{n}</span><span className="text-[13px] text-ink-mute">{t}</span></span></div>)}
+        </div>
+      )}
+      {(r.summary || r.key_points.length > 0) && (
+        <Section art="💡" title="Главное">
+          {r.summary && <p className="text-[16px] leading-relaxed text-ink-soft">{r.summary}</p>}
+          {r.key_points.length > 0 && <ul className="mt-3 grid gap-2">{r.key_points.map((k) => <li key={k} className="flex gap-2.5"><CheckCircle2 size={18} className="mt-0.5 shrink-0 text-mint" />{k}</li>)}</ul>}
+        </Section>
+      )}
+      {r.vocabulary.length > 0 && (
+        <Section art="🔤" title="Новые слова" actions={<a href="#/app/words" className="btn-brand btn-sm"><Repeat size={14} /> Учить карточками</a>}>
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-4">{r.vocabulary.map((w) => <Flashcard key={w.word} w={w} />)}</div>
+          <p className="mt-3 text-[13px] text-ink-mute">Нажмите на карточку, чтобы увидеть перевод. Слова уже в разделе «Слова».</p>
+        </Section>
+      )}
       {r.rules.length > 0 && (
-        <Panel title="Правила" icon={Ruler}>
-          <div className="grid gap-5">{r.rules.map((rule) => <div key={rule.title}><p className="font-bold">{rule.title}</p><p className="mb-2 mt-1 text-ink-soft">{rule.explanation}</p><Bullets items={rule.examples} /></div>)}</div>
-        </Panel>
+        <Section art="📝" title="Правила">
+          <div className="grid gap-4">
+            {r.rules.map((rule) => (
+              <div key={rule.title} className="rounded-2xl border-l-4 border-sun bg-sun-soft/40 p-4">
+                <p className="text-[16px] font-semibold">{rule.title}</p>
+                {rule.explanation && rule.explanation !== rule.title && <p className="mt-1.5 text-ink-soft">{rule.explanation}</p>}
+                {rule.examples?.length > 0 && (
+                  <ul className="mt-3 grid gap-1.5">
+                    {rule.examples.map((x) => (
+                      <li key={x} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2">
+                        <button type="button" onClick={() => speak(x, lang)} className="text-study" aria-label={`Произнести: ${x}`}><Volume2 size={16} /></button>
+                        <span className="italic">{x}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
       )}
       {r.corrections.length > 0 && (
-        <Panel title="Работа над ошибками" icon={Wrench}>
-          <ul className="grid gap-2">{r.corrections.map((c, i) => <li key={i}><s className="text-teach-deep/70">{c.wrong}</s> → <b className="text-[#146b4c]">{c.correct}</b>{c.note ? <span className="text-ink-mute"> – {c.note}</span> : null}</li>)}</ul>
-        </Panel>
+        <Section art="✅" title="Работа над ошибками">
+          <ul className="grid gap-2.5">
+            {r.corrections.map((c, i) => (
+              <li key={i} className="grid gap-1.5 rounded-2xl bg-cream p-3.5 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-3">
+                <span className="rounded-xl bg-teach-tint px-3 py-1.5 text-teach-deep line-through decoration-teach/60">{c.wrong}</span>
+                <span className="hidden text-ink-mute sm:block">→</span>
+                <span className="rounded-xl bg-mint-soft px-3 py-1.5 font-semibold text-[#146b4c]">{c.correct}</span>
+                {c.note && <span className="text-[13px] text-ink-mute sm:col-span-3">{c.note}</span>}
+              </li>
+            ))}
+          </ul>
+        </Section>
       )}
-      {r.review_items.length > 0 && <Panel title="Что повторить" icon={Repeat}><Bullets items={r.review_items} /></Panel>}
-      {r.vocabulary.length > 0 && (
-        <Panel title="Новые слова" icon={Sparkles} actions={<a href="#/app/cards" className="btn-brand btn-sm">Учить карточками</a>}>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">{r.vocabulary.map((w) => <Flashcard key={w.word} w={w} />)}</div>
-        </Panel>
+      {r.test.length > 0 && (
+        <section className="panel flex flex-col items-center gap-4 !border-mint/40 !bg-mint-soft/50 p-5 text-center sm:flex-row sm:text-left md:p-6">
+          <Iskorka size={70} mood="happy" />
+          <div className="min-w-0 flex-1"><h2 className="text-lg">Проверь себя</h2><p className="text-ink-soft">{r.test.length} {plural(r.test.length, "вопрос", "вопроса", "вопросов")} по уроку. По одному, с проверкой сразу.</p></div>
+          <button type="button" onClick={() => setQuest(lessonQuest(r, id))} className="w-full rounded-2xl bg-mint px-7 py-3 text-[16px] font-bold text-white shadow-[0_4px_0_#146b4c] active:translate-y-1 active:shadow-none sm:w-auto">Пройти тест</button>
+        </section>
       )}
-      {r.test.length > 0 && <Test test={r.test} lessonId={id} />}
-      {hw.length > 0 && <Panel title="Домашнее задание" icon={NotebookPen}><Bullets items={hw} /></Panel>}
+      {r.review_items.length > 0 && <Section art="🔁" title="Что повторить"><Bullets items={r.review_items} /></Section>}
+      {hw.length > 0 && (
+        <Section art="🎒" title="Домашнее задание" actions={<a href="#/app/homework" className="btn-light btn-sm">Открыть домашку</a>}>
+          <ul className="grid gap-2">
+            {hw.map((t, i) => (
+              <li key={i} className="flex gap-3 rounded-2xl border border-line p-3.5">
+                <span className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-2 border-line" />
+                <span className="min-w-0 flex-1">{t.text}<span className="mt-0.5 block text-[12px] text-ink-mute">{t.source === "teacher" ? "от преподавателя" : "дополнительно"}</span></span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
     </div>
   );
 }
@@ -107,16 +156,16 @@ function ParentBody({ r }) {
   const p = r.parent;
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Panel title="Как прошёл урок" icon={BookOpen} className="md:col-span-2">
-        {p.summary && <p className="text-ink-soft">{p.summary}</p>}
+      <Section art="📖" title="Как прошёл урок" className="md:col-span-2">
+        {p.summary && <p className="text-[16px] leading-relaxed text-ink-soft">{p.summary}</p>}
         {p.activity && <p className="mt-2 text-sm text-ink-mute">Активность: {p.activity}</p>}
-      </Panel>
-      {p.achievements.length > 0 && <Panel title="Успехи" icon={Trophy}><Bullets items={p.achievements} /></Panel>}
-      {p.attention.length > 0 && <Panel title="На что обратить внимание" icon={TriangleAlert}><Bullets items={p.attention} /></Panel>}
-      {p.teacher_remarks.length > 0 && <Panel title="Замечания преподавателя" icon={MessageSquareQuote}><Bullets items={p.teacher_remarks} /></Panel>}
-      <Panel title="Домашнее задание" icon={NotebookPen}><p className="mb-3 text-sm">Прошлое ДЗ: <b>{r.homework_status_ru}</b></p><Bullets items={r.homework} /></Panel>
-      {r.words.length > 0 && <Panel title="Новые слова" icon={Sparkles}><div className="flex flex-wrap gap-2">{r.words.map((w) => <span key={w} className="chip">{w}</span>)}</div></Panel>}
-      {p.recommendations.length > 0 && <Panel title="Как помочь дома" icon={Lightbulb}><Bullets items={p.recommendations} /></Panel>}
+      </Section>
+      {p.achievements.length > 0 && <Section art="🏆" title="Успехи"><Bullets items={p.achievements} /></Section>}
+      {p.attention.length > 0 && <Section art="⚠️" title="На что обратить внимание"><Bullets items={p.attention} /></Section>}
+      {p.teacher_remarks.length > 0 && <Section art="💬" title="Замечания преподавателя"><Bullets items={p.teacher_remarks} /></Section>}
+      <Section art="🎒" title="Домашнее задание"><p className="mb-3 text-sm">Прошлое ДЗ: <b>{r.homework_status_ru}</b></p><Bullets items={r.homework} /></Section>
+      {r.words.length > 0 && <Section art="🔤" title="Новые слова"><div className="flex flex-wrap gap-2">{r.words.map((w) => <span key={w} className="rounded-xl bg-cream px-3 py-1.5 font-semibold">{w}</span>)}</div></Section>}
+      {p.recommendations.length > 0 && <Section art="💡" title="Как помочь дома"><Bullets items={p.recommendations} /></Section>}
     </div>
   );
 }

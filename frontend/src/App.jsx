@@ -20,6 +20,7 @@ const Auth = lazy(() => import("./site/Auth.jsx"));
 const ReviewsPage = lazy(() => import("./site/ReviewsPage.jsx"));
 const Market = lazy(() => import("./site/Market.jsx"));
 const AppShell = lazy(() => import("./app/AppShell.jsx"));
+const BookPrint = lazy(() => import("./app/books.jsx").then((m) => ({ default: m.BookPrint })));
 
 const PUBLIC = { "": Landing, teach: Landing, study: Study, schools: Schools, download: Download, privacy: Privacy, pricing: Pricing, reviews: ReviewsPage, market: Market,
   login: Auth, register: Auth, join: Auth, forgot: Auth, reset: Auth };
@@ -50,7 +51,9 @@ export default function App() {
   const Page = PUBLIC[name];
   return (
     <SessionContext.Provider value={session}>
-      {inApp ? (
+      {name === "print" && route.parts[1] === "book" ? (
+        <Suspense fallback={<div className="p-10"><Loading /></div>}><BookPrint id={route.parts[2]} /></Suspense>
+      ) : inApp ? (
         <Suspense fallback={<div className="p-10"><Loading /></div>}><AppShell route={route} /></Suspense>
       ) : (
         <div className="bg-mesh min-h-screen">

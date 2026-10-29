@@ -49,7 +49,7 @@ const NAV = {
     ["words", "Слова", Layers, WordsHub, 3],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
-    ["courses", "Курсы Bright", GraduationCap, CoursesPage, 0],
+    ["courses", "Учебники", GraduationCap, CoursesPage, 0],
     ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["find", "Найти преподавателя", Search, null, 0, "#/market"],
     ["profile", "Профиль и оформление", Settings, ProfilePage, 0],

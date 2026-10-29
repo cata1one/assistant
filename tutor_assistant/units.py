@@ -361,7 +361,28 @@ class Units:
         from .library import LIBRARY
 
         self.portal.accesses(viewer)  # только для вошедших
-        return {"library": [self._library_card(u) for u in LIBRARY]}
+        from .library import BOOKS
+
+        return {"library": [self._library_card(u) for u in LIBRARY], "books": BOOKS}
+
+    def library_book(self, viewer: Any, book_id: str) -> dict[str, Any]:
+        """Учебник целиком. Преподавателю и школе – с ответами (для печати с ключами), ученику – без."""
+        from .library import BOOKS, library_unit
+        from .relay import TUTOR
+
+        accesses = self.portal.accesses(viewer)
+        book = next((b for b in BOOKS if b["id"] == book_id), None)
+        if not book:
+            raise PortalError(404, "учебник не найден")
+        teacher = any(a.role == TUTOR for a in accesses)
+        if not teacher:
+            try:
+                teacher = self._owner(viewer) is not None  # преподаватель или школа без учеников
+            except PortalError:
+                teacher = False
+        units = [library_unit(uid) for uid in book["units"]]
+        return {"book": book, "teacher": teacher,
+                "units": [u if teacher else {**student_view(u), "summary": u["summary"], "tags": u["tags"]} for u in units if u]}
 
     def library_check(self, viewer: Any, lib_id: str, body: Any) -> dict[str, Any]:
         from .library import LIBRARY

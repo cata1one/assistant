@@ -199,3 +199,17 @@ def test_homework_step_check_does_not_save(env):
     assert units.homework_unit(student, hid)["result"] is None  # проверка по ходу ничего не сохраняет
     with pytest.raises(PortalError):
         units.homework_check(tutor, hid, {"answers": {}})
+
+
+def test_books_cover_library_and_hide_answers_from_students(env):
+    from tutor_assistant.library import BOOKS, LIBRARY
+    from tutor_assistant.units import Units
+    ids = {u["id"] for u in LIBRARY}
+    assert all(uid in ids for b in BOOKS for uid in b["units"])
+    tutor, student, chat = pair(env)
+    units = Units(env["l"])
+    t = units.library_book(tutor, "en-a1")
+    assert t["teacher"] and any("answer" in q for u in t["units"] for b in u["blocks"] if b["type"] == "choice" for q in b["questions"])
+    s = units.library_book(student, "en-a1")
+    assert not s["teacher"] and not any("answer" in q for u in s["units"] for b in u["blocks"] if b["type"] == "choice" for q in b["questions"])
+    assert len(s["units"]) == 8
