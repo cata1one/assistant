@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, Circle, LayoutPanelLeft, LogOut, MessageSquare, Mic, MicOff, MonitorUp, PenLine, Send, ShieldCheck, Square, Video, VideoOff,
+  ArrowLeft, AudioLines, Circle, LayoutPanelLeft, LogOut, MessageSquare, Mic, MicOff, MonitorUp, PenLine, Send, ShieldCheck, Square, Video, VideoOff,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { request } from "../lib/api.js";
@@ -77,11 +77,19 @@ function Control({ on = true, onClick, label, icon: Icon, offIcon: OffIcon }) {
   );
 }
 
+/** Чат урока и расшифровка речи – раздельно: ошибка распознавания не смешивается с тем, что люди написали сами. */
 function Chat({ messages, onSend, canWrite }) {
   const [text, setText] = useState("");
   const [warn, setWarn] = useState(null);
+  const [tab, setTab] = useState("chat");
   const box = useRef(null);
-  useEffect(() => { box.current?.scrollTo({ top: box.current.scrollHeight }); }, [messages.length]);
+  const chat = messages.filter((m) => m.source !== "speech");
+  const speech = messages.filter((m) => m.source === "speech");
+  const list = tab === "chat" ? chat : speech;
+  const seen = useRef({ chat: 0, speech: 0 });
+  seen.current[tab] = list.length;
+  const unread = { chat: chat.length - seen.current.chat, speech: speech.length - seen.current.speech };
+  useEffect(() => { box.current?.scrollTo({ top: box.current.scrollHeight }); }, [list.length, tab]);
   const submit = async (e) => {
     e.preventDefault();
     if (!text.trim()) return;
@@ -91,18 +99,33 @@ function Chat({ messages, onSend, canWrite }) {
     else setWarn(res?.moderation?.warning || null);
     setText("");
   };
+  const tabBtn = (id, title, Icon) => (
+    <button type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+      className={`flex flex-1 items-center justify-center gap-1.5 rounded-[8px] px-2 py-1.5 text-[13px] font-semibold transition ${tab === id ? "bg-white text-ink shadow-soft" : "text-ink-mute hover:text-ink"}`}>
+      <Icon size={14} />{title}{tab !== id && unread[id] > 0 && <span className="rounded-md bg-ink px-1.5 text-[11px] text-white">{unread[id]}</span>}
+    </button>
+  );
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <div role="tablist" aria-label="Чат или расшифровка" className="mb-2 flex gap-0.5 rounded-xl bg-cream p-1">
+        {tabBtn("chat", "Чат", MessageSquare)}
+        {tabBtn("speech", "Расшифровка", AudioLines)}
+      </div>
+      {tab === "speech" && <p className="mb-2 rounded-xl bg-sun-soft/70 px-3 py-2 text-[12px] leading-snug text-ink-soft">Распознаётся автоматически и может ошибаться. Это черновик для конспекта: перед отправкой ученику вы всё проверите.</p>}
       <div ref={box} className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {!messages.length && <p className="text-sm text-ink-mute">Здесь появятся сообщения и расшифровка речи.</p>}
-        {messages.map((m) => (
-          <div key={m.id} className={`rounded-2xl px-3 py-2 text-sm ${m.source === "speech" ? "bg-cream text-ink-mute" : "bg-brand-tint text-ink"}`}>
-            <span className={`mr-1.5 text-xs font-bold ${m.role === "tutor" ? "text-teach" : "text-study"}`}>{m.source === "speech" && "🎙 "}{m.speaker_name}</span>{m.text}
+        {!list.length && <p className="text-sm text-ink-mute">{tab === "chat" ? "Здесь будут сообщения. Удобно для слов, ссылок и заданий." : "Здесь появится текст того, что говорят на уроке."}</p>}
+        {list.map((m) => (tab === "chat" ? (
+          <div key={m.id} className="rounded-2xl bg-cream px-3 py-2 text-sm text-ink">
+            <span className={`mr-1.5 text-xs font-bold ${m.role === "tutor" ? "text-teach" : "text-study"}`}>{m.speaker_name}</span>{m.text}
           </div>
-        ))}
+        ) : (
+          <p key={m.id} className="border-l-2 pl-2.5 text-[13px] leading-relaxed text-ink-soft" style={{ borderColor: m.role === "tutor" ? "#E4572E" : "#2B59E8" }}>
+            <span className="mr-1 font-semibold text-ink">{m.speaker_name}:</span>{m.text}
+          </p>
+        )))}
       </div>
       {warn && <Notice tone="warn" className="mt-2">{warn}</Notice>}
-      {canWrite && (
+      {canWrite && tab === "chat" && (
         <form onSubmit={submit} className="mt-2 flex gap-2">
           <input className="field !py-2" placeholder="Сообщение…" maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} aria-label="Сообщение в чат урока" />
           <button type="submit" className="btn-brand !px-3" aria-label="Отправить"><Send size={16} /></button>
@@ -268,7 +291,6 @@ export default function Room({ id }) {
           <aside className="hidden w-[300px] shrink-0 flex-col gap-3 md:flex">
             {view === "board" && <div className="grid grid-cols-2 gap-2">{remoteTile("aspect-[4/3]")}{localTile("aspect-[4/3]")}</div>}
             <div className="card flex min-h-0 flex-1 flex-col !p-3">
-              <h2 className="mb-2 flex items-center gap-2 text-sm"><MessageSquare size={14} /> Чат и расшифровка</h2>
               <Chat messages={messages} onSend={sendChat} canWrite={participant} />
             </div>
           </aside>

@@ -93,7 +93,7 @@ class Settings:
 
     # Распознавание речи (голосовые, запись урока). mode: auto – если установлен faster-whisper; on; off.
     stt_mode: str = "auto"
-    stt_model: str = "small"  # tiny | base | small | medium | large-v3 – чем больше, тем точнее и медленнее
+    stt_model: str = "auto"  # auto (по памяти: large-v3-turbo от 8 ГБ, иначе small) | tiny | base | small | medium | large-v3-turbo
     stt_language: str = ""  # пусто – определять автоматически (урок обычно смешанный: ru + изучаемый язык)
     stt_device: str = "cpu"  # cpu | cuda
     stt_compute_type: str = "int8"

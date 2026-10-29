@@ -385,13 +385,18 @@ class TutorAssistant:
     def speech_available(self) -> bool:
         return self.transcriber.available
 
-    def transcribe(self, audio: AudioInput, languages: tuple[str, ...] | None = None) -> tuple[Transcription | None, str | None]:
+    def transcribe(self, audio: AudioInput, languages: tuple[str, ...] | None = None,
+                   prompt: str | None = None) -> tuple[Transcription | None, str | None]:
         if not self.transcriber.available:
             return None, self.transcriber.last_error or "распознавание речи недоступно"
         try:
-            if languages and "allowed" in inspect.signature(self.transcriber.transcribe).parameters:
-                return self.transcriber.transcribe(audio, allowed=languages), None
-            return self.transcriber.transcribe(audio), None
+            params = inspect.signature(self.transcriber.transcribe).parameters
+            kwargs = {}
+            if languages and "allowed" in params:
+                kwargs["allowed"] = languages
+            if prompt and "prompt" in params:
+                kwargs["prompt"] = prompt
+            return self.transcriber.transcribe(audio, **kwargs), None
         except Exception as exc:
             log.exception("Ошибка распознавания речи")
             return None, f"не удалось распознать речь: {exc}"
@@ -405,14 +410,17 @@ class TutorAssistant:
         """
         lesson = self.lesson(lesson_id)
         langs = tuple(dict.fromkeys([self.settings.native_language, self.lesson_language(lesson)]))
-        transcription, error = self.transcribe(audio, languages=langs)
+        st = self._state(lesson_id)
+        with self._lock:  # тема и последние фразы урока подсказывают модели слова и имена
+            recent = " ".join(t for t in st.speech_tail.values() if t)[-200:]
+        prompt = " ".join(x for x in (f"Тема: {lesson.get('title')}." if lesson.get("title") else "", recent) if x)
+        transcription, error = self.transcribe(audio, languages=langs, prompt=prompt or None)
         if recording:
             self.storage.touch_recording(lesson_id, transcription.duration if transcription else audio_duration(audio))
         if transcription is None:
             return AudioOutcome(checked=False, error=error)
         if not transcription.text:
             return AudioOutcome(checked=True, transcription=transcription)
-        st = self._state(lesson_id)
         tail_key = str(speaker_id or speaker_name or role or "")
         with self._lock:
             tail = st.speech_tail.get(tail_key)

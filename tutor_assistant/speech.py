@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 import threading
 import time
 import wave
@@ -34,6 +35,23 @@ INITIAL_PROMPT = ("Урок иностранного языка. Препода�
                   "Слова: homework, vocabulary, Present Perfect, grammar, pronunciation, listening.")
 
 
+# Фразы, которые Whisper «слышит» в тишине и шуме: он учился на субтитрах к видео. На уроке их не бывает.
+HALLUCINATION_RE = re.compile(
+    r"субтитр|редактор субтитров|продолжение следует|спасибо за (просмотр|внимание)|подписывайтесь|ставьте лайк|"
+    r"thank(s)? you for watching|subscribe to|amara\.org|dimatorzok|корректор|music\b|♪|\[музыка\]|\(музыка\)",
+    re.I)
+
+
+def auto_model() -> str:
+    """Самая точная модель, которая поместится в память: turbo заметно лучше small, но просит ~2 ГБ и время."""
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as f:
+            avail = next(int(line.split()[1]) for line in f if line.startswith("MemAvailable")) / 1024 / 1024
+    except (OSError, StopIteration, ValueError):
+        return "small"
+    return "large-v3-turbo" if avail >= 8 else "small" if avail >= 2 else "base"
+
+
 @dataclass
 class Segment:
     start: float
@@ -47,6 +65,15 @@ class Transcription:
     segments: list[Segment] = field(default_factory=list)
     language: str | None = None
     duration: float = 0.0
+
+
+def _real(seg) -> bool:
+    """Отбрасываем пустое, «галлюцинации» и то, что модель сама считает тишиной."""
+    text = (getattr(seg, "text", "") or "").strip()
+    if not text or HALLUCINATION_RE.search(text):
+        return False
+    no_speech, logprob = getattr(seg, "no_speech_prob", 0.0) or 0.0, getattr(seg, "avg_logprob", 0.0) or 0.0
+    return not (no_speech > 0.6 and logprob < -1.0)
 
 
 class Transcriber(Protocol):
@@ -79,7 +106,7 @@ class WhisperTranscriber:
                  language: str | None = None, model_dir: str | None = None):
         from faster_whisper import WhisperModel  # noqa: F401 – проверяем, что пакет установлен
 
-        self.model_name = model
+        self.model_name = auto_model() if model in ("", "auto") else model
         self.device = device
         self.compute_type = compute_type
         self.language = language or None
@@ -101,8 +128,17 @@ class WhisperTranscriber:
                 raise RuntimeError(self.last_error or "модель распознавания речи недоступна")
             log.info("Загрузка модели распознавания речи %s (%s/%s)…", self.model_name, self.device, self.compute_type)
             try:
-                self._model = WhisperModel(self.model_name, device=self.device, compute_type=self.compute_type,
-                                           download_root=self.model_dir)
+                try:
+                    self._model = WhisperModel(self.model_name, device=self.device, compute_type=self.compute_type,
+                                               download_root=self.model_dir)
+                except Exception:
+                    if self.model_name in ("small", "base", "tiny"):
+                        raise
+                    # старый faster-whisper не знает turbo или не хватило памяти: берём проверенную small
+                    log.warning("Модель %s не загрузилась, беру small", self.model_name)
+                    self.model_name = "small"
+                    self._model = WhisperModel("small", device=self.device, compute_type=self.compute_type,
+                                               download_root=self.model_dir)
             except Exception as exc:
                 # Не пытаемся скачать модель на каждом фрагменте – повтор не чаще раза в минуту.
                 self._load_failed_at = time.monotonic()
@@ -112,7 +148,7 @@ class WhisperTranscriber:
         return self._model
 
     def transcribe(self, audio: AudioInput, language: str | None = None,
-                   allowed: tuple[str, ...] | None = None) -> Transcription:
+                   allowed: tuple[str, ...] | None = None, prompt: str | None = None) -> Transcription:
         """allowed – языки, на которых может идти речь (русский и изучаемый). Whisper на коротких фрагментах
         нередко «узнаёт» соседний язык (украинский вместо русского, немецкий вместо английского) и пишет
         бессмыслицу; поэтому язык выбираем только из разрешённых."""
@@ -135,7 +171,8 @@ class WhisperTranscriber:
                 beam_size=5, best_of=5,
                 # Тишину и вдохи отбрасываем: без этого Whisper «слышит» в паузах выдуманные фразы
                 vad_filter=True, vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 200},
-                condition_on_previous_text=False, initial_prompt=INITIAL_PROMPT,
+                # Подсказка: тема урока и последние сказанные слова – так модель держит контекст между фрагментами
+                condition_on_previous_text=False, initial_prompt=(INITIAL_PROMPT + " " + prompt[-300:]) if prompt else INITIAL_PROMPT,
                 temperature=(0.0, 0.2, 0.4), no_speech_threshold=0.5, compression_ratio_threshold=2.2,
             )
             lang = language or self.language
@@ -145,7 +182,7 @@ class WhisperTranscriber:
                 best = max(allowed, key=lambda code: probs.get(code, 0.0))
                 if not isinstance(samples, (str, io.BytesIO)):
                     segments_iter, info = model.transcribe(samples, language=best, **options)
-            segments = [Segment(float(s.start), float(s.end), s.text.strip()) for s in segments_iter if s.text.strip()]
+            segments = [Segment(float(s.start), float(s.end), s.text.strip()) for s in segments_iter if _real(s)]
         return Transcription(text=" ".join(s.text for s in segments).strip(), segments=segments,
                              language=getattr(info, "language", None), duration=float(getattr(info, "duration", 0.0)))
 

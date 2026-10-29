@@ -10,6 +10,11 @@ git -C "$APP_DIR" fetch -q origin "$BRANCH"
 git -C "$APP_DIR" reset -q --hard "origin/$BRANCH"
 REQ=requirements.txt; grep -q "^TUTOR_STT=off" "$APP_DIR/.env" || REQ=requirements-speech.txt
 "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/$REQ"
+# Точнее распознавание: на сервере от 4 ядер и 8 ГБ переходим со small/medium на large-v3-turbo
+ENV="$APP_DIR/.env"
+if grep -qE "^TUTOR_STT_MODEL=(small|medium)$" "$ENV" && [ "$(nproc)" -ge 4 ] && [ "$(awk '/MemTotal/ {print int($2/1024/1024)}' /proc/meminfo)" -ge 8 ]; then
+  sed -i "s/^TUTOR_STT_MODEL=.*/TUTOR_STT_MODEL=large-v3-turbo/" "$ENV" && echo "Распознавание речи: модель large-v3-turbo (скачается при первом уроке, ~1.6 ГБ)"
+fi
 chown -R school:school "$APP_DIR"
 systemctl restart better-study
 sleep 3

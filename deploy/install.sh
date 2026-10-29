@@ -75,10 +75,12 @@ setenv TUTOR_DB_PATH "$DATA_DIR/tutor_assistant.sqlite3"
 setenv TUTOR_STT_MODEL_DIR "$DATA_DIR/models"
 # Модель расшифровки подбираем по мощности сервера: точнее модель, дольше расшифровка каждого фрагмента
 CORES="$(nproc)"; MEM_GB=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1024 / 1024 ))
-if [ -z "$(getenv TUTOR_STT_MODEL)" ]; then
-  if [ "$CORES" -ge 8 ] && [ "$MEM_GB" -ge 14 ]; then setenv TUTOR_STT_MODEL medium
-  else setenv TUTOR_STT_MODEL small; fi
-fi
+# large-v3-turbo заметно точнее small на смешанной русско-иностранной речи, но просит 4+ ядра и 8+ ГБ
+case "$(getenv TUTOR_STT_MODEL)" in
+  ""|small|medium)
+    if [ "$CORES" -ge 4 ] && [ "$MEM_GB" -ge 8 ]; then setenv TUTOR_STT_MODEL large-v3-turbo
+    else setenv TUTOR_STT_MODEL small; fi ;;
+esac
 setenv TUTOR_API_HOST 127.0.0.1
 setenv TUTOR_API_PORT 8080
 setenv TUTOR_TRUST_PROXY 1

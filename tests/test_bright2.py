@@ -162,3 +162,24 @@ def test_app_files_and_links(tmp_path):
     settings2 = Settings(llm_mode="off", stt_mode="off", db_path=":memory:", rustore_url="https://www.rustore.ru/catalog/app/x")
     site2 = Website(Portal(TutorAssistant(settings2, Storage(":memory:"))), web_dir=web)
     assert site2.public_config()["rustore_url"].startswith("https://www.rustore.ru/")
+
+
+def test_speech_drops_hallucinations_and_passes_prompt(env):
+    from types import SimpleNamespace
+
+    from tutor_assistant.speech import _real, auto_model
+    seg = lambda text, ns=0.1, lp=-0.3: SimpleNamespace(text=text, no_speech_prob=ns, avg_logprob=lp)  # noqa: E731
+    assert _real(seg("I have been to London"))
+    assert not _real(seg("Субтитры сделал DimaTorzok"))
+    assert not _real(seg("Продолжение следует..."))
+    assert not _real(seg("Thank you for watching!"))
+    assert not _real(seg("угу", ns=0.9, lp=-1.5))
+    assert auto_model() in ("large-v3-turbo", "small", "base")
+    # подсказка с темой урока доходит до распознавания
+    seen = {}
+    env["stt"].transcribe = lambda audio, allowed=None, prompt=None: seen.update(prompt=prompt) or __import__(
+        "tutor_assistant.speech", fromlist=["Transcription"]).Transcription(text="")
+    tutor, student, chat = pair(env)
+    lesson = env["a"].start_lesson(chat_id=chat, tutor_id="t", tutor_name="Анна", student_id="s", student_name="Миша", title="Present Perfect")
+    env["a"].process_audio(lesson["id"], "t", "Анна", b"x" * 400, role="tutor")
+    assert "Present Perfect" in (seen.get("prompt") or "")
