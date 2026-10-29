@@ -237,7 +237,10 @@ def generate_offline(topic: str, words_text: str, text: str = "", language: str 
         blocks.append({"type": "match", "title": "Соедините слово и перевод",
                        "pairs": [[w["word"], w["translation"]] for w in translated[:12]]})
     if text.strip():
-        gapped, n = _bracket_words(text.strip(), [w["word"] for w in words])
+        if GAP_RE.search(text):  # преподаватель сам расставил [ответы] – берём текст как есть
+            gapped, n = text.strip(), len(GAP_RE.findall(text))
+        else:
+            gapped, n = _bracket_words(text.strip(), [w["word"] for w in words])
         if not n:  # слов из списка в тексте нет – просто текст для чтения
             blocks.append({"type": "text", "title": "Прочитайте текст", "body": text.strip()})
         else:  # полный текст не показываем отдельно – иначе ответы видны

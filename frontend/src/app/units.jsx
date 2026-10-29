@@ -152,7 +152,8 @@ function CreateModal({ ai, onClose }) {
           <input className="field" value={f.level} onChange={set("level")} maxLength={20} placeholder="A2, B1, HSK 2" aria-label="Уровень" />
         </div>
         <label className="label">Слова (необязательно)<textarea className="field font-normal" rows={4} value={f.words} onChange={set("words")} placeholder={"luggage – багаж\nboarding pass – посадочный талон"} /></label>
-        <label className="label">Свой текст (необязательно)<textarea className="field font-normal" rows={3} value={f.text} onChange={set("text")} placeholder="Текст, по которому строить задания" /></label>
+        <label className="label">Свой текст или упражнение (необязательно)<textarea className="field font-normal" rows={4} value={f.text} onChange={set("text")} placeholder={"Вставьте текст. Правильные ответы пишите в [квадратных скобках]: I [have been] to London. Ученик увидит пропуски, ответы видны только вам."} /></label>
+        <p className="-mt-1 text-xs text-ink-mute">Скобки не расставили – не страшно: пропуски сделаем из ваших слов.</p>
         {ai && <input className="field" value={f.wishes} onChange={set("wishes")} maxLength={1000} placeholder="Пожелания для ИИ: «для подростка, больше говорения»" aria-label="Пожелания" />}
         <ErrorBox error={error} />
         <div className="flex flex-wrap gap-2">

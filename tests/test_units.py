@@ -189,3 +189,12 @@ def test_library_units_are_valid():
         blocks = validate_blocks(unit["blocks"])
         assert len(blocks) == len(unit["blocks"]), unit["id"]
         student_view({"id": unit["id"], "title": unit["title"], "blocks": blocks})
+
+
+def test_quick_create_keeps_teacher_brackets():
+    from tutor_assistant.units import generate_offline, student_view
+    u = generate_offline("Мой урок", "", "I [have been] to London. She [has|'s] a cat.")
+    gap = next(b for b in u["blocks"] if b["type"] == "gap")
+    assert "[have been]" in gap["text"]
+    view = student_view({"id": "x", "title": "t", **u})
+    assert "have been" not in str(view["blocks"][0].get("parts"))  # ответ ученику не виден
