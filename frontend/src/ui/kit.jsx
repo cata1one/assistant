@@ -78,7 +78,7 @@ export function PageTitle({ title, text, actions }) {
         <h1 className="text-[1.7rem] md:text-[2rem]">{title}</h1>
         {text && <p className="mt-1 max-w-2xl text-[15px] text-ink-mute">{text}</p>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex min-w-0 max-w-full flex-wrap gap-2">{actions}</div>}
     </div>
   );
 }

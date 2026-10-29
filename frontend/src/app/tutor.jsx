@@ -100,7 +100,7 @@ export function TutorHome() {
                   <li key={s.pair_id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-cream">
                     <ProfileAvatar photo={s.photo} name={s.name} size={38} />
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2 font-semibold">{s.name} <MoodChip mood={s.mood} /></span>
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold"><span className="truncate">{s.name}</span> <MoodChip mood={s.mood} /></span>
                       <span className="block truncate text-[13px] text-ink-mute">{s.joined ? (LANGS.find((l) => l.id === s.language)?.title || "") : "ждём по ссылке"}{s.balance ? ` · оплачено: ${s.balance}` : ""}</span>
                     </span>
                     {s.joined && <StartButton chatId={s.chat_id} active={s.active_lesson} small />}

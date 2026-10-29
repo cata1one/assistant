@@ -99,7 +99,7 @@ function HomeworkItem({ h, reload }) {
   return (
     <div className="card !p-5" onPaste={onPaste}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-ink-mute">{h.role === "tutor" ? h.student : h.role === "parent" ? `${h.student} · ${h.tutor}` : h.tutor} · {shortDate(h.created_at)}{h.due ? ` · до ${h.due}` : ""}</span>
+        <span className="text-sm font-semibold text-ink-mute">{h.role === "tutor" ? h.student : h.role === "parent" ? `${h.student} · ${h.tutor}` : h.tutor} · {shortDate(h.created_at)}{h.due ? ` · до ${new Date(h.due).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}` : ""}</span>
         <span className="flex items-center gap-2">
           {h.score && <span className="chip chip-brand">{h.score.score} из {h.score.total}</span>}
           <span className={cls}>{label}</span>
@@ -116,8 +116,9 @@ function HomeworkItem({ h, reload }) {
       {h.materials.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">{h.materials.map((m) => <a key={m.id} href={m.url} target="_blank" rel="noopener" className="chip hover:border-brand"><File size={12} /> {m.title}</a>)}</div>
       )}
-      <Attachments h={h} reload={reload} canEdit={student && h.status !== "checked"} />
-      {student && h.status !== "checked" && (
+      {/* Занятие сдаётся в самом плеере: поле ответа и фото к нему не нужны */}
+      {(!h.unit || h.attachments.length > 0) && <Attachments h={h} reload={reload} canEdit={student && h.status !== "checked" && !h.unit} />}
+      {student && h.status !== "checked" && !h.unit && (
         <div className="mt-4 grid gap-2">
           <textarea className="field min-h-[70px]" maxLength={3000} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Ответ или комментарий для преподавателя" aria-label="Ответ" />
           <div className="flex gap-2">

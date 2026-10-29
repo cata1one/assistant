@@ -92,7 +92,7 @@ const ObjView = memo(function ObjView({ o, selected, editing, onEditDone, active
         </div>
       );
     }
-    return <div data-oid={o.oid} className={cls} style={style}><img alt={o.title || ""} draggable="false" src={o.src} className="pointer-events-none h-full w-full rounded-lg object-contain" /></div>;
+    return <div data-oid={o.oid} className={cls} style={style}><img alt={o.title || ""} draggable="false" src={o.src} className="pointer-events-none h-full w-full rounded-lg object-contain shadow-[0_0_0_1px_rgba(23,23,26,.08),0_8px_24px_-12px_rgba(23,23,26,.25)]" /></div>;
   }
   if (o.type === "video") {
     const active = activeVideo === o.oid;

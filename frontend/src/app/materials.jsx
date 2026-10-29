@@ -129,12 +129,12 @@ function Files() {
             const I = ICON[k];
             return (
               <div key={m.id} className="panel group flex flex-col overflow-hidden transition hover:border-ink/25">
-                <button type="button" onClick={() => setOpen(m)} className="relative grid h-32 place-items-center bg-cream">
-                  {k === "image" ? <img src={m.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                <button type="button" onClick={() => setOpen(m)} className="relative grid h-32 place-items-center overflow-hidden bg-cream">
+                  {k === "image" ? <img src={m.url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                     : <span className="flex flex-col items-center gap-1.5 text-ink-soft"><I size={28} strokeWidth={1.6} /><span className="text-[11px] font-semibold uppercase tracking-wide">{k === "pdf" ? "PDF" : k === "video" ? "видео" : k === "link" ? "ссылка" : (m.title.split(".").pop() || "файл").slice(0, 5)}</span></span>}
                 </button>
                 <div className="flex flex-1 flex-col p-3.5">
-                  <p className="line-clamp-2 text-[14px] font-semibold leading-snug">{m.title}</p>
+                  <button type="button" onClick={() => setOpen(m)} className="line-clamp-2 text-left text-[14px] font-semibold leading-snug hover:underline">{m.title}</button>
                   <p className="mt-1 text-xs text-ink-mute">{m.folder ? `${m.folder} · ` : ""}{m.kind === "file" ? fmtSize(m.size) : KIND_TITLE[k]}{m.shared ? " · школа" : ""}</p>
                   <div className="mt-auto flex items-center gap-1 pt-2">
                     <button type="button" className="btn-ghost btn-sm !px-2" onClick={() => setOpen(m)}>Открыть</button>

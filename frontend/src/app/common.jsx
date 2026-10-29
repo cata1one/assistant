@@ -16,6 +16,14 @@ export function useApi(path, deps = []) {
   const [error, setError] = useState(null);
   const load = () => request("GET", path).then((d) => { setData(d); setError(null); }).catch(setError);
   useEffect(() => { if (path) load(); }, [path, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Вернулись в приложение (например, из банка после оплаты) – данные обновляются сами
+  useEffect(() => {
+    if (!path) return undefined;
+    let last = Date.now();
+    const back = () => { if (!document.hidden && Date.now() - last > 20000) { last = Date.now(); load(); } };
+    document.addEventListener("visibilitychange", back);
+    return () => document.removeEventListener("visibilitychange", back);
+  }, [path, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
   return { data, error, reload: load };
 }
 
