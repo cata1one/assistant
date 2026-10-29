@@ -1,0 +1,23 @@
+{
+  "appId": "online.brightplatform.app",
+  "appName": "Bright",
+  "webDir": "www",
+  "server": {
+    "url": "https://brightplatform.online",
+    "androidScheme": "https",
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "appendUserAgent": "BrightApp",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "auto",
+      "style": "LIGHT"
+    }
+  }
+}

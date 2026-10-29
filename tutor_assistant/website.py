@@ -621,7 +621,7 @@ class Website:
         st = self.portal.settings
         return {"name": st.school_name, "support_email": st.support_email, "bot": st.bot_username or None,
                 "online_payments": self.plan_pay.enabled, "rustore_url": st.rustore_url or None,
-                "apk_url": st.apk_url or ("/bright.apk" if self.apk_file() else None)}
+                "apk_url": st.apk_url or ("/bright.apk" if self.apk_file() else None), "legal_name": st.legal_name or None}
 
     def apk_file(self) -> Path | None:
         apk = Path(self.portal.settings.db_path).resolve().parent / "bright.apk"

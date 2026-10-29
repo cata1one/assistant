@@ -63,7 +63,6 @@
 
 /* Нижняя панель приложения учитывает «чёлку» и полосу жестов телефона */
 .safe-bottom { padding-bottom: max(.5rem, env(safe-area-inset-bottom)); }
-.safe-top { padding-top: env(safe-area-inset-top); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

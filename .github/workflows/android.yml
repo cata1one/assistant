@@ -1,0 +1,62 @@
+# Сборка приложения Bright для Android (APK для установки и AAB для магазинов).
+# Готовые файлы: вкладка Actions → последняя сборка → Artifacts → bright-android.
+# Для RuStore нужен ваш ключ подписи: секреты BRIGHT_KEYSTORE_BASE64, BRIGHT_KEYSTORE_PASSWORD,
+# BRIGHT_KEY_ALIAS, BRIGHT_KEY_PASSWORD (как их сделать – в mobile/README.md).
+name: Android app
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ["mobile/**", ".github/workflows/android.yml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Capacitor
+        working-directory: mobile
+        run: npm ci && npx cap sync android
+
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BRIGHT_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > mobile/android/app/bright.keystore
+            echo "Подписываем вашим ключом"
+          else
+            echo "::warning::Секрет BRIGHT_KEYSTORE_BASE64 не задан: APK подписан отладочным ключом. Поставить на телефон можно, загрузить в RuStore нельзя."
+          fi
+
+      - name: Build APK and AAB
+        working-directory: mobile/android
+        env:
+          BRIGHT_KEYSTORE_PASSWORD: ${{ secrets.BRIGHT_KEYSTORE_PASSWORD }}
+          BRIGHT_KEY_ALIAS: ${{ secrets.BRIGHT_KEY_ALIAS }}
+          BRIGHT_KEY_PASSWORD: ${{ secrets.BRIGHT_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease bundleRelease
+          cp app/build/outputs/apk/release/app-release.apk ../bright.apk
+          cp app/build/outputs/bundle/release/app-release.aab ../bright.aab
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bright-android
+          path: |
+            mobile/bright.apk
+            mobile/bright.aab
+          if-no-files-found: error

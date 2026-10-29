@@ -133,7 +133,7 @@ function TabBar({ items, current, unread }) {
     <>
       {open && (
         <div className="fixed inset-0 z-40 bg-ink/30 lg:hidden" onClick={() => setOpen(false)}>
-          <div className="safe-bottom absolute inset-x-0 bottom-0 rounded-t-4xl bg-white px-3 pb-20 pt-3 animate-fadeup" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-x-0 bottom-0 rounded-t-4xl bg-white px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3 animate-fadeup" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
             <nav aria-label="Ещё" className="grid grid-cols-3 gap-1.5">
               {more.map(([id, title, Icon, , , href]) => (
@@ -165,7 +165,7 @@ function TabBar({ items, current, unread }) {
 
 function MobileTop({ session, title }) {
   return (
-    <header className="safe-top sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-white/95 px-4 py-2.5 backdrop-blur lg:hidden">
+    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-white/95 px-4 pb-2.5 pt-[calc(.625rem+env(safe-area-inset-top))] backdrop-blur lg:hidden">
       <a href="#/app" aria-label="Сегодня"><Logo size={26} school={session.role === "school"} /></a>
       <span className="ml-1 min-w-0 flex-1 truncate text-sm font-semibold text-ink-mute">{title}</span>
       <a href="#/app/profile" aria-label="Профиль"><ProfileAvatar prefs={session.account?.prefs} name={session.account?.name || "?"} size={30} /></a>

@@ -25,7 +25,7 @@ export default function Navbar({ active }) {
   // Преподаватель ищет учеников, ученик – преподавателя
   const links = session?.role === "tutor" ? LINKS.map((l) => (l[0] === "market" ? ["market", "#/market?tab=students", "Заявки"] : l)) : LINKS;
   return (
-    <header className={`fixed inset-x-0 top-0 z-40 border-b transition-colors ${scrolled || open ? "border-line bg-paper/95 backdrop-blur" : "border-transparent bg-paper"}`}>
+    <header className={`fixed inset-x-0 top-0 z-40 border-b pt-[env(safe-area-inset-top)] transition-colors ${scrolled || open ? "border-line bg-paper/95 backdrop-blur" : "border-transparent bg-paper"}`}>
       <nav aria-label="Разделы" className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 md:px-6">
         <a href="#/" aria-label="Bright, на главную" className="shrink-0"><Logo school={session?.role === "school"} /></a>
         <ul className="hidden items-center gap-1 lg:flex">

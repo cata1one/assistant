@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { setToken } from "./lib/api.js";
+import { isApp } from "./lib/install.js";
 import { useRoute } from "./lib/router.js";
 import { brandOf, SessionContext, useSessionState } from "./lib/session.js";
 import Footer from "./site/Footer.jsx";
@@ -12,6 +13,7 @@ import { Loading } from "./ui/kit.jsx";
 // Остальное грузится по требованию – главная открывается быстро даже на слабом телефоне
 const Schools = lazy(() => import("./site/Schools.jsx"));
 const Download = lazy(() => import("./site/Download.jsx"));
+const Privacy = lazy(() => import("./site/Privacy.jsx"));
 const Study = lazy(() => import("./site/Study.jsx"));
 const Pricing = lazy(() => import("./site/Pricing.jsx"));
 const Auth = lazy(() => import("./site/Auth.jsx"));
@@ -19,7 +21,7 @@ const ReviewsPage = lazy(() => import("./site/ReviewsPage.jsx"));
 const Market = lazy(() => import("./site/Market.jsx"));
 const AppShell = lazy(() => import("./app/AppShell.jsx"));
 
-const PUBLIC = { "": Landing, teach: Landing, study: Study, schools: Schools, download: Download, pricing: Pricing, reviews: ReviewsPage, market: Market,
+const PUBLIC = { "": Landing, teach: Landing, study: Study, schools: Schools, download: Download, privacy: Privacy, pricing: Pricing, reviews: ReviewsPage, market: Market,
   login: Auth, register: Auth, join: Auth, forgot: Auth, reset: Auth };
 
 export default function App() {
@@ -29,7 +31,9 @@ export default function App() {
 
   // Старые ссылки: кабинет из Telegram-бота (#/cabinet?t=…) и разделы прошлой версии сайта
   useEffect(() => {
-    if (name === "cabinet") {
+    if (name === "" && isApp()) {
+      window.location.replace("#/app"); // приложение открывается сразу в кабинете
+    } else if (name === "cabinet") {
       const t = route.params.get("t");
       if (t) { setToken(t); session.reload(); }
       window.location.replace("#/app");

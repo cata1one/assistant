@@ -137,6 +137,7 @@ class Settings:
     # под именем bright.apk, сайт отдаёт его сам по адресу /bright.apk
     rustore_url: str = ""
     apk_url: str = ""
+    legal_name: str = ""  # оператор персональных данных для политики: ФИО или ИП и ИНН
 
     # Оплата тарифа через ЮKassa (карты, СБП). Пока ключи не заданы, оплата отключена, а срок продлевает администратор
     yookassa_shop_id: str = ""
@@ -203,6 +204,7 @@ class Settings:
             support_email=_env("TUTOR_SUPPORT_EMAIL", cls.support_email),
             rustore_url=_env("TUTOR_RUSTORE_URL"),
             apk_url=_env("TUTOR_APK_URL"),
+            legal_name=_env("TUTOR_LEGAL_NAME"),
             yookassa_shop_id=_env("YOOKASSA_SHOP_ID"),
             yookassa_secret_key=_env("YOOKASSA_SECRET_KEY"),
             yookassa_receipt=_env_bool("YOOKASSA_RECEIPT", cls.yookassa_receipt),

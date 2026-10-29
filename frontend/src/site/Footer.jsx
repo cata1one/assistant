@@ -26,7 +26,7 @@ export default function Footer() {
           <p className="text-xs text-ink-mute">Отвечаем в течение дня. Или нажмите «?» в углу экрана.</p>
         </div>
       </div>
-      <p className="pb-8 text-center text-xs text-ink-mute">© {new Date().getFullYear()} Bright</p>
+      <p className="pb-8 text-center text-xs text-ink-mute">© {new Date().getFullYear()} Bright · <a className="hover:text-ink" href="#/privacy">Политика обработки персональных данных</a></p>
     </footer>
   );
 }

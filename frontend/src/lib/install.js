@@ -7,6 +7,10 @@ const listeners = new Set();
 const notify = () => listeners.forEach((f) => f());
 
 if (typeof window !== "undefined") {
+  // В Android-приложении окно сайта не заходит под строку состояния: так ничего не прячется под часами и вырезом
+  if (/BrightApp/.test(navigator.userAgent)) {
+    document.querySelector('meta[name="viewport"]')?.setAttribute("content", "width=device-width, initial-scale=1");
+  }
   window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferred = e; notify(); });
   window.addEventListener("appinstalled", () => { deferred = null; notify(); });
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {

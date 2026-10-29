@@ -257,7 +257,7 @@ export default function Auth({ route }) {
           {!login && (
             <label className="flex items-start gap-3 text-sm text-ink-soft">
               <input type="checkbox" className="mt-1 h-4 w-4 accent-[rgb(var(--brand))]" checked={f.consent} onChange={set("consent")} required />
-              Согласен на обработку персональных данных
+              <span>Согласен на обработку персональных данных по <a className="link font-normal" href="#/privacy" target="_blank" rel="noreferrer">политике</a></span>
             </label>
           )}
           {error && <ErrorBox error={error} />}

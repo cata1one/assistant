@@ -60,7 +60,7 @@ export function Modal({ open, onClose, title, children, wide }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center sm:p-4" onMouseDown={onClose}>
       <div role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => e.stopPropagation()}
-        className={`safe-bottom max-h-[92vh] w-full overflow-y-auto rounded-t-4xl bg-white p-5 shadow-lift animate-fadeup sm:rounded-4xl sm:p-6 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}>
+        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-4xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-lift animate-fadeup sm:rounded-4xl sm:p-6 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-lg">{title}</h3>
           <button type="button" className="btn-ghost !h-9 !w-9 !p-0" onClick={onClose} aria-label="Закрыть"><X size={18} /></button>

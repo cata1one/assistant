@@ -208,7 +208,7 @@ export function MarketNew() {
           <div className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true"><input tabIndex={-1} autoComplete="off" value={f.website} onChange={set("website")} /></div>
           <label className="flex items-start gap-3 text-sm text-ink-soft">
             <input type="checkbox" className="mt-1 h-4 w-4" checked={f.consent} onChange={set("consent")} />
-            Согласен на обработку персональных данных и публикацию заявки без контактов
+            <span>Согласен на обработку персональных данных по <a className="link font-normal" href="#/privacy" target="_blank" rel="noreferrer">политике</a> и публикацию заявки без контактов</span>
           </label>
           <ErrorBox error={error} />
           <div><button type="submit" className="btn-brand btn-lg" disabled={busy}>{busy ? "Публикуем…" : <>Опубликовать <ArrowRight size={16} /></>}</button></div>
