@@ -1,18 +1,16 @@
-import { Gift } from "lucide-react";
 import { firstMonth, PRICE } from "../lib/pricing.js";
 import { Faq, PricingCards, Section } from "./parts.jsx";
 
 export default function Pricing() {
   return (
-    <div className="pt-20">
-      <Section eyebrow="Тарифы" title={`Всё включено за ${PRICE.teacher} ₽ в месяц`}
+    <div className="pt-16">
+      <Section label="Тарифы" title={`Всё включено за ${PRICE.teacher} ₽ в месяц`}
         text={`Начните с ${PRICE.trialDays} дней бесплатно на своих учениках или оплатите сразу: первый месяц стоит ${firstMonth()} ₽. Это меньше одного урока.`}>
         <PricingCards />
       </Section>
       <Section>
-        <div className="card flex flex-wrap items-center gap-5 md:!p-8">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-soft text-brand"><Gift size={26} /></span>
-          <div className="min-w-0 flex-1">
+        <div className="rounded-3xl bg-cream p-6 md:p-8">
+          <div>
             <h3 className="text-xl">Скидка 50% за коллегу</h3>
             <p className="mt-1 text-ink-soft">Отправьте коллеге свою ссылку из кабинета. Когда он оформит тариф, ваше следующее продление будет вдвое дешевле. Скидки за разных коллег копятся.</p>
           </div>

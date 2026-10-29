@@ -129,3 +129,33 @@ def test_transcribe_passes_allowed_languages(env):
     env["a"].transcriber = FakeTranscriber()  # старый интерфейс без allowed тоже работает
     tr, err = env["a"].transcribe(b"hello", languages=("ru", "en"))
     assert tr.text == "hello" and err is None
+
+
+# -- приложение: service worker, APK и ссылки на него ----------------------------------------------
+
+def test_app_files_and_links(tmp_path):
+    from tutor_assistant.website import Website
+
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "index.html").write_text("<html></html>")
+    (web / "sw.js").write_text("self.addEventListener('fetch', () => {});")
+    settings = Settings(llm_mode="off", stt_mode="off", db_path=str(tmp_path / "db.sqlite3"))
+    site = Website(Portal(TutorAssistant(settings, Storage(":memory:"))), web_dir=web)
+    assert Website.handles("/sw.js") and Website.handles("/bright.apk")
+
+    sw = site.static("/sw.js")
+    assert sw.status == 200 and sw.headers["Cache-Control"] == "no-cache"
+    assert site.static("/bright.apk").status == 404
+    cfg = site.public_config()
+    assert cfg["apk_url"] is None and cfg["rustore_url"] is None
+
+    (tmp_path / "bright.apk").write_bytes(b"PK\x03\x04apk")
+    apk = site.static("/bright.apk")
+    assert apk.status == 200 and apk.body == b"PK\x03\x04apk"
+    assert apk.content_type == "application/vnd.android.package-archive"
+    assert site.public_config()["apk_url"] == "/bright.apk"
+
+    settings2 = Settings(llm_mode="off", stt_mode="off", db_path=":memory:", rustore_url="https://www.rustore.ru/catalog/app/x")
+    site2 = Website(Portal(TutorAssistant(settings2, Storage(":memory:"))), web_dir=web)
+    assert site2.public_config()["rustore_url"].startswith("https://www.rustore.ru/")

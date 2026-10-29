@@ -46,8 +46,8 @@ function Shell({ children, wide, school }) {
   return (
     <div className="grid min-h-[80vh] place-items-center pb-16 pt-28">
       <div className={`w-full ${wide ? "max-w-2xl" : "max-w-md"}`}>
-        <div className="mb-6 flex justify-center"><Logo size={36} school={school} /></div>
-        <div className="glass rounded-[2rem] p-6 md:p-8">{children}</div>
+        {school && <div className="mb-6 flex justify-center"><Logo size={36} school /></div>}
+        <div className="rounded-3xl border border-line bg-white p-6 md:p-8">{children}</div>
       </div>
     </div>
   );

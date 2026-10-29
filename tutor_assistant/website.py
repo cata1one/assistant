@@ -213,7 +213,7 @@ class Website:
 
     @staticmethod
     def handles(path: str) -> bool:
-        return path in ("/", "/index.html", "/robots.txt", "/favicon.ico") or path.startswith(("/static/", "/site/"))
+        return path in ("/", "/index.html", "/robots.txt", "/favicon.ico", "/sw.js", "/bright.apk") or path.startswith(("/static/", "/site/"))
 
     def handle(self, method: str, path: str, query: dict[str, str], raw: bytes, headers: Any,
                ip: str | None) -> Response:
@@ -260,8 +260,16 @@ class Website:
     def static(self, path: str) -> Response:
         if path == "/robots.txt":
             return Response(200, b"User-agent: *\nDisallow: /site/\n", "text/plain; charset=utf-8")
+        if path == "/bright.apk":  # приложение для Android, если владелец положил его рядом с базой
+            apk = self.apk_file()
+            if apk is None:
+                return json_response(404, {"error": "приложение ещё не загружено"})
+            return Response(200, apk.read_bytes(), "application/vnd.android.package-archive",
+                            {"Content-Disposition": 'attachment; filename="bright.apk"', "Cache-Control": "no-cache"})
         if path in ("/", "/index.html"):
             name = "index.html"
+        elif path == "/sw.js":  # service worker должен лежать в корне, иначе не управляет страницами сайта
+            name = "sw.js"
         elif path == "/favicon.ico":
             name = "favicon.svg"
         else:
@@ -275,7 +283,7 @@ class Website:
         ctype = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype in ("application/javascript", "image/svg+xml"):
             ctype += "; charset=utf-8"
-        cache = "no-cache" if name == "index.html" else "public, max-age=300"
+        cache = "no-cache" if name in ("index.html", "sw.js") else "public, max-age=300"
         return Response(200, file.read_bytes(), ctype, {"Cache-Control": cache})
 
     # -- обработчики -------------------------------------------------------------
@@ -612,7 +620,12 @@ class Website:
     def public_config(self, **_: Any) -> Any:
         st = self.portal.settings
         return {"name": st.school_name, "support_email": st.support_email, "bot": st.bot_username or None,
-                "online_payments": self.plan_pay.enabled}
+                "online_payments": self.plan_pay.enabled, "rustore_url": st.rustore_url or None,
+                "apk_url": st.apk_url or ("/bright.apk" if self.apk_file() else None)}
+
+    def apk_file(self) -> Path | None:
+        apk = Path(self.portal.settings.db_path).resolve().parent / "bright.apk"
+        return apk if apk.is_file() else None
 
     def support(self, body: Any, ip: str | None, headers: Any, **_: Any) -> Any:
         try:

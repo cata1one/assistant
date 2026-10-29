@@ -10,7 +10,8 @@ import Landing from "./site/Landing.jsx";
 import { Loading } from "./ui/kit.jsx";
 
 // Остальное грузится по требованию – главная открывается быстро даже на слабом телефоне
-const Teach = lazy(() => import("./site/Teach.jsx"));
+const Schools = lazy(() => import("./site/Schools.jsx"));
+const Download = lazy(() => import("./site/Download.jsx"));
 const Study = lazy(() => import("./site/Study.jsx"));
 const Pricing = lazy(() => import("./site/Pricing.jsx"));
 const Auth = lazy(() => import("./site/Auth.jsx"));
@@ -18,7 +19,7 @@ const ReviewsPage = lazy(() => import("./site/ReviewsPage.jsx"));
 const Market = lazy(() => import("./site/Market.jsx"));
 const AppShell = lazy(() => import("./app/AppShell.jsx"));
 
-const PUBLIC = { "": Landing, teach: Teach, study: Study, pricing: Pricing, reviews: ReviewsPage, market: Market,
+const PUBLIC = { "": Landing, teach: Landing, study: Study, schools: Schools, download: Download, pricing: Pricing, reviews: ReviewsPage, market: Market,
   login: Auth, register: Auth, join: Auth, forgot: Auth, reset: Auth };
 
 export default function App() {
@@ -49,7 +50,7 @@ export default function App() {
         <Suspense fallback={<div className="p-10"><Loading /></div>}><AppShell route={route} /></Suspense>
       ) : (
         <div className="bg-mesh min-h-screen">
-          <Navbar brand={brand} active={name} />
+          <Navbar active={name} />
           <main className="mx-auto max-w-6xl px-4 md:px-6">
             <Suspense fallback={<div className="pt-32"><Loading /></div>}>
               {Page ? <Page route={route} brand={brand} /> : (

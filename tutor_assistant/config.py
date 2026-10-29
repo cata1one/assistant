@@ -133,6 +133,10 @@ class Settings:
     smtp_password: str = ""
     smtp_from: str = ""  # от чьего имени; по умолчанию как smtp_user
     support_email: str = "monework@mail.ru"  # сюда приходят обращения из окна помощи
+    # Приложение для телефона: ссылка на страницу в RuStore и на APK. Если APK лежит рядом с базой
+    # под именем bright.apk, сайт отдаёт его сам по адресу /bright.apk
+    rustore_url: str = ""
+    apk_url: str = ""
 
     # Оплата тарифа через ЮKassa (карты, СБП). Пока ключи не заданы, оплата отключена, а срок продлевает администратор
     yookassa_shop_id: str = ""
@@ -197,6 +201,8 @@ class Settings:
             smtp_password=_env("TUTOR_SMTP_PASSWORD"),
             smtp_from=_env("TUTOR_SMTP_FROM"),
             support_email=_env("TUTOR_SUPPORT_EMAIL", cls.support_email),
+            rustore_url=_env("TUTOR_RUSTORE_URL"),
+            apk_url=_env("TUTOR_APK_URL"),
             yookassa_shop_id=_env("YOOKASSA_SHOP_ID"),
             yookassa_secret_key=_env("YOOKASSA_SECRET_KEY"),
             yookassa_receipt=_env_bool("YOOKASSA_RECEIPT", cls.yookassa_receipt),

@@ -1,0 +1,23 @@
+{
+  "name": "Bright – уроки языков",
+  "short_name": "Bright",
+  "description": "Уроки, доска, домашка, карточки слов и сообщения преподавателю.",
+  "id": "/",
+  "start_url": "/#/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FAFAF8",
+  "theme_color": "#FAFAF8",
+  "lang": "ru",
+  "categories": ["education"],
+  "icons": [
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Слова", "url": "/#/app/words", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Сообщения", "url": "/#/app/messages", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

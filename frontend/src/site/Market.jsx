@@ -16,7 +16,7 @@ const myHref = (id, key) => `#/market/my?id=${id}&k=${encodeURIComponent(key)}`;
 function Head({ eyebrow, title, text, children }) {
   return (
     <section className="pb-10 pt-28 md:pt-36">
-      {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+      {eyebrow && <p className="text-sm font-medium text-ink-mute">{eyebrow}</p>}
       <h1 className="mt-2 max-w-3xl text-[clamp(2.1rem,5vw,3.6rem)]">{title}</h1>
       {text && <p className="mt-4 max-w-2xl text-lg text-ink-soft">{text}</p>}
       {children}
@@ -120,7 +120,7 @@ export function MarketHome({ params }) {
   const last = mine[mine.length - 1];
   return (
     <>
-      <Head eyebrow="Поиск" title={tab === "students" ? <>Найдите <span className="text-brand">учеников</span></> : <>Найдите <span className="text-brand">своего</span> преподавателя</>}
+      <Head eyebrow="Поиск" title={tab === "students" ? <>Найдите <span className="mark">учеников</span></> : <>Найдите своего преподавателя</>}
         text={tab === "students" ? "Ученики описывают задачу и бюджет – вы откликаетесь со своей ценой. Без комиссии за поиск и без рекламы."
           : "Опишите цель и бюджет – преподаватели предложат свою цену и подход. Бесплатно, а ваш телефон преподаватели не видят."}>
         <div className="mt-6"><Tabs label="Кого ищу" value={tab} onChange={setTab}
@@ -133,7 +133,7 @@ export function MarketHome({ params }) {
               [HandCoins, "Получите отклики", "Преподаватели предложат цену и расскажут, как будут заниматься."],
               [CheckCircle2, "Выберите", "Одна кнопка – и вы в общем кабинете: урок, доска, домашка, отчёты."]].map(([I, t, d], i) => (
               <div key={t} className="card">
-                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-brand-soft font-display font-extrabold text-brand">{i + 1}</span>
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-ink text-sm font-semibold text-white">{i + 1}</span>
                 <h3 className="mt-4 flex items-center gap-2 text-lg"><I size={18} className="text-brand" />{t}</h3>
                 <p className="mt-1.5 text-sm text-ink-soft">{d}</p>
               </div>
