@@ -174,6 +174,8 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
       {unit.blocks.map((b, i) => (
         <section key={i} className="panel p-5">
           {b.title && <h2 className="mb-3 text-lg">{b.title}</h2>}
+          {b.context && <details className="lesson-source"><summary>Ситуация и текст к заданию</summary><p dir="auto">{b.context}</p></details>}
+          {b.instruction && <p className="mb-4 text-sm leading-relaxed text-ink-soft">{b.instruction}</p>}
           {b.type === "text" && <p className="whitespace-pre-wrap text-ink-soft">{b.body}</p>}
           {b.type === "words" && (
             <ul className="grid gap-2 sm:grid-cols-2">

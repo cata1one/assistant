@@ -45,7 +45,7 @@ function toEdit(b) {
 }
 
 function fromEdit(e) {
-  const b = { type: e.type, title: e.title || "" };
+  const b = { type: e.type, title: e.title || "", context: e.context || "", instruction: e.instruction || "" };
   if (e.type === "text") b.body = e.body || "";
   if (e.type === "words") b.items = (e.itemsText || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const p = splitPair(l); return p ? { word: p[0], translation: p[1] } : { word: l }; });
   if (e.type === "gap") Object.assign(b, { text: e.text || "", bank: !!e.bank });
@@ -71,6 +71,11 @@ function BlockEditor({ b, onChange, audios }) {
   return (
     <div className="grid gap-3">
       <input className="field" value={b.title || ""} onChange={set("title")} placeholder="Заголовок задания" aria-label="Заголовок" />
+      {["gap", "choice", "listening", "write"].includes(b.type) && <details className="rounded-xl border border-line p-3">
+        <summary className="cursor-pointer text-sm font-semibold">Контекст и инструкция к заданию</summary>
+        <div className="mt-3 grid gap-3"><label className="label">Ситуация или исходный текст{area("context", "Этот текст останется рядом с вопросом в режиме ученика.", 5)}</label>
+        <label className="label">Что нужно сделать{area("instruction", "Укажите форму ответа, ограничения и критерии.", 3)}</label></div>
+      </details>}
       {b.type === "text" && <>{area("body", "Текст, правило или инструкция", 6)}<button type="button" className="btn-light btn-sm w-fit" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button></>}
       {b.type === "words" && <>{area("itemsText", "kitchen – кухня\nwardrobe – шкаф", 5)}<p className="text-xs text-ink-mute">При выдаче занятия эти слова сразу попадут в карточки ученика.</p></>}
       {b.type === "gap" && (

@@ -61,6 +61,13 @@ try {
  await page.getByRole("button", { name: "Прослушать", exact: true }).click();
  await page.waitForFunction(() => document.querySelector("audio").currentTime > 0.25);
  await page.waitForFunction(() => document.querySelector("audio").paused);
+ await page.goto("http://127.0.0.1:5173/static/qa/preview.html?context=1");
+ await page.getByRole("button",{name:"Пройти как ученик",exact:true}).click();
+ await page.getByRole("button",{name:"Понятно",exact:true}).click();
+ await page.getByRole("button",{name:"Дальше",exact:true}).click();
+ await page.getByText("Where should they meet?",{exact:true}).waitFor();
+ assert(await page.locator(".lesson-source[open]").count() === 1, "Reading context stays open beside the question");
+ await page.locator(".lesson-source").getByText("Maya booked a train for Friday at six. She needs to meet her cousin at the station.",{exact:true}).waitFor();
  assert.deepEqual(errors, []);
  console.log("Browser checks passed: desktop/mobile layout, scoped speech, cleanup, recording boundaries and replay.");
 } finally { await browser.close(); await server.close(); }

@@ -1,8 +1,8 @@
-name: Learning refresh checks
+name: Bright Studio and context checks
 on:
   push:
-    branches: ["codex/bright-learning-refresh"]
-    paths-ignore: ["tutor_assistant/web/**", "frontend/public/*.png", "frontend/public/favicon.ico"]
+    branches: ["codex/bright-studio-context"]
+    paths-ignore: ["tutor_assistant/web/**", "frontend/public/*.png", "frontend/public/favicon.ico", "frontend/public/shot-*.webp", "docs/previews/**", "mobile/android/app/src/main/res/**"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: codex/bright-learning-refresh
+          ref: codex/bright-studio-context
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -25,7 +25,7 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install -r requirements-dev.txt cairosvg Pillow
       - name: Check changed Python files
-        run: python -m ruff check --fix tutor_assistant/units.py tutor_assistant/billing.py tutor_assistant/provision_access.py tutor_assistant/library_advanced.py tests/test_learning_refresh.py
+        run: python -m ruff check --fix tutor_assistant/units.py tutor_assistant/billing.py tutor_assistant/provision_access.py tutor_assistant/library_advanced.py tests/test_learning_refresh.py tests/test_context_support.py
       - name: Python tests
         run: python -m pytest -q
       - name: Build brand icons
@@ -36,9 +36,6 @@ jobs:
       - name: Playback logic tests
         working-directory: frontend
         run: node --test scripts/listening.test.mjs
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
       - name: Install browser checks
         working-directory: frontend
         run: |
@@ -47,18 +44,30 @@ jobs:
       - name: Browser regression checks
         working-directory: frontend
         run: node scripts/browser-check.mjs
+      - name: Build demonstration data without user records
+        run: PYTHONPATH=. python frontend/scripts/showcase-data.py
+      - name: Studio and screenshot checks
+        working-directory: frontend
+        run: node scripts/studio-check.mjs
+      - name: Encode refreshed screenshots
+        run: python frontend/scripts/render-shots.py
+      - name: Build verified frontend
+        working-directory: frontend
+        run: npm run build
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: learning-refresh-preview
-          path: frontend/qa-output
+          path: |
+            frontend/qa-output
+            docs/previews
           if-no-files-found: ignore
       - name: Save verified generated assets on this feature branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tutor_assistant/web frontend/public/*.png frontend/public/favicon.ico tutor_assistant/units.py tutor_assistant/billing.py tutor_assistant/provision_access.py tutor_assistant/library_advanced.py tests/test_learning_refresh.py
+          git add tutor_assistant/web frontend/public/*.png frontend/public/favicon.ico frontend/public/shot-*.webp mobile/android/app/src/main/res docs/previews tutor_assistant/units.py tutor_assistant/billing.py tutor_assistant/provision_access.py tutor_assistant/library_advanced.py tests/test_learning_refresh.py tests/test_context_support.py
           if ! git diff --cached --quiet; then
-            git commit -m "Build verified Bright frontend and brand icons [skip ci]"
-            git push origin HEAD:codex/bright-learning-refresh
+            git commit -m "Build verified Bright Studio assets, icons and screenshots [skip ci]"
+            git push origin HEAD:codex/bright-studio-context
           fi
