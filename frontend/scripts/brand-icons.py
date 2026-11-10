@@ -10,6 +10,11 @@ svg = (root / "favicon.svg").read_bytes()
 for name, size in (("icon-192.png", 192), ("icon-512.png", 512),
                    ("icon-maskable-512.png", 512), ("apple-touch-icon.png", 180)):
     cairosvg.svg2png(bytestring=svg, write_to=str(root / name), output_width=size, output_height=size)
+# A maskable icon keeps the original mark inside the platform's safe zone.
+mask = Image.new("RGBA", (512, 512), "#FAFAF8")
+mark = Image.open(BytesIO(cairosvg.svg2png(bytestring=svg, output_width=320, output_height=320))).convert("RGBA")
+mask.alpha_composite(mark, (96, 96))
+mask.save(root / "icon-maskable-512.png")
 image = Image.open(BytesIO(cairosvg.svg2png(bytestring=svg, output_width=64, output_height=64)))
 image.save(root / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
 
@@ -20,7 +25,12 @@ for path in res.glob("mipmap-*/*.png"):
         continue
     with Image.open(path) as current:
         width, height = current.size
-    cairosvg.svg2png(bytestring=svg, write_to=str(path), output_width=width, output_height=height)
+    foreground = path.name == "ic_launcher_foreground.png"
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0) if foreground else "#FAFAF8")
+    size = int(min(width, height) * (0.62 if foreground else 0.8))
+    mark = Image.open(BytesIO(cairosvg.svg2png(bytestring=svg, output_width=size, output_height=size))).convert("RGBA")
+    canvas.alpha_composite(mark, ((width - size) // 2, (height - size) // 2))
+    canvas.save(path)
 for path in res.glob("drawable*/splash.png"):
     with Image.open(path) as current:
         width, height = current.size
