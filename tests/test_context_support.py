@@ -1,4 +1,10 @@
-from tutor_assistant.library_advanced import ADVANCED
+from tutor_assistant.library import LIBRARY
+
+ADVANCED = [unit for unit in LIBRARY if unit["id"] in {
+    "lib-en-b1-decisions", "lib-en-b1-stories", "lib-en-b1-advice",
+    "lib-en-b2-media", "lib-en-b2-negotiation", "lib-en-b2-environment",
+    "lib-en-c1-hedging", "lib-en-c1-argument", "lib-en-c1-register",
+}]
 from tutor_assistant.units import grade, student_view, validate_blocks
 
 
