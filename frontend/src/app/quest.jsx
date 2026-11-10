@@ -1,5 +1,6 @@
 import { Flame, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ttsOf } from "../lib/langs.js";
 import { ErrorBox } from "../ui/kit.jsx";
 import Iskorka from "./Iskorka.jsx";
@@ -241,7 +242,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
   if (final) {
     const acc = graded.all ? Math.round((graded.ok / graded.all) * 100) : 100;
     const min = Math.max(1, Math.round((Date.now() - started.current) / 60000));
-    return (
+    return createPortal(
       <div className="fixed inset-0 z-[60] overflow-y-auto bg-paper px-4">
       <div className="relative mx-auto max-w-lg overflow-hidden py-10 text-center">
         <Confetti />
@@ -256,7 +257,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
         <p className="mt-3 text-sm text-ink-mute">Время: {min} мин{mistakes ? ` · ошибок по ходу: ${mistakes}` : " · без единой ошибки"}</p>
         <button type="button" onClick={onExit} className="mt-7 w-full rounded-2xl bg-ink py-3.5 text-[17px] font-bold text-white shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-none">Готово</button>
       </div>
-      </div>
+      </div>, document.body
     );
   }
 
@@ -265,7 +266,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
   const usedBank = new Set(s.kind === "gap" ? s.gaps.map((g) => gapVals[g]).filter(Boolean) : []);
   const fillNext = (w) => { const g = s.gaps.find((x) => !gapVals[x]); if (g === undefined) return; play("tap"); const a = [...gapVals]; a[g] = w; setAnswers(withGaps(answers, s, a)); };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-paper px-4 pt-[max(1rem,env(safe-area-inset-top))]">
     <div className="mx-auto flex min-h-full max-w-[1040px] flex-col">
       {/* верх: выход, прогресс, серия */}
@@ -375,7 +376,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
         )}
       </div>
     </div>
-    </div>
+    </div>, document.body
   );
 }
 
