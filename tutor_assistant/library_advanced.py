@@ -1,6 +1,6 @@
 """Original Bright English practice: three B1, three B2 and three C1 lessons."""
 
-from .library import C, G, L, T, W, WR, unit
+from .library import WR, C, G, L, T, W, unit
 
 ADVANCED = [
     unit(
