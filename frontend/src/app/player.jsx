@@ -1,6 +1,7 @@
 import { CheckCircle2, Headphones, Pause, Volume2, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ttsOf } from "../lib/langs.js";
+import { clipBounds } from "../lib/listening.js";
 import { ErrorBox } from "../ui/kit.jsx";
 
 /** Озвучка браузером (бесплатно, без сервера). Голос зависит от устройства. */
@@ -75,21 +76,76 @@ function Questions({ questions, value = [], onChange, result, answers }) {
   );
 }
 
-function Listen({ b }) {
+/** Playback is scoped to the current exercise and stops on navigation/check/close. */
+export function ListeningAudio({ b, text = b.speak, playbackKey = "", disabled = false }) {
   const [playing, setPlaying] = useState(false);
-  useEffect(() => () => { try { window.speechSynthesis.cancel(); } catch { /* нет озвучки */ } }, []);
-  if (b.audio) return <audio controls src={b.audio} className="mb-4 w-full" />;
-  const play = (rate) => {
-    if (playing) { window.speechSynthesis.cancel(); setPlaying(false); return; }
-    if (speak(b.speak, b.lang, rate)) {
-      setPlaying(true);
-      const t = setInterval(() => { if (!window.speechSynthesis.speaking) { setPlaying(false); clearInterval(t); } }, 300);
-    }
+  const [error, setError] = useState(null);
+  const audio = useRef(null);
+  const utterance = useRef(null);
+  const { start, end } = clipBounds(b);
+  useEffect(() => {
+    setPlaying(false); setError(null);
+    if (audio.current?.readyState >= 1) audio.current.currentTime = start;
+    return () => {
+      audio.current?.pause();
+      if (utterance.current) {
+        utterance.current.onend = null; utterance.current.onerror = null;
+        window.speechSynthesis?.cancel();
+        utterance.current = null;
+      }
+    };
+  }, [playbackKey, text, b.audio, start, end, disabled]);
+  const stop = () => {
+    audio.current?.pause();
+    if (utterance.current) window.speechSynthesis?.cancel();
+    utterance.current = null;
+    setPlaying(false);
+  };
+  const play = async (rate) => {
+    if (playing) { stop(); return; }
+    setError(null);
+    try {
+      if (b.audio) {
+        const media = audio.current;
+        media.playbackRate = rate;
+        if (media.currentTime < start || (end != null && media.currentTime >= end)) media.currentTime = start;
+        await media.play();
+        setPlaying(true);
+      } else {
+        if (!window.speechSynthesis || !text) throw new Error("Озвучка недоступна в этом браузере.");
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = b.lang || "en-US"; u.rate = rate;
+        const voice = window.speechSynthesis.getVoices().find((v) => v.lang?.replace("_", "-").startsWith(u.lang.slice(0, 2)));
+        if (voice) u.voice = voice;
+        u.onend = () => { setPlaying(false); utterance.current = null; };
+        u.onerror = () => { setPlaying(false); utterance.current = null; };
+        utterance.current = u;
+        window.speechSynthesis.speak(u);
+        setPlaying(true);
+      }
+    } catch (e) { setPlaying(false); setError(e.message || "Не удалось воспроизвести запись."); }
   };
   return (
-    <div className="mb-4 flex flex-wrap gap-2">
-      <button type="button" className="btn-brand" onClick={() => play(0.9)}>{playing ? <Pause size={16} /> : <Headphones size={16} />} {playing ? "Стоп" : "Прослушать"}</button>
-      <button type="button" className="btn-light" onClick={() => play(0.65)}>Медленнее</button>
+    <div className="mb-4">
+      {b.audio && <audio ref={audio} src={b.audio} preload="metadata"
+        onLoadedMetadata={() => { audio.current.currentTime = start; }}
+        onEnded={() => setPlaying(false)}
+        onPause={() => setPlaying(false)}
+        onTimeUpdate={() => {
+          if (end != null && audio.current.currentTime >= end) {
+            audio.current.pause(); audio.current.currentTime = start; setPlaying(false);
+          }
+        }}
+        onError={() => { setPlaying(false); setError("Не удалось загрузить аудиозапись."); }} />}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-brand" disabled={disabled} onClick={() => play(0.9)}>
+          {playing ? <Pause size={16} /> : <Headphones size={16} />} {playing ? "Остановить" : "Прослушать"}
+        </button>
+        <button type="button" className="btn-light" disabled={disabled} onClick={() => play(0.65)}>Медленнее</button>
+        <button type="button" className="btn-ghost" disabled={disabled} onClick={() => { stop(); if (audio.current) audio.current.currentTime = start; }}>Сначала</button>
+      </div>
+      {error && <p role="alert" className="mt-2 text-sm text-teach-deep">{error}</p>}
     </div>
   );
 }
@@ -108,7 +164,7 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
   };
   const r = (i) => result?.blocks?.[String(i)];
   return (
-    <div className="grid gap-4">
+    <div className="lesson-player grid gap-5">
       {result && result.total > 0 && (
         <div className={`panel flex items-center gap-4 p-5 ${result.score === result.total ? "!bg-mint-soft" : "!bg-sun-soft"}`}>
           <span className="num font-display text-4xl font-bold">{result.score}/{result.total}</span>
@@ -151,7 +207,7 @@ export default function UnitPlayer({ unit, result: initial, onSubmit, readOnly, 
           {b.type === "choice" && <Questions questions={b.questions} value={answers[i]} onChange={(v) => set(i, v)} result={r(i)?.questions} answers={r(i)?.question_answers} />}
           {b.type === "listening" && (
             <>
-              <Listen b={b} />
+              <ListeningAudio b={b} />
               {b.parts && <div className="mb-4"><Gaps parts={b.parts} bank={b.bank} value={answers[i]?.gaps} onChange={(v) => set(i, { ...(answers[i] || {}), gaps: v })} result={r(i)?.gaps} answers={r(i)?.gap_answers} /></div>}
               {b.questions?.length > 0 && <Questions questions={b.questions} value={answers[i]?.questions} onChange={(v) => set(i, { ...(answers[i] || {}), questions: v })} result={r(i)?.questions} answers={r(i)?.question_answers} />}
               {r(i)?.script && <details className="mt-3 text-sm"><summary className="cursor-pointer font-semibold">Текст записи</summary><p className="mt-2 whitespace-pre-wrap text-ink-soft">{r(i).script}</p></details>}

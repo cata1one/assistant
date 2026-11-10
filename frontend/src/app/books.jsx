@@ -116,7 +116,7 @@ export function BookView({ bookId, onBack, onAssign }) {
           </li>
         ))}
       </ol>
-      <Modal open={!!look} onClose={() => setLook(null)} title={look?.title || ""} wide>
+      <Modal lesson open={!!look} onClose={() => setLook(null)} title={look?.title || ""} wide>
         {look && <UnitPlayer unit={look.preview} submitLabel="Проверить себя" onSubmit={(answers) => request("POST", `/site/v1/library/${look.id}/check`, { answers })} />}
       </Modal>
     </>

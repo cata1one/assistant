@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export function Loading({ text = "Загружаем…" }) {
   return (
@@ -47,7 +48,7 @@ export function Tabs({ items, value, onChange, label, className = "" }) {
 }
 
 /** Окно: на компьютере по центру, на телефоне выезжает снизу. */
-export function Modal({ open, onClose, title, children, wide }) {
+export function Modal({ open, onClose, title, children, wide, lesson = false }) {
   useEffect(() => {
     if (!open) return undefined;
     const esc = (e) => e.key === "Escape" && onClose();
@@ -57,17 +58,17 @@ export function Modal({ open, onClose, title, children, wide }) {
     return () => { window.removeEventListener("keydown", esc); document.body.style.overflow = prev; };
   }, [open, onClose]);
   if (!open) return null;
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center sm:p-4" onMouseDown={onClose}>
       <div role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => e.stopPropagation()}
-        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-4xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-lift animate-fadeup sm:rounded-4xl sm:p-6 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}>
+        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-4xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-lift animate-fadeup sm:rounded-4xl sm:p-6 ${lesson ? "sm:max-w-[1200px]" : wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-lg">{title}</h3>
           <button type="button" className="btn-ghost !h-9 !w-9 !p-0" onClick={onClose} aria-label="Закрыть"><X size={18} /></button>
         </div>
         {children}
       </div>
-    </div>
+    </div>, document.body
   );
 }
 

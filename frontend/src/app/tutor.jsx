@@ -220,6 +220,7 @@ const fmtUntil = (iso) => new Date(iso).toLocaleDateString("ru-RU", { day: "nume
 
 export function BillingStatus({ billing, compact }) {
   if (!billing || billing.state === "free") return null;
+  if (billing.lifetime) return compact ? null : <Notice tone="ok">Постоянный бесплатный доступ ко всем функциям{billing.by_school ? " по тарифу школы" : ""}.</Notice>;
   if (billing.state === "active") return compact ? null : <Notice tone="ok">Тариф оплачен до {fmtUntil(billing.until)}{billing.by_school ? ", оплачивает школа" : ""}.</Notice>;
   if (billing.state === "trial") {
     const left = billing.days_left >= 1 ? `${billing.days_left + 1} дн.` : `${Math.max(1, billing.hours_left)} ч.`;
@@ -323,7 +324,7 @@ export function PlanPage() {
     <>
       <PageTitle title="Тариф" text={byOrg ? `Вы преподаёте в школе «${account.org.name}», доступ оплачивает школа.` : "Один тариф, все функции платформы."} />
       <BillingStatus billing={account?.billing} />
-      {!byOrg && <PayPanel account={account} />}
+      {!byOrg && !account?.billing?.lifetime && <PayPanel account={account} />}
       {!byOrg && <details className="mt-5"><summary className="cursor-pointer text-sm font-semibold text-ink-soft">Что входит в тариф</summary><div className="mt-3"><PricingCards inApp /></div></details>}
       {ref && (
         <div className="card mt-6 grid gap-4 md:grid-cols-[1.4fr_1fr] md:items-center">

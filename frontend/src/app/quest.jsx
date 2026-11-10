@@ -1,9 +1,10 @@
-import { Flame, Headphones, Snail, Volume2, VolumeX, X } from "lucide-react";
+import { Flame, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ttsOf } from "../lib/langs.js";
 import { ErrorBox } from "../ui/kit.jsx";
 import Iskorka from "./Iskorka.jsx";
-import { speak } from "./player.jsx";
+import { ListeningAudio, speak } from "./player.jsx";
+import { listeningText } from "../lib/listening.js";
 
 /**
  * Занятие «как в Duolingo»: по одному заданию на экране, проверка сразу, ошибки возвращаются в конце.
@@ -85,16 +86,6 @@ const getQs = (answers, s) => (s.nested ? answers[s.i]?.questions : answers[s.i]
 function withGaps(answers, s, gaps) { return { ...answers, [s.i]: s.nested ? { ...(answers[s.i] || {}), gaps } : gaps }; }
 function withQs(answers, s, qs) { return { ...answers, [s.i]: s.nested ? { ...(answers[s.i] || {}), questions: qs } : qs }; }
 
-function ListenButtons({ b }) {
-  if (b.audio) return <audio controls src={b.audio} className="mb-5 w-full" />;
-  return (
-    <div className="mb-5 flex items-center gap-3">
-      <button type="button" onClick={() => speak(b.speak, b.lang, 0.9)} className="grid h-16 w-16 place-items-center rounded-2xl bg-study text-white shadow-[0_4px_0_#1E44C0] transition active:translate-y-1 active:shadow-none" aria-label="Прослушать"><Headphones size={28} /></button>
-      <button type="button" onClick={() => speak(b.speak, b.lang, 0.6)} className="grid h-12 w-12 place-items-center rounded-2xl border-2 border-line bg-white text-ink-soft shadow-[0_3px_0_#E7E5DF] active:translate-y-0.5 active:shadow-none" aria-label="Медленно"><Snail size={20} /></button>
-    </div>
-  );
-}
-
 /** Объёмная плитка-кнопка, как в Duolingo. */
 function Tile({ children, state, onClick, disabled, className = "" }) {
   const look = {
@@ -169,7 +160,11 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
   const lang = ttsOf(unit.language);
 
   useEffect(() => { try { localStorage.setItem("bright-quiet", muted ? "1" : "0"); } catch { /* нет хранилища */ } }, [muted]);
-  useEffect(() => { if (s?.listen && !s.b.audio) setTimeout(() => speak(s.b.speak, s.b.lang, 0.9), 300); }, [pos]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; window.speechSynthesis?.cancel(); };
+  }, []);
 
   const remember = (step, value) => { // первая попытка задания
     if (firstSeen.current.has(step.n)) return;
@@ -272,7 +267,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-paper px-4 pt-[max(1rem,env(safe-area-inset-top))]">
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col">
+    <div className="mx-auto flex min-h-full max-w-[1040px] flex-col">
       {/* верх: выход, прогресс, серия */}
       <div className="flex items-center gap-3 pb-5">
         <button type="button" onClick={onExit} className="grid h-9 w-9 place-items-center rounded-xl text-ink-mute hover:bg-cream" aria-label="Выйти"><X size={22} /></button>
@@ -294,7 +289,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
           </div>
         </div>
 
-        {s.listen && <ListenButtons b={s.b} />}
+        {s.listen && <ListeningAudio b={s.b} text={listeningText(s)} playbackKey={pos} disabled={!!feedback} />}
         {s.watch && <p className="mb-3 rounded-xl bg-cream px-3 py-2 text-sm text-ink-soft">Вопрос по видео. Если не уверены – пересмотрите его ещё раз.</p>}
 
         {s.kind === "words" && (

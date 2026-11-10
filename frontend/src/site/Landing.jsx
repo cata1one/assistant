@@ -43,16 +43,17 @@ export default function Landing() {
   return (
     <>
       <section className="pb-6 pt-28 md:pt-36">
-        <div className="max-w-3xl animate-fadeup">
+        <div className="max-w-4xl">
           <p className="text-sm font-medium text-ink-mute">Для репетиторов языков и небольших онлайн-школ</p>
-          <h1 className="mt-4 text-[clamp(2.5rem,6.4vw,4.6rem)] leading-[1.02]">Урок ведёте <span className="mark">вы</span>.<br />Остальное сделает Bright</h1>
+          <h1 className="mt-4 max-w-3xl text-[clamp(2.5rem,6.4vw,4.6rem)] leading-[1.08]">Место для хороших<br className="hidden sm:block" /> уроков английского.<span className="mt-3 block text-[0.55em] font-medium leading-tight text-ink-soft">И других языков, которые открывают мир.</span></h1>
           <p className="mt-6 max-w-2xl text-lg text-ink-soft md:text-xl">
-            Видеосвязь с доской и стикерами, конспект и слова сразу после урока, домашка, которую хочется делать, оплата занятий и новые ученики. Ученики заходят с компьютера, с телефона или из приложения.
+            Откройте материалы, встретитесь с учеником и проведите урок в своём ритме. Доска, задания, слова и переписка рядом — без переключения между сервисами.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <a href="#/register?role=tutor&start=trial" className="btn-brand btn-lg">Попробовать {PRICE.trialDays} дня бесплатно</a>
+            <a href="#/register?role=tutor&start=trial" className="btn-accent btn-lg">Начать преподавать</a>
             <a href="#/study" className="btn-light btn-lg">Я ученик или родитель</a>
           </div>
+          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-sm text-ink-soft"><span>01 · Подготовьте занятие</span><span>02 · Проведите урок</span><span>03 · Дайте практику</span></div>
           <p className="mt-4 text-sm text-ink-mute">{PRICE.teacher} ₽ в месяц, первый месяц {firstMonth()} ₽. Для пробного периода карта не нужна.</p>
         </div>
         <div className="relative mt-14 md:mt-16">
@@ -98,7 +99,7 @@ export default function Landing() {
       </Feature>
 
       <Feature label="Материалы" title="Готовые уроки и ваши учебники в одном месте"
-        text="72 урока Bright с заданиями и автопроверкой: английский от A1 до B2, IELTS, ОГЭ и ЕГЭ, HSK, испанский, французский, итальянский и другие. Свои PDF загружаете один раз и открываете прямо на уроке."
+        text="Уроки Bright с заданиями и автопроверкой: английский от A1 до C1, IELTS, ОГЭ и ЕГЭ, HSK, испанский, французский, итальянский и другие. Свои PDF загружаете один раз и открываете прямо на уроке."
         items={["Урок можно выдать как домашку в два касания", "Ученик видит результат сразу, вы видите ошибки", "Свои занятия собираются из тех же блоков"]}>
         <Shot src="/static/shot-courses.webp" alt="Курсы Bright: список готовых уроков" />
       </Feature>

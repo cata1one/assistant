@@ -46,7 +46,7 @@
   .eyebrow { @apply text-sm font-semibold text-brand; }
   .link { @apply font-semibold text-ink underline decoration-ink/25 underline-offset-4 transition hover:decoration-ink; }
   .muted { @apply text-ink-mute; }
-  .mark { background: linear-gradient(transparent 58%, #FFD43B 58%, #FFD43B 92%, transparent 92%); padding: 0 .08em; }
+  .mark { color: #173D36; font-weight: 750; }
   .kbd { @apply rounded-md border border-line bg-white px-1.5 text-[12px] font-semibold text-ink-soft; }
 }
 
@@ -87,4 +87,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Reading surfaces remain generous on desktop and fit a phone without horizontal scrolling. */
+.lesson-player { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.lesson-player section { padding: clamp(1rem, 3vw, 2rem); }
+.lesson-player input, .lesson-player select { max-width: 100%; }
+@media (min-width: 768px) {
+  .lesson-player { font-size: 17px; line-height: 1.7; }
 }
