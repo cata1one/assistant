@@ -1,8 +1,10 @@
-import { ArrowRight, Smartphone } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, Headphones, Play, Smartphone } from "lucide-react";
 import { useState } from "react";
 import { firstMonth, PRICE } from "../lib/pricing.js";
 import { useSession } from "../lib/session.js";
 import { copy } from "../ui/kit.jsx";
+import Logo, { LogoMark } from "../ui/Logo.jsx";
+import { speak } from "../app/player.jsx";
 import Reviews from "./Reviews.jsx";
 import { Faq, Phone, PricingCards, Section, Shot, Ticks } from "./parts.jsx";
 
@@ -35,41 +37,72 @@ function Feature({ label, title, text, items, flip, children, more }) {
   );
 }
 
+
+/** A real, self-contained exercise, not a screenshot of a fictional lesson. */
+function LessonSample() {
+  const [picked, setPicked] = useState(null);
+  const [checked, setChecked] = useState(false);
+  return <div className="studio-sample">
+    <div className="studio-sample-top"><Logo size={24} /><span>Попробуйте прямо здесь</span><span className="studio-level">B1</span></div>
+    <div className="studio-sample-body">
+      <div className="studio-sample-label"><span>01 / 03</span><span>ENGLISH IN REAL LIFE</span></div>
+      <h2>A little change<br /><em>of plans.</em></h2>
+      <p className="studio-context">The train leaves at six. We booked our tickets yesterday and agreed on a meeting place.</p>
+      <p className="studio-question">Which sentence describes our arrangement?</p>
+      <div className="studio-options">
+        {["We're meeting at the station at five thirty.", "We meet at the station every day.", "We might meet one day."].map((text, i) =>
+          <button key={text} type="button" aria-pressed={picked === i} disabled={checked}
+            className={`studio-option ${picked === i ? "is-picked" : ""} ${checked && i === 0 ? "is-correct" : ""}`}
+            onClick={() => setPicked(i)}><span>{String.fromCharCode(65 + i)}</span>{text}{checked && i === 0 && <Check size={18} />}</button>)}
+      </div>
+      {checked && <p role="status" className="studio-answer">{picked === 0 ? "Верно!" : "Правильный ответ — A."} Present Continuous подходит для уже согласованного плана.</p>}
+      <div className="studio-sample-actions">
+        <button type="button" className="studio-listen" onClick={() => speak("The train leaves at six. We booked our tickets yesterday and agreed on a meeting place.", "en-GB")}><Headphones size={17} /> Послушать</button>
+        <button type="button" className="studio-check" disabled={picked === null} onClick={() => checked ? (setChecked(false), setPicked(null)) : setChecked(true)}>{checked ? "Ещё раз" : "Проверить"}<ArrowRight size={17} /></button>
+      </div>
+    </div>
+    <div className="studio-sample-foot"><span className="studio-dot" /> Небольшой шаг. Настоящий прогресс.</div>
+  </div>;
+}
+
 export default function Landing() {
   const session = useSession();
   const ref = session?.account?.referral?.code;
   const [copied, setCopied] = useState(false);
   const share = () => { copy(ref ? `${window.location.origin}/#/register?role=tutor&ref=${ref}` : window.location.origin); setCopied(true); };
   return (
-    <>
-      <section className="pb-6 pt-28 md:pt-36">
-        <div className="max-w-4xl">
-          <p className="text-sm font-medium text-ink-mute">Для репетиторов языков и небольших онлайн-школ</p>
-          <h1 className="mt-4 max-w-3xl text-[clamp(2.5rem,6.4vw,4.6rem)] leading-[1.08]">Место для хороших<br className="hidden sm:block" /> уроков английского.<span className="mt-3 block text-[0.55em] font-medium leading-tight text-ink-soft">И других языков, которые открывают мир.</span></h1>
-          <p className="mt-6 max-w-2xl text-lg text-ink-soft md:text-xl">
-            Откройте материалы, встретитесь с учеником и проведите урок в своём ритме. Доска, задания, слова и переписка рядом — без переключения между сервисами.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <a href="#/register?role=tutor&start=trial" className="btn-accent btn-lg">Начать преподавать</a>
-            <a href="#/study" className="btn-light btn-lg">Я ученик или родитель</a>
+    <div className="bright-studio">
+      <section className="studio-hero">
+        <div className="studio-intro">
+          <p className="studio-kicker"><span />ЯЗЫКИ · ЛЮДИ · ХОРОШИЕ УРОКИ</p>
+          <h1>Здесь хочется<br /><em>заниматься.</em></h1>
+          <p className="studio-lead">Всё для урока, в котором есть жизнь.<br className="hidden sm:block" /> Доска для ваших идей, задания со смыслом<br className="hidden sm:block" /> и больше времени друг для друга.</p>
+          <div className="studio-hero-actions">
+            <a href="#/register?role=tutor&start=trial" className="studio-primary">Создать свой класс<ArrowUpRight size={20} /></a>
+            <a href="#/study" className="studio-secondary">Я хочу учиться<ArrowRight size={18} /></a>
           </div>
-          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-sm text-ink-soft"><span>01 · Подготовьте занятие</span><span>02 · Проведите урок</span><span>03 · Дайте практику</span></div>
-          <p className="mt-4 text-sm text-ink-mute">{PRICE.teacher} ₽ в месяц, первый месяц {firstMonth()} ₽. Для пробного периода карта не нужна.</p>
+          <p className="studio-price">{PRICE.trialDays} дня бесплатно · Без банковской карты</p>
+          <div className="studio-lesson-note"><span className="studio-note-icon"><LogoMark size={30} /></span><p>Ваш стиль преподавания.<br /><b>Место, которое его поддерживает.</b></p></div>
         </div>
-        <div className="relative mt-14 md:mt-16">
-          <Shot src="/static/shot-board.webp" alt="Доска Bright: заметки, таблица Present Perfect, карточка со словом, таймер и стикеры" className="hidden sm:block lg:mr-28" />
-          <Phone src="/static/shot-phone-home.webp" alt="Кабинет ученика на телефоне" className="mx-auto sm:hidden" />
-          <Phone src="/static/shot-phone-home.webp" alt="Кабинет ученика на телефоне" className="absolute -bottom-14 right-0 hidden !max-w-[200px] lg:block" />
+        <div className="studio-demo">
+          <span className="studio-corner-label">ОТКРЫТО ДЛЯ ЛЮБОПЫТСТВА ↘</span>
+          <LessonSample />
+          <span className="studio-course-stamp"><span>B1 · B2 · C1</span><b>Английский<br />в действии</b></span>
         </div>
       </section>
 
-      <div className="mt-16 grid gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-3">
-        {[["В браузере и в приложении", "Ничего не нужно устанавливать, но можно"], ["Видео не записывается", "Только текст речи для конспекта"], ["Ученикам и родителям бесплатно", "Платит преподаватель или школа"]].map(([t, d]) => (
-          <div key={t} className="bg-white p-5"><p className="font-semibold">{t}</p><p className="mt-1 text-sm text-ink-mute">{d}</p></div>
-        ))}
+      <div className="studio-strip" aria-label="Возможности Bright">
+        <span><i className="studio-pill studio-pill-coral">01</i>Урок с видео и доской</span>
+        <span><i className="studio-pill studio-pill-blue">02</i>Практика с понятной целью</span>
+        <span><i className="studio-pill studio-pill-yellow">03</i>Слова, которые остаются</span>
       </div>
 
-      <Feature label="На уроке" title="Доска, за которой ученику интересно"
+      <section className="studio-workspace">
+        <div className="studio-section-heading"><p className="studio-kicker">ВАШ РАБОЧИЙ СТОЛ</p><h2>Меньше вкладок.<br /><em>Больше урока.</em></h2><p>Открывайте материалы, пробуйте идеи и общайтесь. Всё нужное уже рядом.</p></div>
+        <div className="studio-browser"><div className="studio-browser-bar"><span className="studio-browser-dots">● ● ●</span><Logo size={22} /><span>Доска вашего урока</span></div><Shot src="/static/shot-board.webp" alt="Обновлённая доска Bright с новой айдентикой, карточками и заметками" className="studio-board-shot" /></div>
+      </section>
+
+      <Feature label="На уроке" title={<>Пространство для идей.<br /><em className="studio-serif">И ваших, и ученика.</em></>}
         text="Рисуйте пальцем или мышкой, кладите на доску материалы, видео и страницы учебника. Ученик видит всё сразу, демонстрация экрана не нужна."
         items={["Карточки-перевёртыши, таблицы и таймер для упражнений", "Страница учебника из PDF прямо на доску", "446 стикеров: похвала, грамматика, праздники"]}>
         <Shot src="/static/shot-stickers.webp" alt="Доска с открытой панелью стикеров" />
@@ -98,8 +131,8 @@ export default function Landing() {
         <div className="flex justify-center"><Phone src="/static/shot-phone-spark.webp" alt="Искорка проверяет слова ученика" className="!max-w-[280px]" /></div>
       </Feature>
 
-      <Feature label="Материалы" title="Готовые уроки и ваши учебники в одном месте"
-        text="Уроки Bright с заданиями и автопроверкой: английский от A1 до C1, IELTS, ОГЭ и ЕГЭ, HSK, испанский, французский, итальянский и другие. Свои PDF загружаете один раз и открываете прямо на уроке."
+      <Feature label="Материалы" title={<>Хорошая практика<br /><em className="studio-serif">начинается с контекста.</em></>}
+        text="В готовых уроках Bright есть ситуация, понятная задача и место для собственного ответа. Английский от A1 до C1 и другие языки. А ваши учебники всегда можно добавить рядом."
         items={["Урок можно выдать как домашку в два касания", "Ученик видит результат сразу, вы видите ошибки", "Свои занятия собираются из тех же блоков"]}>
         <Shot src="/static/shot-courses.webp" alt="Курсы Bright: список готовых уроков" />
       </Feature>
@@ -177,6 +210,6 @@ export default function Landing() {
           <p className="mx-auto mt-5 max-w-md text-sm text-ink-mute">Когда коллега оформит тариф по вашей ссылке, ваше следующее продление будет вдвое дешевле.</p>
         </div>
       </section>
-    </>
+    </div>
   );
 }

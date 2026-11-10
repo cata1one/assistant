@@ -87,6 +87,9 @@ def validate_blocks(raw: Any) -> list[dict[str, Any]]:
             continue
         t = b["type"]
         block: dict[str, Any] = {"type": t, "title": _s(b.get("title"), 120)}
+        for key, limit in (("context", 5000), ("instruction", 1200)):
+            if _s(b.get(key), limit):
+                block[key] = _s(b[key], limit)
         if t == "text":
             block["body"] = _s(b.get("body"), 5000)
             ok = bool(block["body"])
@@ -154,6 +157,7 @@ def student_view(unit: dict[str, Any]) -> dict[str, Any]:
     blocks = []
     for i, b in enumerate(unit["blocks"]):
         v: dict[str, Any] = {"type": b["type"], "title": b.get("title")}
+        v.update({key: b[key] for key in ("context", "instruction") if b.get(key)})
         seed = f"{unit['id']}:{i}"
         if b["type"] in ("gap", "listening"):
             text = b.get("text") if b["type"] == "gap" else b.get("script")

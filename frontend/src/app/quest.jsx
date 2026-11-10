@@ -58,9 +58,13 @@ function gapLines(parts) {
   return lines;
 }
 
-function buildSteps(unit) {
+export function buildSteps(unit) {
   const steps = [];
+  const sources = {};
+  let source = null;
   unit.blocks.forEach((b, i) => {
+    if (b.type === "text" && b.body) source = { title: b.title || "Текст к заданию", body: b.body };
+    sources[i] = b.context ? { title: "Ситуация и текст к заданию", body: b.context } : b.type === "listening" || b.type === "video" ? null : source;
     if (b.type === "words" && b.items?.length) steps.push({ kind: "words", i, b });
     else if (b.type === "text" && b.body) steps.push({ kind: "text", i, b });
     else if (b.type === "video" && b.embed) {
@@ -76,7 +80,7 @@ function buildSteps(unit) {
       (b.questions || []).forEach((q, qi) => steps.push({ kind: "choice", i, qi, q, b, listen: true, nested: true }));
     }
   });
-  return steps.map((s, n) => ({ ...s, n, gaps: s.line ? s.line.filter((x) => x.gap !== undefined).map((x) => x.gap) : undefined }));
+  return steps.map((s, n) => ({ ...s, n, source: ["gap", "choice", "write", "match"].includes(s.kind) ? sources[s.i] : null, gaps: s.line ? s.line.filter((x) => x.gap !== undefined).map((x) => x.gap) : undefined }));
 }
 
 const TITLE = { words: "Новые слова", text: "Правило", video: "Посмотрите видео", write: "Напишите ответ", match: "Соедините пары", choice: "Выберите ответ", gap: "Вставьте пропущенное" };
@@ -290,8 +294,10 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
           </div>
         </div>
 
+        {s.source && <details className="lesson-source" open><summary>{s.source.title}</summary><p dir="auto">{s.source.body}</p></details>}
+        {s.b.instruction && <p className="mb-4 rounded-xl bg-sun-soft px-4 py-3 text-sm leading-relaxed text-ink-soft">{s.b.instruction}</p>}
         {s.listen && <ListeningAudio b={s.b} text={listeningText(s)} playbackKey={pos} disabled={!!feedback} />}
-        {s.watch && <p className="mb-3 rounded-xl bg-cream px-3 py-2 text-sm text-ink-soft">Вопрос по видео. Если не уверены – пересмотрите его ещё раз.</p>}
+        {s.watch && <details className="lesson-source"><summary>Пересмотреть видео к вопросу</summary><iframe title={s.b.title || "Видео"} src={s.b.embed} className="mt-3 aspect-video w-full rounded-xl" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen /></details>}
 
         {s.kind === "words" && (
           <div className="grid gap-2.5 sm:grid-cols-2">

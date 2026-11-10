@@ -9,7 +9,7 @@ ADVANCED = [
         T("Language focus", "Use will for a decision made now: I'll call the hotel. Use going to for an intention: We're going to travel by train. Use the present continuous for a fixed arrangement: We're meeting at nine on Friday. Give a reason with because; contrast options with although."),
         W("arrangement – договорённость\nbudget – бюджет\nreliable – надёжный\nafford – позволить себе\ninstead – вместо этого\nconfirm – подтвердить"),
         T("Read and discuss", "Maya wants to visit her cousin for a weekend. A flight takes one hour, but the airport bus adds two more. The train is slower but arrives in the city centre. Maya has a small budget and wants to read during the journey. Her cousin can meet her at the station on Friday evening."),
-        G("Use the language in context", "We [are meeting|'re meeting] at the station on Friday; the tickets are booked.\nThe phone is ringing. I [will|'ll] answer it.\nWe chose the train [because] it arrives in the centre.\nWe can't [afford] the hotel, so we're staying with family.", bank=False),
+        G("Use the language in context", "We [are meeting|'re meeting] at the station on Friday; the tickets are booked.\nThe phone is ringing. I [will|'ll] answer it.\nWe chose the train [because|as|since] it arrives in the centre.\nWe can't [afford] the hotel, so we're staying with family.", bank=False),
         C("Read, think and choose", "Why might the train suit Maya? | It is always faster | *It fits her budget and plans | Her cousin works on it\nWhich sentence describes a fixed arrangement? | Maybe I will travel | *I'm leaving on Friday at six | I like travelling\nChoose the useful follow-up question. | Why are trains made? | *What time shall we meet? | Have all people travelled?"),
         L("Listen, pause and complete", "en-GB", "We've [booked] the train for Friday. It arrives at [six|6], but I'll text you if we are late. Please meet us at the [station], not the airport.", "What should the cousin do? | Go to the airport | *Meet them at the station | Buy new tickets\nWhat will happen if the train is late? | They will cancel | *They will send a text | They will take a plane"),
         WR("Your turn", "Plan a weekend with a friend in 90–120 words. Include one fixed arrangement, one intention, a decision you make now, and a reason for your choice. Check that the time and meeting place are clear."),
@@ -31,7 +31,7 @@ ADVANCED = [
         T("Language focus", "Should gives advice: You should take a break. Have to describes an obligation: I have to finish by Friday. Don't have to means there is no obligation, not a prohibition. Could offers an option: You could switch off notifications. Ask a question before giving advice: What have you tried already?"),
         W("distracted – отвлечённый\nnotification – уведомление\nmanage – справляться\nroutine – распорядок\nsuggest – предлагать\ntake a break – сделать перерыв"),
         T("Read and discuss", "Leo studies online but checks his phone every few minutes. He tried working for three hours without stopping and felt exhausted. His friend suggests short study sessions with planned breaks. Leo decides to leave his phone in another room for twenty minutes. He will try the routine for a week before deciding whether it helps."),
-        G("Use the language in context", "You [should] take a short break if you feel tired.\nYou [don't have to|do not have to] answer every notification immediately; it is optional.\nYou [could] leave your phone in another room as one possible solution.\nA regular [routine] can make studying easier.", bank=False),
+        G("Use the language in context", "You [should|could] take a short break if you feel tired.\nYou [don't have to|do not have to] answer every notification immediately; it is optional.\nYou [could|can] leave your phone in another room as one possible solution.\nA regular [routine] can make studying easier.", bank=False),
         C("Read, think and choose", "Why did Leo's first plan fail? | He studied for only a minute | *He worked too long without breaks | He had no phone\nWhich phrase offers a choice? | You must do this | *You could try this | You are forbidden to do this\nWhat is a fair way to test the new routine? | Give up after one minute | *Try it for a week and review it | Never take breaks again"),
         L("Listen, pause and complete", "en-GB", "You don't have to study all [evening]. Try working for [twenty|20] minutes, then take a short break. Keep your phone in another [room] so you can concentrate.", "Where should the phone be? | On the desk | *In another room | In a school bag on the desk\nWhat kind of plan is suggested? | Study all evening without stopping | *Short sessions with breaks | Stop studying completely"),
         WR("Your turn", "A friend gets distracted during online lessons. Write a helpful reply in 90–120 words. Ask one question, give two possible solutions, and suggest how to check whether the plan works. Use should, could, and don't have to correctly."),
@@ -64,7 +64,7 @@ ADVANCED = [
         T("Language focus", "Use a passive when the process matters more than the actor: Food waste is collected separately. Compare like with like, including cost and access. Link a recommendation to evidence, then acknowledge a limitation with although, whereas, or provided that. Avoid claiming a single action solves every environmental problem."),
         W("reusable – многоразовый\nwaste – отходы\nincentive – стимул\naccessible – доступный\nimplement – внедрять\nwhereas – тогда как"),
         T("Read and discuss", "A university wants to reduce waste from takeaway lunches. One proposal bans disposable containers; another offers a discount for bringing a reusable box. A ban could reduce waste quickly but may disadvantage students who forget a container or cannot wash one between classes. The discount could be easier to introduce, but its effect needs to be measured. A trial with clear data would help the university choose."),
-        G("Use the language in context", "Reusable boxes [are offered] at the campus shop every day.\nA discount could act as an [incentive] to change habits.\nA ban is stricter, [whereas] a discount leaves students a choice.\nThe scheme will work [provided] that washing facilities are available.", bank=False),
+        G("Use the language in context", "Reusable boxes [are offered] at the campus shop every day.\nA discount could act as an [incentive] to change habits.\nA ban is stricter, [whereas] a discount leaves students a choice.\nThe scheme will work [provided|providing] that washing facilities are available.", bank=False),
         C("Read, think and choose", "What is a limitation of the ban? | It increases every student's salary | *Some students may lack practical access to reusable boxes | It cannot change waste levels\nWhat should a trial measure? | Only whether posters look nice | *Waste reduction and who can use the scheme | The price of unrelated books\nWhich sentence uses the passive? | Students bring boxes | *Waste is collected separately | Staff collect waste"),
         L("Listen, pause and complete", "en-GB", "The trial will run for [six|6] weeks. Reusable boxes will be available at the campus [shop], and students who bring one will get a discount. We will measure both waste and [participation] before making a final decision.", "How long will the trial last? | Six days | *Six weeks | Six months\nWhat will be measured besides waste? | Exam results | *Participation | Train delays"),
         WR("Your turn", "Write a 160–190 word recommendation for your school or workplace. Compare a ban with an incentive, discuss access and cost, and propose a way to measure success. Use a passive sentence and a concession."),
@@ -73,7 +73,7 @@ ADVANCED = [
         "lib-en-c1-hedging", "Precision over certainty: нюанс и осторожные выводы", "en", "C1", ["Практика", "Разговорная речь"],
         "Выражайте степень уверенности, отделяйте данные от интерпретации и избегайте чрезмерных обобщений.",
         T("Language focus", "Hedging calibrates a claim to the strength of the evidence. Compare 'This proves remote work is better' with 'These findings suggest remote work may improve satisfaction in this sample.' Scope matters: some participants, under these conditions, over the study period. Avoid empty hedging: say precisely what remains uncertain."),
-        W("tentative – предварительный\nplausible – правдоподобный\nattribute – приписывать\nrobust – устойчивый, надёжный\nconfounding factor – смешивающий фактор\nqualify a claim – уточнить границы утверждения"),
+        W("tentative – предварительный\nplausible – правдоподобный\nattribute – приписывать\nrobust – устойчивый, надёжный\nalbeit – хотя и\nconfounding factor – смешивающий фактор\nqualify a claim – уточнить границы утверждения"),
         T("Read and discuss", "A company reports higher staff satisfaction after introducing flexible working. At the same time it raised salaries and replaced an unpopular manager. It is plausible that flexibility contributed to the improvement, but the available data do not isolate its effect. A stronger evaluation would compare similar teams over time and account for changes in pay and management. The result is promising, not conclusive."),
         G("Use the language in context", "The improvement cannot be [attributed] solely to flexible working.\nHigher pay is a potential [confounding] factor.\nThe findings are promising, [albeit] preliminary.\nFurther evidence would be needed to draw a [robust] conclusion.", bank=False),
         C("Read, think and choose", "Which claim is best calibrated? | Flexibility caused every improvement | *Flexibility may have contributed, alongside other changes | Flexible work never matters\nWhy is salary relevant? | It proves the manager was popular | *It changed at the same time and could affect satisfaction | It removes all uncertainty\nWhich revision adds a meaningful limitation? | This is perhaps maybe true | *The effect was observed in one company over a short period | Everyone knows this is complicated"),
@@ -84,7 +84,7 @@ ADVANCED = [
         "lib-en-c1-argument", "A case worth answering: сильная аргументация", "en", "C1", ["Практика", "Разговорная речь"],
         "Постройте тезис, добросовестно изложите возражение и ответьте на него с уступкой.",
         T("Language focus", "An effective argument makes a claim, supplies reasons and evidence, and explains the link between them. Represent the strongest reasonable objection before responding. A concession acknowledges a valid concern without abandoning your position: Admittedly..., Nevertheless... Distinguish a rebuttal of an argument from criticism of its author."),
-        W("contention – основной тезис\ncounterargument – контраргумент\nconcede – признавать\noutweigh – перевешивать\nproportionate – соразмерный\nsafeguard – защитная мера"),
+        W("contention – основной тезис\ncounterargument – контраргумент\nconcede – признавать\nadmittedly – надо признать\noutweigh – перевешивать\nproportionate – соразмерный\nsafeguard – защитная мера"),
         T("Read and discuss", "A town proposes closing its centre to private cars on Saturdays. Supporters expect cleaner air and safer streets. Opponents point out that some disabled residents rely on cars and that shops need deliveries. A stronger proposal includes accessible permits and early delivery windows, then measures air quality and business activity. These safeguards address real objections while preserving the main aim."),
         G("Use the language in context", "[Admittedly], some residents depend on private cars.\nThe proposal should include [safeguards] for accessible travel.\nThe benefits may [outweigh] the costs if the scheme is designed carefully.\nA restriction should be [proportionate] to the problem it addresses.", bank=False),
         C("Read, think and choose", "Which objection deserves a substantive response? | The proposer has an unfashionable coat | *Some residents cannot use public transport | Every change is always bad\nWhat strengthens the proposal? | Ignoring deliveries | *Adding access permits and measuring effects | Attacking shop owners\nWhat does a concession do? | Automatically rejects the whole argument | *Acknowledges a valid concern | Replaces evidence with an insult"),
@@ -103,3 +103,32 @@ ADVANCED = [
         WR("Your turn", "Write two versions of a reply to a last-minute rewrite request: 70–90 words to a colleague and 130–160 words to a client. Preserve the same facts, limits and proposed next step. Explain in two sentences how you adjusted register without obscuring the decision."),
     ),
 ]
+
+
+# Every assessed block carries the situation it needs even when practice displays one question per screen.
+# Lexical prompts are constrained to taught language; valid alternatives are accepted in gap keys.
+_GAP_GUIDES = {
+    "lib-en-b1-decisions": "Write a full verb phrase where needed: meet (a fixed arrangement), will (a decision now), a reason linker, afford. The reading gives the situation.",
+    "lib-en-b1-stories": "Use wait in Past Continuous for the background action and answer in Past Simple for the next event. Then use meanwhile and relieved from the word list.",
+    "lib-en-b1-advice": "Complete the advice with should/could, don't have to for no obligation, could/can for an option, and routine from the word list.",
+    "lib-en-b2-media": "Use survey in Past Perfect after said to practise backshift; use misleading and sample from the vocabulary; after reported, use the -ing form of feel.",
+    "lib-en-b2-negotiation": "Use reduce in the second conditional. Complete the remaining phrases with willing, priority and feasible.",
+    "lib-en-b2-environment": "Use offer in the Present Simple passive (boxes = plural). Then use incentive, whereas, and provided/providing that.",
+    "lib-en-c1-hedging": "Use attribute in the passive after be; complete the remaining phrases with confounding, albeit and robust from the vocabulary.",
+    "lib-en-c1-argument": "Use admittedly to introduce a concession; then use safeguards, outweigh and proportionate from the vocabulary.",
+    "lib-en-c1-register": "Use undertake, however, confirm and in due course. Keep the client's deadline and the team's limits in mind.",
+}
+for _lesson in ADVANCED:
+    _reading = next(b["body"] for b in _lesson["blocks"] if b["type"] == "text" and b["title"] == "Read and discuss")
+    for _block in _lesson["blocks"]:
+        if _block["type"] in ("gap", "choice", "write"):
+            _block["context"] = _reading
+        if _block["type"] == "gap":
+            _block["instruction"] = _GAP_GUIDES[_lesson["id"]]
+        elif _block["type"] == "choice":
+            _block["instruction"] = "Use the reading above and the language focus. Choose the one option supported by the text or the situation."
+        elif _block["type"] == "listening":
+            _block["instruction"] = "First complete each sentence by listening to its short recording. Then answer the questions using the full recording. You can replay it at any point."
+        elif _block["type"] == "write":
+            _block["instruction"] = "This is an open task: several answers are possible. Follow the situation, purpose and word limit; your teacher will review the response."
+del _lesson, _reading, _block
