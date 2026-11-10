@@ -64,13 +64,14 @@ def unit(uid: str, title: str, language: str, level: str, tags: list[str], summa
             "blocks": list(blocks)}
 
 
+from .library_advanced import ADVANCED  # noqa: E402
 from .library_arabic import ARABIC  # noqa: E402
 from .library_en import ENGLISH  # noqa: E402 – содержимое использует помощники выше
 from .library_exams import EXAMS  # noqa: E402
 from .library_more import MORE  # noqa: E402
 from .library_world import WORLD  # noqa: E402
 
-LIBRARY: list[dict[str, Any]] = [*ENGLISH, *EXAMS, *WORLD, *MORE, *ARABIC]
+LIBRARY: list[dict[str, Any]] = [*ENGLISH, *ADVANCED, *EXAMS, *WORLD, *MORE, *ARABIC]
 
 # Учебники Bright: уроки, собранные по порядку в курс. cover – эмодзи для объёмной обложки (Fluent 3D).
 BOOKS: list[dict[str, Any]] = [
@@ -85,11 +86,17 @@ BOOKS: list[dict[str, Any]] = [
     {"id": "en-b1", "title": "English B1. Свободнее", "language": "en", "level": "B1", "cover": "🗺️", "color": "#FFF4C7",
      "about": "Времена в связке, условия, модальные глаголы, фразовые глаголы и разговор.",
      "units": ["lib-en-b1-present-perfect", "lib-en-b1-conditionals", "lib-en-b1-modals", "lib-en-b1-phrasal",
-               "lib-en-b1-passive", "lib-en-b1-small-talk"]},
+               "lib-en-b1-passive", "lib-en-b1-small-talk",
+               "lib-en-b1-decisions", "lib-en-b1-stories", "lib-en-b1-advice"]},
     {"id": "en-b2", "title": "English B2. Уверенно", "language": "en", "level": "B2", "cover": "🏔️", "color": "#EEEBFB",
      "about": "Сложные условные, косвенная речь, предположения, gerund и infinitive, связки и коллокации.",
      "units": ["lib-en-b2-third-conditional", "lib-en-b2-reported", "lib-en-b2-deduction", "lib-en-b2-gerund",
-               "lib-en-b2-linkers", "lib-en-b2-make-do"]},
+               "lib-en-b2-linkers", "lib-en-b2-make-do",
+               "lib-en-b2-media", "lib-en-b2-negotiation", "lib-en-b2-environment"]},
+    {"id": "en-c1", "title": "English C1. Точность и глубина", "language": "en", "level": "C1",
+     "cover": "📚", "color": "#DFF5E6",
+     "about": "Осторожные выводы, сильная аргументация и дипломатичный регистр: чтение, аудирование, письмо.",
+     "units": ["lib-en-c1-hedging", "lib-en-c1-argument", "lib-en-c1-register"]},
     {"id": "ielts", "title": "IELTS: все части экзамена", "language": "en", "level": "B1–B2", "cover": "🎓", "color": "#FCE6DE",
      "about": "Speaking, Writing Task 1 и 2, Listening и Reading: стратегии и тренировка.",
      "units": ["lib-ielts-speaking-hometown", "lib-ielts-speaking-part2", "lib-ielts-writing-trends",

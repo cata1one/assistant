@@ -1,7 +1,7 @@
 // Bright: service worker приложения. Страница всегда берётся из сети (чтобы обновления приходили сразу),
 // а без сети показывается последняя сохранённая. Файлы сборки с хешем в имени кэшируются навсегда.
 // Запросы к API (/site/) не кэшируются никогда.
-const CACHE = "bright-v1";
+const CACHE = "bright-v2-book-sun";
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/"])).catch(() => {}));

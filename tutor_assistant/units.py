@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 import re
 from typing import Any
@@ -48,7 +49,31 @@ def _questions(raw: Any) -> list[dict[str, Any]]:
         if len(options) < 2 or not isinstance(answer, int) or isinstance(answer, bool) or not 0 <= answer < len(options):
             continue
         out.append({"q": _s(q.get("q") or q.get("question"), 300), "options": options, "answer": answer,
-                    "explain": _s(q.get("explain"), 300) or None})
+                    "explain": _s(q.get("explain"), 300) or None,
+                    "speak": _s(q.get("speak"), 5000) or None})
+    return out
+
+
+
+def _audio_clip(raw: dict[str, Any]) -> dict[str, Any]:
+    """Optional recording boundaries, in seconds; invalid ranges are rejected."""
+    try:
+        start = float(raw.get("audio_start") or 0)
+        end = float(raw["audio_end"]) if raw.get("audio_end") not in (None, "") else None
+    except (TypeError, ValueError):
+        raise PortalError(400, "границы аудио — числа в секундах") from None
+    if not math.isfinite(start) or start < 0 or (end is not None and (not math.isfinite(end) or end <= start)):
+        raise PortalError(400, "конец аудио должен быть позже начала, начало — не меньше нуля")
+    return {"audio_start": start, "audio_end": end}
+
+
+def gap_speech(script: str) -> list[str]:
+    """One spoken sentence per gap, preserving the original gap order."""
+    chunks = re.split(r"(?<=[.!?…])\s+|\n+", script)
+    out = []
+    for chunk in chunks:
+        spoken = GAP_RE.sub(lambda m: m.group(1).split("|")[0], chunk).strip()
+        out.extend([spoken] * len(GAP_RE.findall(chunk)))
     return out
 
 
@@ -91,6 +116,7 @@ def validate_blocks(raw: Any) -> list[dict[str, Any]]:
             block["lang"] = _s(b.get("lang"), 10) or "en-US"
             audio = _s(b.get("audio"), 80)
             block["audio"] = audio if FILE_URL_RE.match(audio) else None
+            block.update(_audio_clip(b))
             block["questions"] = _questions(b.get("questions"))
             ok = bool(block["script"] or block["audio"]) and (bool(GAP_RE.search(block["script"])) or
                                                              bool(block["questions"]))
@@ -138,8 +164,10 @@ def student_view(unit: dict[str, Any]) -> dict[str, Any]:
             if b["type"] == "listening":
                 v["audio"] = b.get("audio")
                 v["lang"] = b.get("lang")
+                v.update(_audio_clip(b))
+                v["gap_speech"] = gap_speech(b.get("script") or "")
                 v["speak"] = GAP_RE.sub(lambda m: m.group(1).split("|")[0], b.get("script") or "")
-                v["questions"] = [{"q": q["q"], "options": q["options"]} for q in b.get("questions", [])]
+                v["questions"] = [{"q": q["q"], "options": q["options"], "speak": q.get("speak")} for q in b.get("questions", [])]
         elif b["type"] == "match":
             v["left"] = [p[0] for p in b["pairs"]]
             v["right"] = _shuffled([p[1] for p in b["pairs"]], seed)

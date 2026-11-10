@@ -478,7 +478,7 @@ class Storage:
         if "source" not in cols:  # text – набрано в чате, speech – расшифровка речи
             self._conn.execute("ALTER TABLE messages ADD COLUMN source TEXT NOT NULL DEFAULT 'text'")
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(accounts)").fetchall()}
-        for col in ("trial_until", "paid_until", "ref_code", "referred_by", "ref_used", "prefs", "pay_cfg"):  # тарифы, приглашения, оплата занятий
+        for col in ("trial_until", "paid_until", "ref_code", "referred_by", "ref_used", "prefs", "pay_cfg", "lifetime_access"):  # тарифы, приглашения, оплата занятий
             if col not in cols:
                 self._conn.execute(f"ALTER TABLE accounts ADD COLUMN {col} TEXT")
                 if col == "trial_until":  # уже зарегистрированным – те же 3 пробных дня с момента обновления

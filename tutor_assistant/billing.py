@@ -67,6 +67,9 @@ def plan_state(storage: Any, acc: dict[str, Any] | None, at: datetime | None = N
     paid, trial = _dt(who.get("paid_until")), _dt(who.get("trial_until"))
     plan = "school" if who.get("role") == "school" else "teacher"
     by_school = who["id"] != acc["id"]
+    if who.get("lifetime_access") == "1":
+        return {"state": "active", "until": None, "plan": plan, "by_school": by_school,
+                "days_left": None, "lifetime": True}
     if paid and paid > at:
         return {"state": "active", "until": paid.isoformat(timespec="seconds"), "plan": plan, "by_school": by_school,
                 "days_left": max(0, (paid - at).days)}

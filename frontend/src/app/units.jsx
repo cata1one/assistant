@@ -51,7 +51,7 @@ function fromEdit(e) {
   if (e.type === "gap") Object.assign(b, { text: e.text || "", bank: !!e.bank });
   if (e.type === "match") b.pairs = (e.pairsText || "").split("\n").map((l) => splitPair(l.trim())).filter(Boolean);
   if (e.type === "choice") b.questions = textToQuestions(e.qText || "");
-  if (e.type === "listening") Object.assign(b, { script: e.script || "", lang: e.lang || "en-US", audio: e.audio || null, questions: textToQuestions(e.qText || "") });
+  if (e.type === "listening") Object.assign(b, { script: e.script || "", lang: e.lang || "en-US", audio: e.audio || null, audio_start: Number(e.audio_start || 0), audio_end: e.audio_end === "" || e.audio_end == null ? null : Number(e.audio_end), questions: textToQuestions(e.qText || "") });
   if (e.type === "write") b.prompt = e.prompt || "";
   if (e.type === "video") Object.assign(b, { url: e.url || "", questions: textToQuestions(e.qText || "") });
   return b;
@@ -99,6 +99,10 @@ function BlockEditor({ b, onChange, audios }) {
                   {audios.map((m) => <option key={m.id} value={m.url}>{m.title}</option>)}
                 </select>
               </div>
+              {b.audio && <div className="grid gap-3 sm:grid-cols-2">
+                <label className="label">Начало фрагмента, сек.<input type="number" min="0" step="0.1" className="field" value={b.audio_start ?? 0} onChange={set("audio_start")} /></label>
+                <label className="label">Конец фрагмента, сек.<input type="number" min="0" step="0.1" className="field" placeholder="До конца записи" value={b.audio_end ?? ""} onChange={set("audio_end")} /></label>
+              </div>}
               {area("script", "Текст записи. Пропуски для ученика – в [скобках]: My name is [Anna].", 5)}
               <p className="text-xs text-ink-mute">Без аудиофайла текст прочитает голос браузера – бесплатно. Аудиофайл загрузите в «Материалы».</p>
             </>
@@ -278,20 +282,20 @@ export function UnitsPage({ embedded = false, tab: fixedTab } = {}) {
       )}
       {create && <CreateModal ai={data?.ai} onClose={() => setCreate(false)} />}
       {assign && <AssignModal unit={assign} onClose={() => setAssign(null)} />}
-      <Modal open={!!preview} onClose={() => { setPreview(null); setQuest(false); }} title={preview?.title || ""} wide>
+      <Modal lesson open={!!preview && !quest} onClose={() => { setPreview(null); setQuest(false); }} title={preview?.title || ""} wide>
         {preview && (
           <div className="grid gap-4">
-            {quest ? <Quest unit={preview.preview} onCheck={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })}
-              onSubmit={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })} onExit={() => setQuest(false)} />
-              : <>
                 <button type="button" onClick={() => setQuest(true)} className="w-fit rounded-2xl bg-mint px-6 py-2.5 font-bold text-white shadow-[0_3px_0_#146b4c] active:translate-y-0.5 active:shadow-none">Пройти как ученик</button>
                 <UnitPlayer unit={preview.preview} submitLabel="Проверить себя"
                   onSubmit={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })} />
-              </>}
             {role !== "student" && <button type="button" className="btn-brand w-fit" onClick={() => copyLib(preview)}><Copy size={14} /> Взять себе и изменить</button>}
           </div>
         )}
       </Modal>
+      {preview && quest && <Quest unit={preview.preview}
+        onCheck={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })}
+        onSubmit={(answers) => request("POST", `/site/v1/library/${preview.id}/check`, { answers })}
+        onExit={() => setQuest(false)} />}
     </>
   );
 }
