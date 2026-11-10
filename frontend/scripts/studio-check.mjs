@@ -40,11 +40,12 @@ try {
  await page.getByRole("button", { name:"Проверить", exact:true }).click();
  await page.getByRole("status").filter({ hasText:"Верно!" }).waitFor();
  await page.getByRole("button", { name:"Ещё раз", exact:true }).click();
+ await page.waitForFunction(() => !document.querySelector(".studio-option.is-correct"));
  await page.screenshot({ path:"../docs/previews/studio-desktop.png", fullPage:false });
  for (const width of [320, 390, 768]) {
   await page.setViewportSize({ width, height:1000 });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Homepage overflow at " + width);
-  if(width === 390) await page.screenshot({ path:"../docs/previews/studio-mobile.png", fullPage:true });
+  if(width === 390) await page.screenshot({ path:"../docs/previews/studio-mobile.png", fullPage:false });
  }
  await page.setViewportSize({ width:1200, height:850 });
  for(const [name,mode] of [["shot-board","board"],["shot-stickers","stickers"],["shot-today","today"],["shot-courses","courses"],["shot-lesson","lesson"]]) {
