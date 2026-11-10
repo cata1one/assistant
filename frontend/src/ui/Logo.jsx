@@ -1,19 +1,23 @@
-/** Bright: a B made from two open pages. The small mark and the wordmark share one master. */
+/**
+ * Логотип Bright: буква «B» в облачке реплики – урок это разговор.
+ * У онлайн-школ рядом пишется School.
+ */
 export function LogoMark({ size = 30, className = "" }) {
-  return <svg width={size} height={size} viewBox="0 0 64 68" aria-hidden="true" className={className}>
-      <path d="M9 7h22c12 0 19 6 19 15 0 5-3 9-7 11 6 2 10 6 10 12 0 10-8 17-21 17H9Z" fill="#293DCD"/>
-      <path d="M18 15c8-3 16-1 23 5v13c-8-5-15-7-23-4Z" fill="#FF8B72"/>
-      <path d="M18 34c9-2 17 0 25 7v14c-9-6-17-9-25-6Z" fill="#FFE07A"/>
-      <path d="M18 15v34" stroke="#FAFAF8" strokeWidth="3" strokeLinecap="round"/>
-      <circle cx="53" cy="9" r="7" fill="#F9C43B"/>
-    </svg>;
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" className={className}>
+      <path d="M12 6h40a8 8 0 0 1 8 8v30a8 8 0 0 1-8 8H30L16 62V52h-4a8 8 0 0 1-8-8V14a8 8 0 0 1 8-8z" fill="#FFD43B" />
+      <path transform="translate(3.95 1.8) scale(.85)" fill="#17171A" fillRule="evenodd" d="M19 12H34C41 12 45 16.5 45 22C45 26 43 29 39.5 30.5C44 32 47 35.5 47 41C47 47.5 42 52 34.5 52H19ZM28 19V28H33.5C36.5 28 37.5 26 37.5 23.5C37.5 21 36 19 33.5 19ZM28 35V45H34C37.5 45 39.5 43 39.5 40C39.5 37 37.5 35 34 35Z" />
+    </svg>
+  );
 }
 
 export default function Logo({ size = 30, school = false, className = "", light = false }) {
-  return <span className={`inline-flex items-center gap-2.5 ${className}`} aria-label={school ? "Bright School" : "Bright"}>
-    <LogoMark size={size} />
-    <span className={`font-display text-[1.35rem] font-extrabold leading-none tracking-[-0.055em] ${light ? "text-white" : "text-ink"}`}>
-      Bright{school && <span className={`ml-1.5 text-[0.72em] font-medium tracking-normal ${light ? "text-white/70" : "text-ink-mute"}`}>School</span>}
+  return (
+    <span className={`inline-flex items-center gap-2 ${className}`} aria-label={school ? "Bright School" : "Bright"}>
+      <LogoMark size={size} />
+      <span className={`font-display text-[1.25rem] font-bold leading-none tracking-[-0.04em] ${light ? "text-white" : "text-ink"}`}>
+        Bright{school && <span className={`ml-1 font-medium ${light ? "text-white/60" : "text-ink-mute"}`}>School</span>}
+      </span>
     </span>
-  </span>;
+  );
 }
