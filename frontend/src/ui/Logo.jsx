@@ -1,3 +1,4 @@
-export const MARK_PATHS = <g><path fill="#06469E" fillRule="evenodd" d="M4 8Q4 6 6 6H28C44 6 48 24 34 29C50 34 44 54 29 54H6Q4 54 4 52ZM19 17V24H27C32 24 32 17 27 17ZM19 34V41H27C32 41 32 34 27 34Z"/><path d="M51 15Q52.5 28.5 64 30Q52.5 31.5 51 45Q49.5 31.5 36 30Q49.5 28.5 51 15Z" fill="white" stroke="#06469E" strokeWidth="1.6" strokeLinejoin="round"/></g>;
-export function LogoMark({size=30,className=""}) { return <svg width={size} height={size} viewBox="0 0 68 64" aria-hidden="true" className={className}>{MARK_PATHS}</svg>; }
-export default function Logo({size=30,school=false,className="",light=false}) { return <span className={`inline-flex items-center gap-2 ${className}`}><img src="/static/bright-wordmark.svg" alt="Bright" style={{height:size*0.82,width:"auto",background:light?"white":undefined,borderRadius:4}} />{school && <span className={light?"text-white":"text-ink"}>School</span>}</span>; }
+export function LogoMark({ size = 30, className = "" }) {
+  return <img src="/static/favicon.svg?v=artwork5" alt="" width={size} height={size} className={className} />;
+}
+export default function Logo({size=30,school=false,className="",light=false}) { return <span className={`inline-flex items-center gap-2 ${className}`}><img src="/static/bright-wordmark.svg" alt="Bright" style={{height:size*0.82,width:"auto",objectFit:"contain",flexShrink:0,background:light?"white":undefined,borderRadius:4}} />{school && <span className={light?"text-white":"text-ink"}>School</span>}</span>; }

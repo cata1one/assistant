@@ -1,5 +1,5 @@
 // Цены в одном месте: те же числа считает сервер (tutor_assistant/billing.py).
-export const PRICE = { teacher: 290, school: 490, firstDiscount: 20, trialDays: 3 };
+export const PRICE = { teacher: 100, school: 490, firstDiscount: 20, trialDays: 3 };
 export const PERIOD_DISCOUNT = { 1: 0, 3: 10, 12: 20 };
 export const PERIOD_TITLE = { 1: "Месяц", 3: "3 месяца", 12: "Год" };
 

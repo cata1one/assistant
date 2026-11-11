@@ -390,7 +390,7 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
 function Confetti() {
   const bits = useMemo(() => Array.from({ length: 36 }, (_, k) => ({
     left: Math.random() * 100, delay: Math.random() * 0.6, dur: 1.6 + Math.random() * 1.2, rot: Math.random() * 360,
-    color: ["#FFD43B", "#1F9D63", "#2B59E8", "#E4572E", "#6E5BD8", "#FF7A8A"][k % 6],
+    color: ["#4f90eb", "#1F9D63", "#2B59E8", "#E4572E", "#6E5BD8", "#FF7A8A"][k % 6],
   })), []);
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden="true">

@@ -87,7 +87,7 @@ export function WordsHub({ route }) {
 
 const GRADES = [
   ["again", "Не помню", "bg-teach-soft text-teach-deep hover:bg-teach-tint"],
-  ["hard", "Трудно", "bg-sun-soft text-[#7a5300] hover:brightness-95"],
+  ["hard", "Трудно", "bg-sun-soft text-[#0c356e] hover:brightness-95"],
   ["good", "Помню", "bg-mint-soft text-[#146b4c] hover:brightness-95"],
   ["easy", "Легко", "bg-study-soft text-study hover:brightness-95"],
 ];
@@ -191,7 +191,7 @@ export function ParentHome() {
                     </Panel>
                     <Panel title="Домашнее задание" icon={NotebookPen}>
                       {c.last.homework.length ? <Bullets items={c.last.homework} /> : <p className="text-sm text-ink-mute">Не задано.</p>}
-                      {c.last.attention.length > 0 && <div className="mt-4"><p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-[#8A6400]"><TriangleAlert size={14} /> Обратить внимание</p><Bullets items={c.last.attention} /></div>}
+                      {c.last.attention.length > 0 && <div className="mt-4"><p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-[#0e3c7c]"><TriangleAlert size={14} /> Обратить внимание</p><Bullets items={c.last.attention} /></div>}
                     </Panel>
                   </div>
                 ) : <Panel><p className="text-ink-mute">Отчёт появится здесь после первого урока.</p></Panel>}

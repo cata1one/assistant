@@ -1,4 +1,4 @@
-"""Bright: цены 290/490, оплата тарифа через ЮKassa, оплата занятий, помощь, настроение, фото, проверка конспекта."""
+"""Bright: цены 100/490, оплата тарифа через ЮKassa, оплата занятий, помощь, настроение, фото, проверка конспекта."""
 
 import pytest
 
@@ -52,13 +52,13 @@ def pair(env):
 
 # -- цены -------------------------------------------------------------------------------------
 def test_prices_and_first_month_discount(env):
-    assert billing.PLANS["teacher"]["periods"] == {1: 290, 3: 783, 12: 2784}
+    assert billing.PLANS["teacher"]["periods"] == {1: 100, 3: 270, 12: 960}
     assert billing.PLANS["school"]["periods"] == {1: 490, 3: 1323, 12: 4704}
     tutor, _ = reg(env, "tutor", "t@mail.ru")
     acc = env["a"].storage.get_account(tutor.user_id)
     q = billing.quote(acc, 1, env["a"].storage)
-    assert (q["total"], q["percent"], q["reason"]) == (232, 20, "first")  # первый месяц на 20% дешевле
-    assert billing.quote(acc, 12, env["a"].storage)["total"] == 2784  # скидки не суммируются с годовой
+    assert (q["total"], q["percent"], q["reason"]) == (80, 20, "first")  # первый месяц на 20% дешевле
+    assert billing.quote(acc, 12, env["a"].storage)["total"] == 960  # скидки не суммируются с годовой
     school, _ = reg(env, "school", "s@mail.ru", school_name="Лингва")
     sq = billing.quote(env["a"].storage.get_account(school.user_id), 1, env["a"].storage, teachers=3)
     assert sq["total"] == 1470 and sq["reason"] is None  # школе скидка на первый месяц не положена
@@ -84,11 +84,11 @@ def test_yookassa_payment_extends_once(env):
     http = FakeYK()
     pp = PlanPayments(env["portal"], YooKassa("shop", "key", http=http))
     opt = pp.options(tutor)
-    assert opt["online"] and [q["total"] for q in opt["quotes"]] == [232, 783, 2784]
+    assert opt["online"] and [q["total"] for q in opt["quotes"]] == [80, 270, 960]
     res = pp.pay(tutor, {"months": 1, "method": "sbp"})
-    assert res["url"].startswith("https://yoomoney.ru") and res["amount"] == 232
+    assert res["url"].startswith("https://yoomoney.ru") and res["amount"] == 80
     sent = http.calls[0][2]
-    assert sent["amount"]["value"] == "232.00" and sent["payment_method_data"] == {"type": "sbp"}
+    assert sent["amount"]["value"] == "80.00" and sent["payment_method_data"] == {"type": "sbp"}
     assert sent["confirmation"]["return_url"].startswith("https://bright.example/#/app/plan")
     assert pp.check(tutor, {"id": res["id"]})["status"] == "pending"
     http.status = "succeeded"
@@ -100,7 +100,7 @@ def test_yookassa_payment_extends_once(env):
     assert billing.plan_state(env["a"].storage, env["a"].storage.get_account(tutor.user_id))["state"] == "active"
     assert any("оплата получена" in m["subject"] for m in env["mail"].sent)
     # второй платёж уже без скидки на первый месяц
-    assert billing.quote(env["a"].storage.get_account(tutor.user_id), 1, env["a"].storage)["total"] == 290
+    assert billing.quote(env["a"].storage.get_account(tutor.user_id), 1, env["a"].storage)["total"] == 100
 
 
 def test_yookassa_rejects_wrong_amount_and_foreign_payment(env):

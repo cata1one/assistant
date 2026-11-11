@@ -10,7 +10,7 @@ import { ProfileAvatar } from "./decor.jsx";
 // == Социальная батарейка ==========================================================================
 const BATTERY = [
   [1, "Села", "🪫", "bg-teach-soft text-teach-deep"],
-  [2, "Мало сил", "🔋", "bg-sun-soft text-[#7a5300]"],
+  [2, "Мало сил", "🔋", "bg-sun-soft text-[#0c356e]"],
   [3, "Нормально", "🔋", "bg-cream text-ink-soft"],
   [4, "Хорошо", "🔋", "bg-mint-soft text-[#146b4c]"],
   [5, "Полный заряд", "⚡", "bg-study-soft text-study-deep"],

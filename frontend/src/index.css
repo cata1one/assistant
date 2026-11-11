@@ -15,7 +15,7 @@
   body { @apply bg-paper font-sans text-ink antialiased; font-size: 16px; line-height: 1.55; font-feature-settings: "ss01"; }
   h1, h2, h3, h4 { @apply font-display text-ink; font-weight: 700; letter-spacing: -0.028em; line-height: 1.08; }
   h3, h4 { letter-spacing: -0.015em; line-height: 1.25; font-weight: 650; }
-  ::selection { background: #FFE58A; }
+  ::selection { background: #96bdf3; }
   :focus-visible { outline: 2px solid #17171A; outline-offset: 2px; border-radius: 8px; }
   .num { font-variant-numeric: tabular-nums lining-nums; }
   /* Колонки сетки не распирает длинным содержимым: на узком телефоне страница не уезжает вбок */
@@ -32,7 +32,7 @@
 
   .btn { @apply inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-semibold transition duration-150 select-none disabled:cursor-default disabled:opacity-45; }
   .btn-brand { @apply btn bg-ink text-white hover:bg-black active:translate-y-px; }
-  .btn-accent { @apply btn bg-sun text-ink hover:bg-[#FFCB0D] active:translate-y-px; }
+  .btn-accent { @apply btn bg-sun text-ink hover:bg-[#2576e7] active:translate-y-px; }
   .btn-dark { @apply btn bg-ink text-white hover:bg-black; }
   .btn-light { @apply btn border border-line bg-white text-ink hover:border-ink/30; }
   .btn-ghost { @apply btn text-ink-soft hover:bg-ink/5 hover:text-ink; }
@@ -67,14 +67,15 @@
 .safe-bottom { padding-bottom: max(.5rem, env(safe-area-inset-bottom)); }
 
 /* Искорка: покачивание, моргание, радость */
+.isk-body { filter: grayscale(1) brightness(1.28) drop-shadow(0 1px 2px #87a4d3); }
 .isk-live .isk-body { animation: isk-float 3.2s ease-in-out infinite; }
 .isk-live svg { animation: isk-float 3.2s ease-in-out infinite; }
 .isk-live .isk-eyes { transform-box: fill-box; transform-origin: center; animation: isk-blink 4.6s infinite; }
 .isk-joy .isk-body, .isk-joy svg { animation: isk-hop .7s cubic-bezier(.3,1.6,.5,1) 2; }
 .isk-oops .isk-body, .isk-oops svg { animation: isk-shake .5s ease-in-out 1; }
 .isk-think .isk-body, .isk-think svg { animation: isk-tilt 1.6s ease-in-out infinite; }
-.isk-sparks i { position: absolute; width: 22%; height: 22%; background: radial-gradient(circle, #FFD43B 0 30%, transparent 32%),
-  conic-gradient(from 45deg, transparent 0 20%, #FFC21A 20% 30%, transparent 30% 45%, #FFC21A 45% 55%, transparent 55% 70%, #FFC21A 70% 80%, transparent 80%);
+.isk-sparks i { position: absolute; width: 22%; height: 22%; background: radial-gradient(circle, #4f90eb 0 30%, transparent 32%),
+  conic-gradient(from 45deg, transparent 0 20%, #317de8 20% 30%, transparent 30% 45%, #317de8 45% 55%, transparent 55% 70%, #317de8 70% 80%, transparent 80%);
   clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); animation: isk-pop .9s ease-out both; }
 .isk-sparks i:nth-child(2) { animation-delay: .12s; } .isk-sparks i:nth-child(3) { animation-delay: .24s; }
 @keyframes isk-float { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-5%) rotate(2deg); } }
@@ -98,7 +99,7 @@
 }
 
 /* Bright Studio: vivid learning materials, precise typography, generous working surfaces. */
-.bright-studio { --studio-blue:#06469E; --studio-coral:#FF8B72; --studio-yellow:#FFE07A; }
+.bright-studio { --studio-blue:#06469E; --studio-coral:#FF8B72; --studio-yellow:#87b4f2; }
 .studio-serif, .bright-studio em { font-family: Georgia, "Times New Roman", serif; font-weight:400; letter-spacing:-.045em; }
 .studio-hero { display:grid; grid-template-columns:1fr 1fr; gap:52px; align-items:center; padding:142px 0 70px; }
 .studio-kicker { display:flex; align-items:center; gap:9px; font-size:10px; font-weight:750; letter-spacing:.14em; color:#51545C; }
@@ -114,7 +115,7 @@
 .studio-price { margin-top:17px; font-size:11px; color:#6A6D76; }
 .studio-lesson-note { display:flex; align-items:center; gap:13px; margin-top:34px; border-top:1px solid #DDDCD6; padding-top:21px; font-size:12px; line-height:1.7; color:#686A72; }
 .studio-lesson-note b { color:#30333C; font-weight:550; }
-.studio-note-icon { display:grid; place-items:center; width:46px; height:46px; background:#FFE07A; border-radius:12px; transform:rotate(-5deg); }
+.studio-note-icon { display:grid; place-items:center; width:46px; height:46px; background:#87b4f2; border-radius:12px; transform:none; }
 .studio-demo { position:relative; padding:20px 0 24px; }
 .studio-corner-label { display:block; margin:0 0 12px 8px; font-size:9px; letter-spacing:.13em; font-weight:650; color:#666973; }
 .studio-sample { position:relative; z-index:1; background:white; border:1px solid #D7D8E2; border-radius:18px; box-shadow:8px 10px 0 #E8EAF8,0 16px 40px -24px #161E51; overflow:hidden; }
@@ -139,15 +140,15 @@
 .studio-listen { display:flex; align-items:center; gap:7px; color:#586078; font-size:11px; }
 .studio-check { display:flex; align-items:center; gap:14px; background:#06469E; color:white; padding:10px 12px; border-radius:8px; font-size:11px; font-weight:650; }
 .studio-check:disabled { opacity:.45; }
-.studio-sample-foot { background:#FFF6D8; border-top:1px solid #EAE3CA; display:flex; align-items:center; gap:8px; padding:12px 24px; color:#6D613D; font-size:10px; }
-.studio-sample-foot .studio-dot { background:#D79D20; width:5px; height:5px; }
+.studio-sample-foot { background:#dce9fb; border-top:1px solid #cdd8e7; display:flex; align-items:center; gap:8px; padding:12px 24px; color:#425268; font-size:10px; }
+.studio-sample-foot .studio-dot { background:#326fc5; width:5px; height:5px; }
 .studio-course-stamp { position:absolute; right:-10px; bottom:-10px; z-index:2; transform:rotate(7deg); background:#FF8B72; color:#342F36; width:112px; height:112px; border-radius:50%; display:flex; flex-direction:column; justify-content:center; align-items:center; box-shadow:0 2px 0 #D96555; text-align:center; }
 .studio-course-stamp span { font-size:9px; font-weight:650; margin-bottom:5px; }
 .studio-course-stamp b { font-size:14px; line-height:1.15; letter-spacing:-.03em; }
 .studio-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:15px; padding:23px 0; border-top:1px solid #DDDCD6; border-bottom:1px solid #DDDCD6; font-size:12px; font-weight:550; }
 .studio-strip > span { display:flex; align-items:center; gap:12px; }
 .studio-pill { display:grid; place-items:center; width:28px; height:28px; border-radius:8px; font-size:10px; font-weight:750; font-style:normal; }
-.studio-pill-coral { background:#FFD9CF; color:#8F3A29; }.studio-pill-blue { background:#E4E8FC; color:#06469E; }.studio-pill-yellow { background:#FFF0B7; color:#786023; }
+.studio-pill-coral { background:#FFD9CF; color:#8F3A29; }.studio-pill-blue { background:#E4E8FC; color:#06469E; }.studio-pill-yellow { background:#bed6f8; color:#2c4870; }
 .studio-workspace { padding:78px 0 30px; }
 .studio-section-heading { display:grid; grid-template-columns:1fr 1fr; gap:14px 55px; align-items:end; margin-bottom:30px; }
 .studio-section-heading .studio-kicker { grid-column:1/-1; }
