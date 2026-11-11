@@ -14,7 +14,7 @@ export function Notice({ tone = "info", children, className = "" }) {
   const tones = {
     info: "border-line bg-white text-ink-soft",
     ok: "border-mint/25 bg-mint-soft text-[#13623E]",
-    warn: "border-sun/60 bg-sun-soft text-[#6B4E00]",
+    warn: "border-sun/60 bg-sun-soft text-[#0b2e60]",
     bad: "border-teach/25 bg-teach-tint text-teach-deep",
   };
   return <div role={tone === "bad" ? "alert" : "status"} className={`rounded-2xl border px-4 py-3 text-sm ${tones[tone]} ${className}`}>{children}</div>;
@@ -98,7 +98,7 @@ export function Stat({ value, label, href, accent }) {
 
 export function Avatar({ name, size = 40 }) {
   const initials = (name || "?").split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase();
-  const tones = ["#FFE7A3", "#D9E4FF", "#FFD9CC", "#D6F0E2", "#E8E2FF", "#F1E6D6"];
+  const tones = ["#accbf6", "#D9E4FF", "#FFD9CC", "#D6F0E2", "#E8E2FF", "#F1E6D6"];
   const tone = tones[[...(name || "")].reduce((a, c) => a + c.charCodeAt(0), 0) % tones.length];
   return (
     <span className="grid shrink-0 place-items-center rounded-full font-semibold text-ink"

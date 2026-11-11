@@ -19,7 +19,7 @@ from .storage import Storage
 
 
 def provision(settings: Settings, teacher_email: str, school_email: str, school_name: str,
-              students: int = 0) -> dict:
+              students: int = 0, release_school_email: bool = False) -> dict:
     teacher_email, school_email = teacher_email.strip().lower(), school_email.strip().lower()
     if not EMAIL_RE.match(teacher_email) or not EMAIL_RE.match(school_email) or teacher_email == school_email:
         raise ValueError("Supply two different valid owner emails.")
@@ -30,6 +30,10 @@ def provision(settings: Settings, teacher_email: str, school_email: str, school_
         # Preflight both roles before changing either owner.
         for email, role in ((teacher_email, "tutor"), (school_email, "school")):
             existing = storage.account_by_email(email)
+            if existing and existing["role"] != role and role == "school" and release_school_email:
+                # Keep the previous account and its records under a reserved, undeliverable address.
+                storage.update_account(existing["id"], email=f"detached-{secrets.token_hex(16)}@accounts.invalid")
+                continue
             if existing and existing["role"] != role:
                 raise ValueError(f"{email}: existing account has a different role; no changes made.")
         accounts = Accounts(Portal(TutorAssistant(settings, storage)))
@@ -70,8 +74,11 @@ def main() -> None:
     parser.add_argument("--school-email", required=True)
     parser.add_argument("--school-name", required=True)
     parser.add_argument("--students", type=int, default=0, help="Create this many NEW student invitations.")
+    parser.add_argument("--release-school-email", action="store_true",
+                        help="Detach the school email from its previous account, preserving that account's data.")
     args = parser.parse_args()
-    result = provision(Settings.from_env(), args.teacher_email, args.school_email, args.school_name, args.students)
+    result = provision(Settings.from_env(), args.teacher_email, args.school_email, args.school_name, args.students,
+                       release_school_email=args.release_school_email)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

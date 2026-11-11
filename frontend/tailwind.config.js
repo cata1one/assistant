@@ -19,7 +19,7 @@ export default {
         line: "#E7E5DF",
         study: { DEFAULT: "#2B59E8", deep: "#1E44C0", soft: "#E2E9FD", tint: "#F3F6FE" },
         teach: { DEFAULT: "#E4572E", deep: "#C2421D", soft: "#FCE6DE", tint: "#FEF4F0" },
-        sun: { DEFAULT: "#FFD43B", soft: "#FFF4C7" },
+        sun: { DEFAULT: "#4f90eb", soft: "#cddff9" },
         mint: { DEFAULT: "#1F9D63", soft: "#E3F4EA" },
         lilac: { DEFAULT: "#6E5BD8", soft: "#EEEBFB" },
       },

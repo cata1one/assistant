@@ -16,8 +16,8 @@ import { PACKS, stickerById } from "./stickers.js";
  * На общей доске операции уходят на сервер, а новые приходят опросом раз в ~1 секунду.
  */
 
-const COLORS = ["#17171A", "#2B59E8", "#E4572E", "#1F9D63", "#F5B400", "#6E5BD8", "#D93B3B"];
-const NOTE_COLORS = ["#FDE68A", "#FBCFE8", "#BFDBFE", "#BBF7D0", "#FED7AA", "#DDD6FE"];
+const COLORS = ["#17171A", "#2B59E8", "#E4572E", "#1F9D63", "#186adc", "#6E5BD8", "#D93B3B"];
+const NOTE_COLORS = ["#95bcf2", "#FBCFE8", "#BFDBFE", "#BBF7D0", "#FED7AA", "#DDD6FE"];
 const LOCAL_KEY = "better-board-local-v2"; // старое имя ключа: личные доски у пользователей не пропадают
 const oidGen = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -527,7 +527,7 @@ export default function Board({ boardId = null, canClear = false, canUpload = fa
     put(obj); setSelected(obj.oid); setEditing(obj.oid); setTool("select");
   };
   const addSticker = (s) => { place({ type: "sticker", sticker: s.id, w: 140, h: 140 }); };
-  const addCard = () => placeAndEdit({ type: "card", w: 220, h: 140, front: "", back: "", flipped: false, color: "#FFF4C7" });
+  const addCard = () => placeAndEdit({ type: "card", w: 220, h: 140, front: "", back: "", flipped: false, color: "#cddff9" });
   const addTable = () => placeAndEdit({ type: "table", w: 400, h: 160, head: true, cells: [["I", "you", "he / she"], ["am", "are", "is"], ["", "", ""]] });
   const addTimer = () => place({ type: "timer", w: 240, h: 150, seconds: 120, left: 120, started: null, label: "Время на задание" });
   const pagePicked = async (blob, page) => {

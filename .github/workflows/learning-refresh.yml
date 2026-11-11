@@ -1,7 +1,7 @@
 name: Bright Studio and context checks
 on:
   push:
-    branches: ["codex/bright-white-spark"]
+    branches: ["codex/bright-artwork"]
     paths-ignore: ["tutor_assistant/web/**", "frontend/public/*.png", "frontend/public/favicon.ico", "frontend/public/shot-*.webp", "docs/previews/**", "mobile/android/app/src/main/res/**"]
   workflow_dispatch:
 permissions:
@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: codex/bright-white-spark
+          ref: codex/bright-artwork
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -69,5 +69,5 @@ jobs:
           git add tutor_assistant/web frontend/public/*.png frontend/public/favicon.ico frontend/public/shot-*.webp mobile/android/app/src/main/res docs/previews tutor_assistant/units.py tutor_assistant/billing.py tutor_assistant/provision_access.py tutor_assistant/library_advanced.py tests/test_learning_refresh.py tests/test_context_support.py
           if ! git diff --cached --quiet; then
             git commit -m "Build verified Bright Studio assets, icons and screenshots [skip ci]"
-            git push origin HEAD:codex/bright-white-spark
+            git push origin HEAD:codex/bright-artwork
           fi

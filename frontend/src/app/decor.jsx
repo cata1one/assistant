@@ -13,18 +13,18 @@ export const THEMES = {
   ocean: { title: "Океан", bg: "linear-gradient(160deg,#D8F0FF 0%,#E3E9FF 60%,#FBF8F3 100%)" },
   forest: { title: "Лес", bg: "linear-gradient(160deg,#DFF5E6 0%,#EEF7D9 60%,#FBF8F3 100%)" },
   lavender: { title: "Лаванда", bg: "linear-gradient(160deg,#ECE6FF 0%,#F7E6FF 60%,#FBF8F3 100%)" },
-  candy: { title: "Конфеты", bg: "radial-gradient(circle at 20% 20%,#FFD6E7 0 12%,transparent 13%),radial-gradient(circle at 80% 30%,#D6F0FF 0 10%,transparent 11%),radial-gradient(circle at 60% 80%,#FFF1C2 0 12%,transparent 13%),#FFF7FB" },
+  candy: { title: "Конфеты", bg: "radial-gradient(circle at 20% 20%,#FFD6E7 0 12%,transparent 13%),radial-gradient(circle at 80% 30%,#D6F0FF 0 10%,transparent 11%),radial-gradient(circle at 60% 80%,#c8dcf9 0 12%,transparent 13%),#FFF7FB" },
   space: { title: "Космос", bg: "radial-gradient(circle at 15% 20%,#fff 0 1px,transparent 2px),radial-gradient(circle at 70% 40%,#fff 0 1px,transparent 2px),radial-gradient(circle at 40% 75%,#fff 0 1.5px,transparent 2.5px),linear-gradient(160deg,#E4E0FF 0%,#D9E8FF 100%)" },
   notebook: { title: "Тетрадь", bg: "linear-gradient(#FBF8F3 23px,#DCE6F7 24px) 0 0/100% 24px,#FBF8F3" },
   // Праздничные
   newyear: { title: "Новый год", bg: "radial-gradient(circle at 12% 18%,#fff 0 2px,transparent 3px),radial-gradient(circle at 42% 8%,#fff 0 3px,transparent 4px),radial-gradient(circle at 78% 22%,#fff 0 2px,transparent 3px),radial-gradient(circle at 60% 60%,#fff 0 2px,transparent 3px),radial-gradient(circle at 25% 75%,#fff 0 3px,transparent 4px),linear-gradient(170deg,#CFE6FF 0%,#E8F1FF 55%,#F7FBFF 100%)" },
   valentine: { title: "Валентин", bg: "radial-gradient(circle at 15% 25%,#FFC2D1 0 9%,transparent 10%),radial-gradient(circle at 85% 15%,#FFD6E0 0 7%,transparent 8%),radial-gradient(circle at 70% 80%,#FFC2D1 0 8%,transparent 9%),#FFF1F4" },
-  spring8: { title: "8 Марта", bg: "linear-gradient(160deg,#FFE3F0 0%,#F3E6FF 55%,#FFF7E0 100%)" },
-  easter: { title: "Пасха", bg: "linear-gradient(160deg,#FFF6D6 0%,#E4F6DE 50%,#EDE6FF 100%)" },
-  summer: { title: "Лето", bg: "linear-gradient(160deg,#FFF3C2 0%,#CDEFFF 60%,#E6FFF1 100%)" },
+  spring8: { title: "8 Марта", bg: "linear-gradient(160deg,#FFE3F0 0%,#F3E6FF 55%,#e3edfc 100%)" },
+  easter: { title: "Пасха", bg: "linear-gradient(160deg,#dae8fb 0%,#E4F6DE 50%,#EDE6FF 100%)" },
+  summer: { title: "Лето", bg: "linear-gradient(160deg,#c8dcf9 0%,#CDEFFF 60%,#E6FFF1 100%)" },
   autumn: { title: "Осень", bg: "linear-gradient(160deg,#FFE2B8 0%,#FFD0A6 50%,#F7EBD9 100%)" },
-  halloween: { title: "Хэллоуин", bg: "radial-gradient(circle at 80% 12%,#FFE9A8 0 6%,transparent 7%),linear-gradient(165deg,#E4DAFF 0%,#FFD9B8 100%)" },
-  birthday: { title: "День рождения", bg: "radial-gradient(circle at 10% 20%,#FFB8D1 0 5%,transparent 6%),radial-gradient(circle at 90% 30%,#B8E3FF 0 5%,transparent 6%),radial-gradient(circle at 50% 85%,#FFE08A 0 6%,transparent 7%),radial-gradient(circle at 30% 60%,#C8F2D6 0 4%,transparent 5%),#FFFDF5" },
+  halloween: { title: "Хэллоуин", bg: "radial-gradient(circle at 80% 12%,#b1cef6 0 6%,transparent 7%),linear-gradient(165deg,#E4DAFF 0%,#FFD9B8 100%)" },
+  birthday: { title: "День рождения", bg: "radial-gradient(circle at 10% 20%,#FFB8D1 0 5%,transparent 6%),radial-gradient(circle at 90% 30%,#B8E3FF 0 5%,transparent 6%),radial-gradient(circle at 50% 85%,#96bdf3 0 6%,transparent 7%),radial-gradient(circle at 30% 60%,#C8F2D6 0 4%,transparent 5%),#f6f9fe" },
 };
 
 const PICKABLE = Object.keys(PACKS);
