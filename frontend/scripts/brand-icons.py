@@ -1,21 +1,22 @@
 """Build install/touch/browser icons from the same vector mark used by the site."""
 from pathlib import Path
-from io import BytesIO
 
-import cairosvg
 from PIL import Image
 
 root = Path(__file__).resolve().parents[1] / "public"
-svg = (root / "favicon.svg").read_bytes()
+source = Image.open(root / "bright-mark.png").convert("RGBA")
+def image_at(size):
+    return source.resize((size, size), Image.Resampling.LANCZOS)
 for name, size in (("icon-192.png", 192), ("icon-512.png", 512),
                    ("icon-maskable-512.png", 512), ("apple-touch-icon.png", 180)):
-    cairosvg.svg2png(bytestring=svg, write_to=str(root / name), output_width=size, output_height=size)
+    image_at(size).save(root / name)
 # A maskable icon keeps the original mark inside the platform's safe zone.
 mask = Image.new("RGBA", (512, 512), "#FAFAF8")
-mark = Image.open(BytesIO(cairosvg.svg2png(bytestring=svg, output_width=320, output_height=320))).convert("RGBA")
+mark = image_at(320)
 mask.alpha_composite(mark, (96, 96))
 mask.save(root / "icon-maskable-512.png")
-image = Image.open(BytesIO(cairosvg.svg2png(bytestring=svg, output_width=64, output_height=64)))
+image_at(32).save(root / "favicon-32.png")
+image = image_at(64)
 image.save(root / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
 
 # Android launcher and splash resources use the same master artwork.
@@ -28,7 +29,7 @@ for path in res.glob("mipmap-*/*.png"):
     foreground = path.name == "ic_launcher_foreground.png"
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0) if foreground else "#FAFAF8")
     size = int(min(width, height) * (0.62 if foreground else 0.8))
-    mark = Image.open(BytesIO(cairosvg.svg2png(bytestring=svg, output_width=size, output_height=size))).convert("RGBA")
+    mark = image_at(size)
     canvas.alpha_composite(mark, ((width - size) // 2, (height - size) // 2))
     canvas.save(path)
 for path in res.glob("drawable*/splash.png"):
@@ -36,6 +37,6 @@ for path in res.glob("drawable*/splash.png"):
         width, height = current.size
     canvas = Image.new("RGBA", (width, height), "#FAFAF8")
     size = max(24, int(min(width, height) * 0.24))
-    logo = Image.open(BytesIO(cairosvg.svg2png(bytestring=svg, output_width=size, output_height=size))).convert("RGBA")
+    logo = image_at(size)
     canvas.alpha_composite(logo, ((width - size) // 2, (height - size) // 2))
     canvas.convert("RGB").save(path)
