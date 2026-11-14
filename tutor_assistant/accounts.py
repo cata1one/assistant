@@ -276,6 +276,8 @@ class Accounts:
         if not set(members) <= allowed:
             raise PortalError(403, "можно добавлять только своих учеников")
         group_id = str(body.get("id") or secrets.token_hex(12))
+        if not re.fullmatch(r"[0-9a-f]{24}", group_id):
+            raise PortalError(400, "неверный идентификатор класса")
         with self.storage._lock:
             db = self.storage._conn
             try:
