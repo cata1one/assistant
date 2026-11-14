@@ -172,9 +172,32 @@ function MobileTop({ session, title }) {
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-white/95 px-4 pb-2.5 pt-[calc(.625rem+env(safe-area-inset-top))] backdrop-blur lg:hidden">
       <a href="#/app" aria-label="Сегодня"><Logo size={26} school={session.role === "school"} /></a>
       <span className="ml-1 min-w-0 flex-1 truncate text-sm font-semibold text-ink-mute">{title}</span>
-      <a href="#/app/profile" aria-label="Профиль"><ProfileAvatar prefs={session.account?.prefs} name={session.account?.name || "?"} size={30} /></a>
+      <a href="#/app/profile" aria-label="Профиль" className="flex min-w-0 items-center gap-2"><span className="hidden max-w-24 truncate text-xs font-medium text-ink-soft sm:block">{session.account?.name}</span><ProfileAvatar prefs={session.account?.prefs} name={session.account?.name || "?"} size={30} /></a>
     </header>
   );
+}
+
+function GettingStarted({ session }) {
+  const key = `bright-guide-v1-${session.role}-${session.account?.id || "guest"}`;
+  const [closed, setClosed] = useState(() => {
+    try { return localStorage.getItem(key) === "hidden"; } catch { return false; }
+  });
+  if (closed || !["tutor", "student"].includes(session.role)) return null;
+  const steps = session.role === "tutor"
+    ? [["Ученики", "#/app/students"], ["Создать занятие", "#/app/units/new"], ["Материалы", "#/app/materials"]]
+    : [["Уроки", "#/app/lessons"], ["Домашка", "#/app/homework"], ["Слова", "#/app/words"]];
+  return <section className="mb-5 rounded-2xl border border-line bg-white p-4" aria-label="Первые шаги">
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="text-base font-semibold">Первые шаги</h2>
+      <button type="button" className="btn-ghost btn-sm" onClick={() => {
+        try { localStorage.setItem(key, "hidden"); } catch { /* dismissal still applies for this session */ }
+        setClosed(true);
+      }}>Скрыть инструкцию</button>
+    </div>
+    <div className="mt-3 flex flex-wrap gap-2">
+      {steps.map(([label, href]) => <a key={href} href={href} className="btn-light btn-sm">{label}</a>)}
+    </div>
+  </section>;
 }
 
 export default function AppShell({ route }) {
@@ -205,6 +228,7 @@ export default function AppShell({ route }) {
       <div className="min-w-0 flex-1">
         <MobileTop session={session} title={title} />
         <main className={`mx-auto px-4 pb-28 pt-5 md:px-8 md:pt-8 lg:pb-12 ${area === "board" ? "max-w-none" : "max-w-[1120px]"}`}>
+          {area === "app" && current === "home" && <GettingStarted key={session.account?.id || session.role} session={session} />}
           {["tutor", "school"].includes(session.role) && session.account?.billing?.state === "expired" && area === "app" && sub !== "plan" && <BillingStatus billing={session.account?.billing} compact />}
           {area === "lesson" && rawSub ? <Lesson id={rawSub} /> : area === "board" ? <BoardPage params={route.params} />
             : rawSub === "units" && third ? <UnitEditor id={third} /> : rawSub === "do" && third ? <DoUnit hwId={third} /> : <Page route={route} />}

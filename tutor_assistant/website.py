@@ -138,6 +138,9 @@ class Website:
         ("POST", re.compile(r"^/site/v1/account/telegram$"), "account_telegram", True),
         ("GET", re.compile(r"^/site/v1/invites/(?P<code>[\w-]+)$"), "invite_info", False),
         ("POST", re.compile(r"^/site/v1/invites/(?P<code>[\w-]+)/join$"), "invite_join", True),
+        ("GET", re.compile(r"^/site/v1/groups$"), "groups", True),
+        ("POST", re.compile(r"^/site/v1/groups$"), "group_save", True),
+        ("POST", re.compile(r"^/site/v1/groups/(?P<id>[0-9a-f]+)/delete$"), "group_delete", True),
         ("GET", re.compile(r"^/site/v1/students$"), "students", True),
         ("POST", re.compile(r"^/site/v1/students$"), "student_add", True),
         ("POST", re.compile(r"^/site/v1/students/(?P<id>[0-9a-f]+)/remove$"), "student_remove", True),
@@ -465,6 +468,15 @@ class Website:
 
     def invite_join(self, viewer: Any, code: str, **_: Any) -> Any:
         return self.accounts.join(viewer, code)
+
+    def groups(self, viewer: Any, **_: Any) -> Any:
+        return self.accounts.groups(viewer)
+
+    def group_save(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.accounts.save_group(viewer, body)
+
+    def group_delete(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.accounts.delete_group(viewer, id)
 
     def students(self, viewer: Any, **_: Any) -> Any:
         return self.accounts.students(viewer)

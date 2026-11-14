@@ -179,6 +179,18 @@ CREATE TABLE IF NOT EXISTS access_tokens (
     expires_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS study_groups (
+    id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS study_group_members (
+    group_id TEXT NOT NULL REFERENCES study_groups(id) ON DELETE CASCADE,
+    pair_id TEXT NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+    PRIMARY KEY (group_id, pair_id)
+);
+
 CREATE TABLE IF NOT EXISTS classrooms (
     chat_id TEXT PRIMARY KEY,
     url TEXT NOT NULL,
