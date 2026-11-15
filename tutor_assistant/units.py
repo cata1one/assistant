@@ -77,7 +77,7 @@ def gap_speech(script: str) -> list[str]:
     return out
 
 
-def validate_blocks(raw: Any) -> list[dict[str, Any]]:
+def validate_blocks(raw: Any, *, allow_drafts: bool = False) -> list[dict[str, Any]]:
     """Очищает блоки занятия; непонятные и пустые блоки отбрасываются."""
     if not isinstance(raw, list):
         raise PortalError(400, "blocks – список блоков")
@@ -103,7 +103,8 @@ def validate_blocks(raw: Any) -> list[dict[str, Any]]:
         elif t == "gap":
             block["text"] = _s(b.get("text"), 5000)
             block["bank"] = bool(b.get("bank"))
-            ok = bool(GAP_RE.search(block["text"]))
+            matches = list(GAP_RE.finditer(block["text"]))
+            ok = bool(matches) and all(any(answer.strip() for answer in match.group(1).split("|")) for match in matches)
         elif t == "match":
             pairs = []
             for p in (b.get("pairs") or [])[:20]:
@@ -121,8 +122,10 @@ def validate_blocks(raw: Any) -> list[dict[str, Any]]:
             block["audio"] = audio if FILE_URL_RE.match(audio) else None
             block.update(_audio_clip(b))
             block["questions"] = _questions(b.get("questions"))
-            ok = bool(block["script"] or block["audio"]) and (bool(GAP_RE.search(block["script"])) or
-                                                             bool(block["questions"]))
+            matches = list(GAP_RE.finditer(block["script"]))
+            valid_gaps = bool(matches) and all(any(answer.strip() for answer in match.group(1).split("|"))
+                                                for match in matches)
+            ok = bool(block["script"] or block["audio"]) and (valid_gaps or bool(block["questions"]))
         elif t == "write":
             block["prompt"] = _s(b.get("prompt"), 2000)
             ok = bool(block["prompt"])
@@ -131,11 +134,34 @@ def validate_blocks(raw: Any) -> list[dict[str, Any]]:
             block["url"], block["embed"] = url, video_embed(url)
             block["questions"] = _questions(b.get("questions"))  # понимание речи: вопросы после просмотра
             ok = bool(block["embed"])
-        if ok:
+        if allow_drafts:
+            editor = b.get("editor")
+            if isinstance(editor, dict):
+                block["editor"] = {key: value[:8000] for key, value in editor.items()
+                                   if key in ("itemsText", "pairsText", "qText") and isinstance(value, str)}
+                if t == "match" and "pairsText" in editor:
+                    lines = [line for line in editor["pairsText"].splitlines() if line.strip()]
+                    ok = ok and len(lines) == len(block["pairs"])
+                if t in ("choice", "listening", "video") and "qText" in editor:
+                    questions = [item for item in re.split(r"\n\s*\n", editor["qText"]) if item.strip()]
+                    ok = ok and len(questions) == len(block["questions"])
+            block["incomplete"] = not ok
             blocks.append(block)
-    if not blocks:
+        elif ok:
+            blocks.append(block)
+    if not blocks and not allow_drafts:
         raise PortalError(400, "в занятии нет ни одного заполненного задания")
     return blocks
+
+
+def require_ready(unit: dict[str, Any]) -> None:
+    """Drafts are safe to save but cannot be assigned or checked."""
+    blocks = unit.get("blocks") or []
+    if not blocks:
+        raise PortalError(400, "Добавьте и заполните хотя бы одно задание перед просмотром или выдачей ученику.")
+    for index, block in enumerate(blocks):
+        if block.get("incomplete"):
+            raise PortalError(400, f"Задание {index + 1} ещё не заполнено. Откройте его и добавьте содержание.")
 
 
 def _gap_answers(text: str) -> list[list[str]]:
@@ -458,7 +484,11 @@ class Units:
             if u["owner_id"] != acc["id"] and acc["role"] != "school":
                 raise PortalError(403, "это занятие школы – скопируйте его к себе, чтобы изменить")
         title = _s(body.get("title"), 120) or "Занятие"
-        blocks = validate_blocks(body.get("blocks"))
+        blocks = validate_blocks(body.get("blocks"), allow_drafts=True)
+        if unit_id and (not blocks or any(block.get("incomplete") for block in blocks)):
+            assigned = self.storage._one("SELECT id FROM assignments WHERE unit_id=? LIMIT 1", (unit_id,))
+            if assigned:
+                raise PortalError(400, "Это занятие уже выдано ученикам. Заполните все задания или сохраните отдельную копию.")
         shared = acc["role"] == "school" or (bool(body.get("shared")) and acc.get("org_id"))
         row = self.storage.save_unit(unit_id or secrets.token_hex(8), acc["id"], acc.get("org_id") if shared else None,
                                      title, _s(body.get("language"), 10) or None, _s(body.get("level"), 20) or None,
@@ -572,7 +602,9 @@ class Units:
 
     def check(self, viewer: Any, unit_id: str, body: Any) -> dict[str, Any]:
         """Проверка в режиме предпросмотра (для преподавателя) – ничего не сохраняет."""
-        return grade(self.accessible(viewer, unit_id), (body or {}).get("answers") if isinstance(body, dict) else None)
+        unit = self.accessible(viewer, unit_id)
+        require_ready(unit)
+        return grade(unit, (body or {}).get("answers") if isinstance(body, dict) else None)
 
     # -- занятие в домашнем задании ----------------------------------------------------------------
     def _homework_unit(self, viewer: Any, assignment_id: int) -> tuple[dict[str, Any], dict[str, Any], Any]:

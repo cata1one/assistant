@@ -43,19 +43,21 @@ const textToQuestions = (text) => text.split(/\n\s*\n/).map((chunk) => {
   if (lines.length < 3) return null;
   const opts = lines.slice(1);
   const answer = opts.findIndex((o) => o.startsWith("*"));
-  return { q: lines[0], options: opts.map((o) => o.replace(/^\*\s*/, "")), answer: Math.max(0, answer) };
+  if (answer < 0) return null;
+  return { q: lines[0], options: opts.map((o) => o.replace(/^\*\s*/, "")), answer };
 }).filter(Boolean);
 
 function toEdit(b) {
   const e = { ...b };
-  if (b.type === "words") e.itemsText = (b.items || []).map((w) => (w.translation ? `${w.word} – ${w.translation}` : w.word)).join("\n");
-  if (b.type === "match") e.pairsText = (b.pairs || []).map((p) => `${p[0]} – ${p[1]}`).join("\n");
-  if (b.type === "choice" || b.type === "listening" || b.type === "video") e.qText = questionsToText(b.questions);
+  if (b.type === "words") e.itemsText = b.editor?.itemsText ?? (b.items || []).map((w) => (w.translation ? `${w.word} – ${w.translation}` : w.word)).join("\n");
+  if (b.type === "match") e.pairsText = b.editor?.pairsText ?? (b.pairs || []).map((p) => `${p[0]} – ${p[1]}`).join("\n");
+  if (b.type === "choice" || b.type === "listening" || b.type === "video") e.qText = b.editor?.qText ?? questionsToText(b.questions);
   return e;
 }
 
 function fromEdit(e) {
   const b = { type: e.type, title: e.title || "", context: e.context || "", instruction: e.instruction || "" };
+  b.editor = Object.fromEntries(["itemsText", "pairsText", "qText"].filter((key) => typeof e[key] === "string").map((key) => [key, e[key]]));
   if (e.type === "text") b.body = e.body || "";
   if (e.type === "words") b.items = (e.itemsText || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const p = splitPair(l); return p ? { word: p[0], translation: p[1] } : { word: l }; });
   if (e.type === "gap") Object.assign(b, { text: e.text || "", bank: !!e.bank });
@@ -373,7 +375,7 @@ export function UnitEditor({ id }) {
       const body = { title: unit.title, language: unit.language, level: unit.level, blocks: unit.blocks.map(fromEdit), source: unit.source };
       const saved = await request("POST", isNew ? "/site/v1/units" : `/site/v1/units/${id}`, body);
       pendingDraft = null;
-      setMsg("Сохранено");
+      setMsg(saved.blocks.length === 0 || saved.blocks.some((block) => block.incomplete) ? "Черновик сохранён. Заполните задания перед выдачей ученику." : "Сохранено");
       if (isNew) window.location.hash = `#/app/units/${saved.id}`;
       else setUnit({ ...saved, blocks: saved.blocks.map(toEdit) });
       return saved;
@@ -409,7 +411,7 @@ export function UnitEditor({ id }) {
           {unit.blocks.map((b, i) => (
             <div key={i} id={`exercise-${i}`} className="card !p-4 md:!p-6">
               <div className="mb-3 flex items-center gap-2">
-                <span className="chip chip-brand">{i + 1}. {TYPES[b.type]}</span>
+                <span className="chip chip-brand">{i + 1}. {TYPES[b.type]}</span>{b.incomplete && <span className="text-xs text-ink-mute">Черновик — заполните задание</span>}
                 <span className="ml-auto flex gap-1">
                   <button type="button" className="btn-ghost !p-1.5" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Выше"><ArrowUp size={15} /></button>
                   <button type="button" className="btn-ghost !p-1.5" disabled={i === unit.blocks.length - 1} onClick={() => move(i, 1)} aria-label="Ниже"><ArrowDown size={15} /></button>

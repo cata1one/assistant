@@ -592,7 +592,10 @@ class Website:
 
     def unit_get(self, viewer: Any, id: str, query: dict[str, str], **_: Any) -> Any:
         if query.get("view") == "student":  # предпросмотр глазами ученика
-            return {"unit": student_view(self.units_service.accessible(viewer, id))}
+            from .units import require_ready
+            unit = self.units_service.accessible(viewer, id)
+            require_ready(unit)
+            return {"unit": student_view(unit)}
         return self.units_service.get(viewer, id)
 
     def unit_update(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:

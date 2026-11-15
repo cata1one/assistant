@@ -208,8 +208,9 @@ class Learning:
         billing.require_active(self.storage, viewer.user_id)
         unit = None
         if body.get("unit_id"):
-            from .units import Units  # занятия используют этот модуль – импорт здесь, без цикла
+            from .units import Units, require_ready  # импорт здесь, без цикла
             unit = Units(self).accessible(viewer, str(body["unit_id"]))
+            require_ready(unit)
         text = _lines(body, "text", 3000) or (f"Выполните занятие «{unit['title']}»" if unit else None)
         if not text:
             raise PortalError(400, "напишите задание")
