@@ -7,6 +7,7 @@ import Logo from "../ui/Logo.jsx";
 export const LINKS = [
   ["study", "#/study", "Ученикам"],
   ["schools", "#/schools", "Онлайн-школам"],
+  ["practice", "#/practice", "Разговорные комнаты"],
   ["market", "#/market", "Заявки"],
   ["pricing", "#/pricing", "Тарифы"],
   ["download", "#/download", "Приложение"],
@@ -28,11 +29,11 @@ export default function Navbar({ active }) {
     <header className={`fixed inset-x-0 top-0 z-40 border-b pt-[env(safe-area-inset-top)] transition-colors ${scrolled || open ? "border-line bg-paper/95 backdrop-blur" : "border-transparent bg-paper"}`}>
       <nav aria-label="Разделы" className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 md:px-6">
         <a href="#/" aria-label="Bright, на главную" className="shrink-0"><Logo school={session?.role === "school"} /></a>
-        <ul className="hidden items-center gap-1 lg:flex">
+        <ul className="hidden items-center gap-0.5 xl:flex">
           {links.map(([id, href, label]) => (
             <li key={id}>
               <a href={href} aria-current={active === id ? "page" : undefined}
-                className={`rounded-lg px-3 py-2 text-[15px] transition ${active === id ? "font-semibold text-ink" : "text-ink-soft hover:text-ink"}`}>{label}</a>
+                className={`rounded-lg px-2 py-2 text-[15px] transition ${active === id ? "font-semibold text-ink" : "text-ink-soft hover:text-ink"}`}>{label}</a>
             </li>
           ))}
         </ul>
@@ -43,13 +44,13 @@ export default function Navbar({ active }) {
               <a href="#/register?role=tutor&start=trial" className="btn-brand hidden sm:inline-flex">{PRICE.trialDays} дня бесплатно</a>
             </>
           )}
-          <button type="button" className="btn-ghost !px-2.5 lg:hidden" aria-label="Меню" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button type="button" className="btn-ghost !px-2.5 xl:hidden" aria-label="Меню" aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </nav>
       {open && (
-        <div className="border-t border-line bg-paper px-4 pb-5 pt-2 lg:hidden">
+        <div className="max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-line bg-paper px-4 pb-5 pt-2 xl:hidden">
           {[["", "#/", "Преподавателям"], ...links].map(([id, href, label]) => <a key={id} href={href} className="block border-b border-line py-3.5 text-[17px] font-medium">{label}</a>)}
           {!session?.role && (
             <div className="mt-5 grid grid-cols-2 gap-2">

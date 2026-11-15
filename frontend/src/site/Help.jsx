@@ -1,32 +1,38 @@
-import { CircleHelp, Mail, Send, X } from "lucide-react";
+import { Mail, Send, X } from "lucide-react";
 import { useState } from "react";
 import { request } from "../lib/api.js";
 import { useConfig } from "../lib/config.js";
 import { useSession } from "../lib/session.js";
 import { ErrorBox, Notice } from "../ui/kit.jsx";
+import Iskorka from "../app/Iskorka.jsx";
+import { SparkPage } from "../app/spark.jsx";
 
 // Быстрые ответы на то, о чём спрашивают чаще всего; роль берётся из кабинета, на сайте показываем общие
 const QUICK = {
   tutor: [
     ["Как добавить ученика?", "Раздел «Ученики»: впишите имя, нажмите «Добавить» и отправьте ему ссылку. Ссылка для родителя лежит рядом."],
     ["Как начать урок?", "На странице «Ученики» или на главной нажмите «Начать урок». Ученик получит уведомление и зайдёт по кнопке."],
+    ["Как создать упражнение?", "В разделе «Материалы» создайте занятие и выберите формат задания. Для пропусков заключите ответы в квадратные скобки: She [works] here."],
+    ["Где разговорные комнаты?", "Откройте главное меню сайта и выберите «Разговорные комнаты». Там можно найти или создать комнату."],
     ["Как сделать, чтобы ученики платили вовремя?", "Раздел «Оплата занятий»: укажите цену, реквизиты и когда напоминать. Всё необязательно, выключено по умолчанию."],
     ["Конспект ушёл ученику с ошибкой", "В профиле включите «Проверять конспект перед отправкой». Тогда он придёт ученику только после вашего подтверждения."],
   ],
   student: [
     ["Как зайти на урок?", "Когда преподаватель начнёт урок, на главной появится кнопка «Войти в урок». Разрешите браузеру камеру и микрофон."],
     ["Где домашнее задание?", "Раздел «Домашка». К письменной работе можно приложить фото тетради."],
+    ["Где разговорные комнаты?", "Откройте главное меню сайта и выберите «Разговорные комнаты». Выберите язык и тему или создайте свою комнату."],
     ["Где мои слова?", "Раздел «Карточки». Слова с уроков и из домашки добавляются сами, лишние можно удалить."],
     ["Как оплатить занятие?", "Если преподаватель включил оплату через платформу, на главной будет блок «Оплата занятий» с реквизитами."],
   ],
   public: [
     ["Это бесплатно?", "Ученикам и родителям бесплатно. Преподавателю 3 дня бесплатно, потом 100 ₽ в месяц."],
     ["Нужно ли что-то устанавливать?", "Нет, всё работает в браузере, в том числе на телефоне."],
+    ["Как попасть в разговорную комнату?", "Выберите «Разговорные комнаты» в меню. Для участия войдите как ученик или преподаватель."],
     ["Я забыл пароль", "На странице входа нажмите «Забыли пароль?» и введите почту: пришлёт ссылку для нового пароля."],
   ],
 };
 
-export default function Help({ className = "" }) {
+export default function Help({ inApp = false, immersive = false }) {
   const session = useSession();
   const cfg = useConfig();
   const [open, setOpen] = useState(false);
@@ -47,16 +53,18 @@ export default function Help({ className = "" }) {
   };
 
   return (
-    <div className={`relative z-30 mx-4 mt-4 flex justify-end md:fixed md:bottom-5 md:right-5 lg:right-5 ${className}`}>
+    <div className={`spark-helper fixed right-3 z-50 flex flex-col items-end md:right-5 ${immersive ? "spark-helper-immersive" : inApp ? "spark-helper-app" : "spark-helper-public"}`}>
       {open && (
-        <div role="dialog" aria-label="Помощь" className="panel absolute bottom-14 right-0 w-[min(22rem,calc(100vw-2rem))] shadow-lift animate-fadeup">
+        <div role="dialog" aria-label="Помощь Искорки" className={`panel absolute right-0 w-[min(23rem,calc(100vw-1.5rem))] overflow-hidden shadow-lift ${immersive ? "top-16" : "bottom-16"}`}>
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <p className="text-[17px] font-semibold">Помощь</p>
+            <div className="flex items-center gap-2"><Iskorka size={36} still /><div><p className="text-base font-semibold">Искорка рядом</p><p className="text-xs text-ink-mute">Помогу с вопросами о Bright</p></div></div>
             <button type="button" className="btn-ghost !p-1.5" onClick={() => setOpen(false)} aria-label="Закрыть"><X size={16} /></button>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto p-4">
+          {view === "chat" && session.role ? <><SparkPage compact /><button type="button" className="w-full border-t border-line px-4 py-2 text-sm font-semibold text-brand" onClick={() => setView("faq")}>Вопросы о платформе и поддержка</button></> : <div className="max-h-[min(60dvh,32rem)] overflow-y-auto p-4">
             {view === "faq" && (
               <>
+                {session.role ? <button type="button" className="btn-brand mb-4 w-full" onClick={() => setView("chat")}>Спросить Искорку</button>
+                  : <div className="mb-4 rounded-2xl bg-brand-tint p-3 text-sm text-ink-soft">Могу подсказать, как устроен Bright. <a className="font-semibold text-brand underline" href="#/login" onClick={() => setOpen(false)}>Войдите</a>, чтобы написать мне в чате.</div>}
                 <div className="grid gap-2">
                   {QUICK[role].map(([q, a]) => (
                     <details key={q} className="rounded-2xl border border-line px-3 py-2 text-sm">
@@ -99,12 +107,12 @@ export default function Help({ className = "" }) {
                 <button type="button" className="btn-light" onClick={() => setView("faq")}>Хорошо</button>
               </div>
             )}
-          </div>
+          </div>}
         </div>
       )}
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Помощь"
-        className="grid h-12 w-12 place-items-center rounded-full bg-ink text-white shadow-lift transition hover:bg-black">
-        {open ? <X size={20} /> : <CircleHelp size={22} />}
+      <button type="button" onClick={() => { setOpen(!open); if (!open) setView(session.role ? "chat" : "faq"); }} aria-expanded={open} aria-label={open ? "Закрыть помощь" : "Спросить Искорку"}
+        className="spark-helper-button flex h-14 items-center gap-1 rounded-full border border-[#b7cdea] bg-[#06469e] pl-1 pr-4 text-sm font-semibold text-white shadow-lift transition hover:bg-[#053477]">
+        {open ? <X className="mx-3" size={20} /> : <><Iskorka size={46} still /><span className="hidden sm:inline">Помогу!</span></>}
       </button>
     </div>
   );

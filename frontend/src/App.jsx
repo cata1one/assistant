@@ -19,10 +19,11 @@ const Pricing = lazy(() => import("./site/Pricing.jsx"));
 const Auth = lazy(() => import("./site/Auth.jsx"));
 const ReviewsPage = lazy(() => import("./site/ReviewsPage.jsx"));
 const Market = lazy(() => import("./site/Market.jsx"));
+const Practice = lazy(() => import("./site/Practice.jsx"));
 const AppShell = lazy(() => import("./app/AppShell.jsx"));
 const BookPrint = lazy(() => import("./app/books.jsx").then((m) => ({ default: m.BookPrint })));
 
-const PUBLIC = { "": Landing, teach: Landing, study: Study, schools: Schools, download: Download, privacy: Privacy, pricing: Pricing, reviews: ReviewsPage, market: Market,
+const PUBLIC = { "": Landing, teach: Landing, study: Study, schools: Schools, download: Download, privacy: Privacy, pricing: Pricing, reviews: ReviewsPage, market: Market, practice: Practice,
   login: Auth, register: Auth, join: Auth, forgot: Auth, reset: Auth };
 
 export default function App() {
@@ -67,9 +68,9 @@ export default function App() {
           </main>
           <Footer />
           <StickyCta name={name} />
-          <Help />
         </div>
       )}
+      {name !== "print" && <Help inApp={inApp} immersive={["room", "board"].includes(name)} />}
     </SessionContext.Provider>
   );
 }

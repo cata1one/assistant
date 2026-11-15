@@ -1,10 +1,9 @@
 import {
-  Activity, BookOpen, Building2, CreditCard, FileStack, GraduationCap, Home, Layers, LogOut, Menu, MessagesSquare, NotebookPen, Search,
+  Activity, BookOpen, Building2, CreditCard, FileStack, Globe2, GraduationCap, Home, Layers, LogOut, Menu, MessagesSquare, NotebookPen, Search,
   Settings, ShieldAlert, Shield, Users, Wallet, X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSession } from "../lib/session.js";
-import Help from "../site/Help.jsx";
 import { Loading } from "../ui/kit.jsx";
 import Logo from "../ui/Logo.jsx";
 import BoardPage from "./BoardPage.jsx";
@@ -38,7 +37,7 @@ const NAV = {
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["materials", "Материалы", FileStack, MaterialsHub, 0],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
-    ["practice", "Разговорные комнаты", MessagesSquare, PracticePage, 0],
+    ["practice", "Разговорные комнаты", MessagesSquare, PracticePage, 0, "#/practice"],
     ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["pay", "Оплата занятий", Wallet, LessonPayPage, 0],
     ["find", "Заявки учеников", Search, null, 0, "#/market?tab=students"],
@@ -52,7 +51,7 @@ const NAV = {
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
     ["courses", "Учебники", GraduationCap, CoursesPage, 0],
-    ["practice", "Разговорные комнаты", MessagesSquare, PracticePage, 0],
+    ["practice", "Разговорные комнаты", MessagesSquare, PracticePage, 0, "#/practice"],
     ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["find", "Найти преподавателя", Search, null, 0, "#/market"],
     ["profile", "Профиль и оформление", Settings, ProfilePage, 0],
@@ -101,17 +100,18 @@ function Sidebar({ items, current, session }) {
   return (
     <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-white px-3 py-5 lg:flex">
       <a href="#/" className="px-2.5" aria-label="На сайт"><Logo size={28} school={session.role === "school"} /></a>
+      <a href="#/" className="mt-3 px-2.5 text-sm font-medium text-brand hover:underline">← Главное меню сайта</a>
       <nav aria-label="Кабинет" className="mt-7 grid gap-0.5 overflow-y-auto">
-        {items.filter((item) => item[4] || ["materials", "homework"].includes(item[0])).map(([id, title, Icon, , , href]) => (
+        {items.filter((item) => item[4] || ["materials", "homework", "pay"].includes(item[0])).map(([id, title, Icon, , , href]) => (
           <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined}
             className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-[14px] font-medium transition ${current === id ? "bg-cream text-ink" : "text-ink-soft hover:bg-cream/70 hover:text-ink"}`}>
             <Icon size={18} strokeWidth={current === id ? 2.2 : 1.8} className={current === id ? "text-brand" : ""} />{title}
             {id === "messages" && <Badge n={unread} />}
           </a>
         ))}
-        <details open={items.some((item) => !item[4] && !["materials", "homework"].includes(item[0]) && item[0] === current)} className="mt-2">
+        <details open={items.some((item) => !item[4] && !["materials", "homework", "pay", "practice", "profile"].includes(item[0]) && item[0] === current)} className="mt-2">
           <summary className="cursor-pointer rounded-xl px-2.5 py-2 text-sm font-semibold text-ink-soft hover:bg-cream">Ещё разделы</summary>
-          <div className="grid gap-0.5">{items.filter((item) => !item[4] && !["materials", "homework"].includes(item[0])).map(([id, title, Icon, , , href]) => (
+          <div className="grid gap-0.5">{items.filter((item) => !item[4] && !["materials", "homework", "pay", "practice", "profile"].includes(item[0])).map(([id, title, Icon, , , href]) => (
             <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium ${current === id ? "bg-cream text-ink" : "text-ink-soft hover:bg-cream/70"}`}>
               <Icon size={18} />{title}
             </a>
@@ -124,13 +124,14 @@ function Sidebar({ items, current, session }) {
             {{ trial: `Пробный период: ${b.days_left + 1} дн.`, active: `Тариф до ${new Date(b.until).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}`, expired: "Тариф закончился. Продлить" }[b.state]}
           </a>
         )}
-        <a href="#/app/profile" className="flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-cream">
+        <div className="flex items-center gap-3 rounded-xl px-2.5 py-2">
           <ProfileAvatar prefs={session.account?.prefs} name={session.account?.name || "?"} size={34} />
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold">{session.account?.name || "Вход через Telegram"}</span>
             <span className="block truncate text-xs text-ink-mute">{session.account?.org?.name || ROLE_TITLE[session.role]}</span>
           </span>
-        </a>
+          <a href="#/app/profile" aria-label="Настройки профиля" title="Настройки профиля" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-cream hover:text-brand"><Settings size={19} /></a>
+        </div>
         <button type="button" onClick={() => { session.logout(); window.location.hash = "#/"; }} className="flex items-center gap-2 px-2.5 py-1 text-xs font-medium text-ink-mute hover:text-ink"><LogOut size={13} /> Выйти</button>
       </div>
     </aside>
@@ -141,7 +142,7 @@ function Sidebar({ items, current, session }) {
 function TabBar({ items, current, unread }) {
   const [open, setOpen] = useState(false);
   const tabs = items.filter((x) => x[4]).sort((a, b) => a[4] - b[4]);
-  const more = items.filter((x) => !x[4]);
+  const more = items.filter((x) => !x[4] && x[0] !== "practice");
   useEffect(() => setOpen(false), [current]);
   const moreActive = more.some(([id]) => id === current);
   return (
@@ -183,7 +184,9 @@ function MobileTop({ session, title }) {
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-white/95 px-4 pb-2.5 pt-[calc(.625rem+env(safe-area-inset-top))] backdrop-blur lg:hidden">
       <a href="#/app" aria-label="Сегодня"><Logo size={26} school={session.role === "school"} /></a>
       <span className="ml-1 min-w-0 flex-1 truncate text-sm font-semibold text-ink-mute">{title}</span>
-      <a href="#/app/profile" aria-label="Профиль" className="flex min-w-0 items-center gap-2"><span className="hidden max-w-24 truncate text-xs font-medium text-ink-soft sm:block">{session.account?.name}</span><ProfileAvatar prefs={session.account?.prefs} name={session.account?.name || "?"} size={30} /></a>
+      <a href="#/" aria-label="Главное меню сайта" title="Главное меню сайта" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Globe2 size={19} /></a>
+      {["tutor", "school"].includes(session.role) && <a href="#/app/pay" aria-label="Оплата занятий" title="Оплата занятий" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Wallet size={19} /></a>}
+      <a href="#/app/profile" aria-label="Настройки профиля" className="flex min-w-0 items-center gap-2"><span className="hidden max-w-24 truncate text-sm font-medium text-ink-soft sm:block">{session.account?.name}</span><ProfileAvatar prefs={session.account?.prefs} name={session.account?.name || "?"} size={30} /><Settings size={18} /></a>
     </header>
   );
 }
@@ -246,7 +249,6 @@ export default function AppShell({ route }) {
         </main>
       </div>
       <TabBar items={items} current={current} unread={session.me?.unread || 0} />
-      {area !== "board" && <Help className="hidden lg:block" />}
     </div>
   );
 }
