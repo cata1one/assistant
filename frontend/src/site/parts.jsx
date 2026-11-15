@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useConfig } from "../lib/config.js";
 import { firstMonth, PERIOD_DISCOUNT, PERIOD_TITLE, perDay, periodTotal, PRICE, rub } from "../lib/pricing.js";
 
 export function Section({ label, title, text, children, className = "", center, id }) {
@@ -66,6 +67,7 @@ const PERIODS = [1, 3, 12];
 
 /** Цена периода: крупно в месяц, ниже сумма и «сколько в день». Первый месяц преподавателя показан со скидкой. */
 export function PricingCards({ inApp }) {
+  const cfg = useConfig();
   const [months, setMonths] = useState(1);
   return (
     <>
@@ -113,15 +115,15 @@ export function PricingCards({ inApp }) {
               {!inApp && (
                 <div className="mt-6 grid gap-2">
                   <a href={`#/register?role=${p.id === "school" ? "school" : "tutor"}&start=trial`} className={p.hot ? "btn-brand" : "btn-light"}>Попробовать {PRICE.trialDays} дня бесплатно</a>
-                  <a href={`#/register?role=${p.id === "school" ? "school" : "tutor"}&start=pay`} className="text-center text-sm font-semibold text-ink-mute hover:text-ink">
-                    {p.id === "teacher" ? `Сразу оплатить за ${firstMonth()} ₽` : "Сразу оплатить"}</a>
+                  {cfg.online_payments && <a href={`#/register?role=${p.id === "school" ? "school" : "tutor"}&start=pay`} className="text-center text-sm font-semibold text-ink-mute hover:text-ink">
+                    {p.id === "teacher" ? `Сразу оплатить за ${firstMonth()} ₽` : "Сразу оплатить"}</a>}
                 </div>
               )}
             </div>
           );
         })}
       </div>
-      <p className="mt-4 text-sm text-ink-mute">Ученики и родители пользуются платформой бесплатно. Оплата картой или через СБП.</p>
+      <p className="mt-4 text-sm text-ink-mute">Ученики и родители пользуются платформой бесплатно. {cfg.online_payments ? "Оплата картой или через СБП." : "Онлайн-оплата временно недоступна."}</p>
     </>
   );
 }

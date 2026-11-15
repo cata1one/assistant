@@ -47,7 +47,7 @@ export default function Help({ className = "" }) {
   };
 
   return (
-    <div className={`fixed bottom-20 right-4 z-30 md:bottom-5 lg:right-5 ${className}`}>
+    <div className={`relative z-30 mx-4 mt-4 flex justify-end md:fixed md:bottom-5 md:right-5 lg:right-5 ${className}`}>
       {open && (
         <div role="dialog" aria-label="Помощь" className="panel absolute bottom-14 right-0 w-[min(22rem,calc(100vw-2rem))] shadow-lift animate-fadeup">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">

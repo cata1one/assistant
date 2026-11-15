@@ -3,12 +3,25 @@ import { request } from "../lib/api.js";
 import { LANGS, langById } from "../lib/langs.js";
 import { ErrorBox } from "../ui/kit.jsx";
 
-const prompts = [
+const englishPrompts = [
   "Describe a place you would like to visit and explain why.",
   "What skill would you like to learn? Ask someone a follow-up question.",
   "Two truths and a lie: say three things about yourself. Let others guess.",
   "Choose an object in your room and describe it without naming it.",
 ];
+const promptsByLanguage = {
+  en: englishPrompts,
+  zh: ["介绍一个你喜欢的地方。", "你想学习什么新技能？为什么？", "描述一件东西，让大家猜一猜。"],
+  es: ["Describe un lugar que te gusta.", "¿Qué habilidad nueva te gustaría aprender y por qué?", "Describe un objeto sin decir su nombre."],
+  fr: ["Décrivez un endroit que vous aimez.", "Quelle nouvelle compétence aimeriez-vous apprendre et pourquoi ?", "Décrivez un objet sans dire son nom."],
+  it: ["Descrivi un posto che ti piace.", "Quale nuova abilità vorresti imparare e perché?", "Descrivi un oggetto senza dire il suo nome."],
+  pt: ["Descreva um lugar de que você gosta.", "Que habilidade nova você gostaria de aprender e por quê?", "Descreva um objeto sem dizer o nome."],
+  ar: ["صِف مكاناً تحبه.", "ما المهارة الجديدة التي تريد تعلمها ولماذا؟", "صِف شيئاً دون أن تذكر اسمه."],
+  sr: ["Опиши место које волиш.", "Коју нову вештину желиш да научиш и зашто?", "Опиши предмет без његовог имена."],
+  hi: ["अपनी पसंद की किसी जगह का वर्णन करें।", "आप कौन सा नया कौशल सीखना चाहते हैं और क्यों?", "किसी वस्तु का नाम लिए बिना उसका वर्णन करें।"],
+  el: ["Περιγράψτε ένα μέρος που σας αρέσει.", "Ποια νέα δεξιότητα θέλετε να μάθετε και γιατί;", "Περιγράψτε ένα αντικείμενο χωρίς να πείτε το όνομά του."],
+};
+
 
 function Video({ stream, muted = false, name }) {
   const ref = useRef(null);
@@ -21,6 +34,8 @@ function LiveRoom({ id, onExit }) {
   const [error, setError] = useState(null);
   const [local, setLocal] = useState(null);
   const [remote, setRemote] = useState({});
+  const [audioOn, setAudioOn] = useState(true);
+  const [videoOn, setVideoOn] = useState(true);
   useEffect(() => {
     let alive = true, timer, stream, cursor = 0, polling = false;
     const peers = new Map();
@@ -93,8 +108,13 @@ function LiveRoom({ id, onExit }) {
   return <div className="grid gap-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1>{room?.title || "Комната"}</h1><p className="text-ink-mute">{room?.topic}</p></div><button className="btn-light" onClick={onExit}>Выйти</button></div>
     <ErrorBox error={error} />
+    {room && <p className="text-sm text-ink-soft">В комнате: {room.peers.map((p) => p.name).join(", ")} · {langById(room.language).flag} {langById(room.language).title}</p>}
+    {local && <div className="flex flex-wrap gap-2">
+      <button type="button" className="btn-light btn-sm" aria-pressed={audioOn} onClick={() => { const next = !audioOn; local.getAudioTracks().forEach((track) => { track.enabled = next; }); setAudioOn(next); }}>{audioOn ? "Выключить микрофон" : "Включить микрофон"}</button>
+      <button type="button" className="btn-light btn-sm" aria-pressed={videoOn} onClick={() => { const next = !videoOn; local.getVideoTracks().forEach((track) => { track.enabled = next; }); setVideoOn(next); }}>{videoOn ? "Выключить камеру" : "Включить камеру"}</button>
+    </div>}
     <div className="grid gap-3 sm:grid-cols-2">{local && <Video stream={local} name="Вы" muted />}{Object.entries(remote).map(([pid, stream]) => <Video key={pid} stream={stream} name={room?.peers.find((p) => p.id === pid)?.name || "Участник"} />)}</div>
-    <div className="card"><p className="font-semibold">Игра для разговора</p><p className="my-3">{prompts[(room?.prompt || 0) % prompts.length]}</p><button className="btn-light btn-sm" onClick={() => request("POST", `/site/v1/practice/${id}/prompt`, {}).catch(setError)}>Другая тема</button></div>
+    <div className="card"><p className="font-semibold">Игра для разговора</p><p className="my-3">{(promptsByLanguage[room?.language] || englishPrompts)[(room?.prompt || 0) % (promptsByLanguage[room?.language] || englishPrompts).length]}</p><button className="btn-light btn-sm" onClick={() => request("POST", `/site/v1/practice/${id}/prompt`, {}).catch(setError)}>Другая тема</button></div>
   </div>;
 }
 

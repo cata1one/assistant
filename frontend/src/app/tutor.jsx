@@ -119,7 +119,7 @@ export function TutorHome() {
                   <span className="h-2 w-2 shrink-0 rounded-full bg-teach" /><span className="min-w-0 flex-1 text-[15px]">{t.text}</span><span className="text-[13px] font-medium text-ink-mute">{t.cta}</span>
                 </a></li>))}
               </ul>
-            ) : <p className="py-1 text-sm text-ink-mute">Всё сделано. Хорошего дня!</p>}
+            ) : <p className="py-1 text-sm text-ink-mute">{students.length ? "Пока нет заданий на проверку или новых сообщений." : "Здесь появятся задания и сообщения, когда ученик подключится."}</p>}
           </Panel>
           <div className="grid grid-cols-2 gap-3">
             <Stat value={students.length} label="учеников" href="#/app/students" />
@@ -168,6 +168,12 @@ function StudyGroups({ students }) {
       {(data?.groups || []).map((g) => <div key={g.id} className="rounded-xl border border-line p-3">
         <p className="font-semibold">{g.title}</p>
         <p className="text-sm text-ink-mute">{g.members.map((id) => students.find((s) => s.pair_id === id)?.name).filter(Boolean).join(", ") || "Пока нет учеников"}</p>
+        {g.members.length > 0 && <details className="mt-3 border-t border-line pt-3"><summary className="cursor-pointer text-sm font-semibold">Ученики класса</summary>
+          <div className="mt-2 grid gap-2">{g.members.map((id) => students.find((student) => student.pair_id === id)).filter(Boolean).map((student) => <div key={student.pair_id} className="flex flex-wrap items-center gap-3 rounded-xl bg-cream p-2">
+            <ProfileAvatar photo={student.photo} name={student.name} size={32} /><span className="min-w-0 flex-1 text-sm font-medium">{student.name}</span>
+            {student.joined ? <StartButton chatId={student.chat_id} active={student.active_lesson} small /> : <CopyLink label="Приглашение" url={student.invite?.url} />}
+          </div>)}</div></details>}
+        <div className="mt-3 flex flex-wrap gap-2"><a href="#/app/units/new" className="btn-light btn-sm">Создать урок</a><a href="#/app/materials?tab=units" className="btn-light btn-sm">Мои занятия</a></div>
         <div className="mt-2 flex gap-2"><button type="button" className="btn-light btn-sm" onClick={() => setDraft(g)}>Изменить</button>
         <button type="button" className="btn-ghost btn-sm" onClick={() => remove(g)}>Удалить</button></div>
       </div>)}
@@ -391,3 +397,4 @@ export function PlanPage() {
     </>
   );
 }
+

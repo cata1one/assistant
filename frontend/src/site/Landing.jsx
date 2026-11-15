@@ -2,6 +2,7 @@ import { ArrowRight, ArrowUpRight, Check, Headphones, Play, Smartphone } from "l
 import { useState } from "react";
 import { firstMonth, PRICE } from "../lib/pricing.js";
 import { useSession } from "../lib/session.js";
+import { useConfig } from "../lib/config.js";
 import { copy } from "../ui/kit.jsx";
 import Logo, { LogoMark } from "../ui/Logo.jsx";
 import { speak } from "../app/player.jsx";
@@ -45,7 +46,7 @@ function LessonSample() {
   return <div className="studio-sample">
     <div className="studio-sample-top"><Logo size={24} /><span>Попробуйте прямо здесь</span><span className="studio-level">B1</span></div>
     <div className="studio-sample-body">
-      <div className="studio-sample-label"><span>01 / 03</span><span>ENGLISH IN REAL LIFE</span></div>
+      <div className="studio-sample-label"><span>ПРИМЕР ЗАДАНИЯ</span><span>ENGLISH IN REAL LIFE</span></div>
       <h2>A little change<br /><em>of plans.</em></h2>
       <p className="studio-context">The train leaves at six. We booked our tickets yesterday and agreed on a meeting place.</p>
       <p className="studio-question">Which sentence describes our arrangement?</p>
@@ -67,6 +68,7 @@ function LessonSample() {
 
 export default function Landing() {
   const session = useSession();
+  const cfg = useConfig();
   const ref = session?.account?.referral?.code;
   const [copied, setCopied] = useState(false);
   const share = () => { copy(ref ? `${window.location.origin}/#/register?role=tutor&ref=${ref}` : window.location.origin); setCopied(true); };
@@ -184,7 +186,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <Section label="Тарифы" title={`${PRICE.teacher} ₽ в месяц, всё включено`} text={`Попробуйте ${PRICE.trialDays} дня бесплатно или оплатите сразу: первый месяц стоит ${firstMonth()} ₽.`}>
+      <Section label="Тарифы" title={`${PRICE.teacher} ₽ в месяц, всё включено`} text={cfg.online_payments ? `Попробуйте ${PRICE.trialDays} дня бесплатно или оплатите сразу: первый месяц стоит ${firstMonth()} ₽.` : `Попробуйте ${PRICE.trialDays} дня бесплатно. Онлайн-оплата пока недоступна.`}>
         <PricingCards />
       </Section>
 
@@ -195,7 +197,7 @@ export default function Landing() {
           ["Записывается ли видео урока?", "Нет. Звук расшифровывается в текст для конспекта, видео и аудио не сохраняются. Ученик видит предупреждение и соглашается перед входом."],
           ["Можно ли проверить конспект до отправки ученику?", "Да. Конспект уходит ученику и родителю только после того, как вы нажмёте «Отправить». Любой пункт можно поправить."],
           ["Как перенести материалы с другой платформы?", "Выгрузите материалы файлами (PDF, картинки, аудио) и перетащите их в «Материалы» пачкой. Ссылки на видео просто вставьте."],
-          ["Сколько стоит?", `Преподавателю ${PRICE.teacher} ₽ в месяц без ограничений по ученикам, школе ${PRICE.school} ₽ за преподавателя. Первые ${PRICE.trialDays} дня бесплатно, при оплате сразу первый месяц стоит ${firstMonth()} ₽.`],
+          ["Сколько стоит?", `Преподавателю ${PRICE.teacher} ₽ в месяц без ограничений по ученикам, школе ${PRICE.school} ₽ за преподавателя. Первые ${PRICE.trialDays} дня бесплатно.${cfg.online_payments ? ` При оплате сразу первый месяц стоит ${firstMonth()} ₽.` : " Онлайн-оплата пока недоступна."}`],
         ]} />
       </Section>
 
