@@ -286,7 +286,7 @@ class Website:
         elif path == "/sw.js":  # service worker должен лежать в корне, иначе не управляет страницами сайта
             name = "sw.js"
         elif path == "/favicon.ico":
-            name = "favicon.svg"
+            name = "favicon.ico"
         else:
             m = STATIC_RE.match(path)
             if not m:
