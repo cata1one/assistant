@@ -25,6 +25,7 @@ def test_practice_room_discovery_capacity_and_signal_access():
         rooms.join(viewer, room_id)
     with pytest.raises(PortalError):
         rooms.join(viewers[4], room_id)
+    assert rooms.state(viewers[1], room_id)["language"] == "en"
     rooms.signal(viewers[0], room_id, {"to": viewers[1].user_id, "kind": "offer", "data": {}})
     assert len(rooms.state(viewers[1], room_id)["signals"]) == 1
     assert rooms.state(viewers[2], room_id)["signals"] == []
