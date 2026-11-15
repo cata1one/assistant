@@ -102,6 +102,7 @@ class Website:
         ("POST", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)/join$"), "practice_join", True),
         ("POST", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)/leave$"), "practice_leave", True),
         ("GET", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)$"), "practice_state", True),
+        ("POST", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)/prompt$"), "practice_prompt", True),
         ("POST", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)/signal$"), "practice_signal", True),
         ("POST", re.compile(r"^/site/v1/rooms$"), "room_start", True),
         ("GET", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)$"), "room_state", True),
@@ -376,6 +377,9 @@ class Website:
         except (TypeError, ValueError):
             raise PortalError(400, "неверный номер сигнала") from None
         return self.practice.state(viewer, id, since)
+
+    def practice_prompt(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.practice.next_prompt(viewer, id)
 
     def practice_signal(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
         return self.practice.signal(viewer, id, body)

@@ -21,7 +21,6 @@ function LiveRoom({ id, onExit }) {
   const [error, setError] = useState(null);
   const [local, setLocal] = useState(null);
   const [remote, setRemote] = useState({});
-  const [prompt, setPrompt] = useState(0);
   useEffect(() => {
     let alive = true, timer, stream, cursor = 0, polling = false;
     const peers = new Map();
@@ -95,7 +94,7 @@ function LiveRoom({ id, onExit }) {
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1>{room?.title || "Комната"}</h1><p className="text-ink-mute">{room?.topic}</p></div><button className="btn-light" onClick={onExit}>Выйти</button></div>
     <ErrorBox error={error} />
     <div className="grid gap-3 sm:grid-cols-2">{local && <Video stream={local} name="Вы" muted />}{Object.entries(remote).map(([pid, stream]) => <Video key={pid} stream={stream} name={room?.peers.find((p) => p.id === pid)?.name || "Участник"} />)}</div>
-    <div className="card"><p className="font-semibold">Идея для разговора</p><p className="my-3">{prompts[prompt % prompts.length]}</p><button className="btn-light btn-sm" onClick={() => setPrompt((n) => n + 1)}>Другая тема</button></div>
+    <div className="card"><p className="font-semibold">Игра для разговора</p><p className="my-3">{prompts[(room?.prompt || 0) % prompts.length]}</p><button className="btn-light btn-sm" onClick={() => request("POST", `/site/v1/practice/${id}/prompt`, {}).catch(setError)}>Другая тема</button></div>
   </div>;
 }
 

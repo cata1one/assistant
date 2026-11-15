@@ -70,7 +70,7 @@ class PracticeRooms:
             rid = secrets.token_hex(12)
             self._rooms[rid] = {"id": rid, "title": title, "topic": topic, "language": language, "level": level,
                                 "owner": viewer.user_id, "peers": {viewer.user_id: {"name": account["name"], "seen": time.monotonic()}},
-                                "signals": [], "next": 1}
+                                "signals": [], "next": 1, "prompt": 0}
             return {"id": rid}
 
     def join(self, viewer, rid):
@@ -96,7 +96,7 @@ class PracticeRooms:
             return {"id": rid, "title": room["title"], "topic": room["topic"], "me": viewer.user_id,
                     "peers": [{"id": k, "name": v["name"]} for k, v in room["peers"].items()],
                     "signals": [s for s in room["signals"] if s["to"] == viewer.user_id and s["id"] > since],
-                    "ice_servers": self.classroom.ice_servers()}
+                    "ice_servers": self.classroom.ice_servers(), "prompt": room["prompt"]}
 
     def signal(self, viewer, rid, body):
         self._account(viewer)
@@ -114,6 +114,16 @@ class PracticeRooms:
             room["next"] += 1
             del room["signals"][:-400]
             return {"ok": True}
+
+    def next_prompt(self, viewer, rid):
+        self._account(viewer)
+        with self._lock:
+            self._clean()
+            room = self._rooms.get(rid)
+            if not room or viewer.user_id not in room["peers"]:
+                raise PortalError(403, "сначала войдите в комнату")
+            room["prompt"] += 1
+            return {"prompt": room["prompt"]}
 
     def leave(self, viewer, rid):
         self._account(viewer)

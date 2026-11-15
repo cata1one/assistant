@@ -30,6 +30,10 @@ def test_practice_room_discovery_capacity_and_signal_access():
     assert rooms.state(viewers[2], room_id)["signals"] == []
     with pytest.raises(PortalError):
         rooms.signal(viewers[5], room_id, {"to": viewers[1].user_id, "kind": "offer", "data": {}})
+    rooms.next_prompt(viewers[1], room_id)
+    assert rooms.state(viewers[2], room_id)["prompt"] == 1
+    with pytest.raises(PortalError):
+        rooms.next_prompt(viewers[5], room_id)
     for viewer in viewers[:4]:
         rooms.leave(viewer, room_id)
     assert rooms.list(viewers[4], {})["rooms"] == []
