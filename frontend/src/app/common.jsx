@@ -183,11 +183,14 @@ export function BoardsPage() {
 // == Сообщения ==============================================================================
 const KIND = { student: "Ученик и преподаватель", parent: "Родитель и преподаватель", school: "Школа" };
 
-export function MessagesPage() {
+export function MessagesPage({ route }) {
   const { data, error, reload } = useApi("/site/v1/chats");
-  const [active, setActive] = useState(null);
+  const requested = route?.params?.get("chat") || null;
+  const [active, setActive] = useState(requested);
   const chats = data?.chats || [];
   const wide = typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
+  useEffect(() => { if (requested) setActive(requested); }, [requested]);
+  useEffect(() => { if (data && active && !chats.some((c) => c.chat_id === active)) setActive(null); }, [data, active]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!active && chats[0] && wide) setActive(chats[0].chat_id); }, [chats, active, wide]);
   const current = chats.find((c) => c.chat_id === active);
   return (
@@ -211,7 +214,7 @@ export function MessagesPage() {
               </li>
             ))}
           </ul>
-          {active && <Conversation key={active} chatId={active} title={current?.title} onBack={() => { setActive(null); reload(); }} />}
+          {current && <Conversation key={active} chatId={active} title={current.title} onBack={() => { setActive(null); reload(); }} />}
         </div>
       )}
     </>

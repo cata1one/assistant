@@ -101,7 +101,11 @@ function Sidebar({ items, current, session }) {
     <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-white px-3 py-5 lg:flex">
       <a href="#/" className="px-2.5" aria-label="На сайт"><Logo size={28} school={session.role === "school"} /></a>
       <a href="#/" className="mt-3 px-2.5 text-sm font-medium text-brand hover:underline">← Главное меню сайта</a>
-      <nav aria-label="Кабинет" className="mt-7 grid gap-0.5 overflow-y-auto">
+      <nav aria-label="Кабинет" className="mt-5 min-h-0 flex-1 overflow-y-auto">
+        {session.role === "tutor" ? <div className="grid gap-0.5">{[["Главное", ["home", "students", "lessons", "materials", "messages"]], ["Работа с учениками", ["homework", "pay"]], ["Другие возможности", ["practice", "spark", "find", "plan"]]].map(([group, ids]) => <div key={group} className="mb-3">
+          <p className="px-2.5 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-ink-mute">{group}</p>
+          {ids.map((id) => items.find((item) => item[0] === id)).filter(Boolean).map(([id, title, Icon, , , href]) => <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-[14px] font-medium transition ${current === id ? "bg-brand-tint text-brand-deep" : "text-ink-soft hover:bg-cream/70 hover:text-ink"}`}><Icon size={18} />{title}{id === "messages" && <Badge n={unread} />}</a>)}
+        </div>)}</div> : <div className="grid gap-0.5">
         {items.filter((item) => item[4] || ["materials", "homework", "pay"].includes(item[0])).map(([id, title, Icon, , , href]) => (
           <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined}
             className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-[14px] font-medium transition ${current === id ? "bg-cream text-ink" : "text-ink-soft hover:bg-cream/70 hover:text-ink"}`}>
@@ -117,6 +121,7 @@ function Sidebar({ items, current, session }) {
             </a>
           ))}</div>
         </details>
+        </div>}
       </nav>
       <div className="mt-auto grid gap-2">
         {["tutor", "school"].includes(session.role) && b?.state && b.state !== "free" && !b.by_school && (
@@ -142,14 +147,14 @@ function Sidebar({ items, current, session }) {
 function TabBar({ items, current, unread }) {
   const [open, setOpen] = useState(false);
   const tabs = items.filter((x) => x[4]).sort((a, b) => a[4] - b[4]);
-  const more = items.filter((x) => !x[4] && x[0] !== "practice");
+  const more = items.filter((x) => !x[4]);
   useEffect(() => setOpen(false), [current]);
   const moreActive = more.some(([id]) => id === current);
   return (
     <>
       {open && (
         <div className="fixed inset-0 z-40 bg-ink/30 lg:hidden" onClick={() => setOpen(false)}>
-          <div className="absolute inset-x-0 bottom-0 rounded-t-4xl bg-white px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3 animate-fadeup" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-4xl bg-white px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3 animate-fadeup" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
             <nav aria-label="Ещё" className="grid grid-cols-3 gap-1.5">
               {more.map(([id, title, Icon, , , href]) => (
