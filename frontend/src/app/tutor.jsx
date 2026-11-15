@@ -18,10 +18,16 @@ import { LANGS } from "../lib/langs.js";
 
 function CopyLink({ label, url }) {
   const [done, setDone] = useState(false);
+  const [failed, setFailed] = useState(false);
   if (!url) return null;
   return (
-    <button type="button" className="btn-light btn-sm" onClick={() => { copy(url); setDone(true); setTimeout(() => setDone(false), 1600); }}>
-      {done ? <Check size={14} /> : <Copy size={14} />} {done ? "Скопировано" : label}
+    <button type="button" className="btn-light btn-sm" onClick={async () => {
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+        await navigator.clipboard.writeText(url); setFailed(false); setDone(true); setTimeout(() => setDone(false), 1600);
+      } catch { setFailed(true); }
+    }}>
+      {done ? <Check size={14} /> : <Copy size={14} />} {done ? "Скопировано" : failed ? "Выделите и скопируйте вручную" : label}
     </button>
   );
 }
@@ -230,9 +236,11 @@ export function StudentsPage() {
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 font-semibold">{s.name} <MoodChip mood={s.mood} /></p>
                 <p className="text-[13px] text-ink-mute">{s.joined ? "подключён" : "ещё не подключился"} · родителей: {s.parents}{s.balance ? ` · оплачено занятий: ${s.balance}` : ""}</p>
+                {!s.joined && s.invite?.code && <p className="mt-1 break-all text-sm">Код ученика: <strong>{s.invite.code}</strong></p>}
               </div>
               <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
                 {s.joined ? <StartButton chatId={s.chat_id} active={s.active_lesson} small /> : <CopyLink label="Ссылка ученику" url={s.invite?.url} />}
+                {!s.joined && <CopyLink label="Скопировать код" url={s.invite?.code} />}
                 <CopyLink label="Родителю" url={s.parent_invite?.url} />
                 {s.joined && <button type="button" className="btn-ghost btn-sm" onClick={() => setWords(s)}>Слова</button>}
                 <select className="field !h-8 !w-auto !py-0 !text-[13px]" value={s.language} onChange={(e) => setStudentLang(s, e.target.value)} aria-label={`Язык ученика ${s.name}`}>
@@ -250,14 +258,15 @@ export function StudentsPage() {
           <label className="label">Какой язык изучает
             <select className="field" value={lang} onChange={(e) => setLang(e.target.value)}>{LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}</select>
           </label>
-          <button type="submit" className="btn-brand"><UserPlus size={16} /> Добавить и получить ссылку</button>
+          <button type="submit" className="btn-brand"><UserPlus size={16} /> Добавить и получить код</button>
         </form>
       </Modal>
       <Modal open={!!words} onClose={() => setWords(null)} title={`Словарь: ${words?.name || ""}`} wide>
         {words && <Vocab chatId={words.chat_id} tutorView />}
       </Modal>
       <Modal open={!!added} onClose={() => setAdded(null)} title={`${added?.name || "Ученик"} добавлен`}>
-        <p className="text-ink-soft">Отправьте ссылки ученику и родителю в WhatsApp, Telegram, MAX или почтой. По ссылке они зарегистрируются и сразу попадут к вам.</p>
+        <p className="text-ink-soft">Отправьте ученику код: он сможет ввести его в своём кабинете на сайте или в приложении. Можно также отправить ссылку.</p>
+        <div className="mt-4 rounded-xl bg-brand-tint p-4"><p className="text-sm font-semibold">Код ученика</p><p className="mt-1 break-all text-lg font-bold">{added?.invite?.code}</p><div className="mt-2"><CopyLink label="Скопировать код" url={added?.invite?.code} /></div><p className="mt-2 text-xs text-ink-mute">Код личный, для одного ученика. Сохраните его в тайне.</p></div>
         <div className="mt-4 grid gap-3">
           {[["Ученику", added?.invite?.url], ["Родителю (отчёты и переписка)", added?.parent_invite?.url]].map(([t, url]) => (
             <div key={t}><p className="mb-1 text-sm font-semibold">{t}</p><div className="flex gap-2"><input readOnly className="field text-sm" value={url || ""} onFocus={(e) => e.target.select()} aria-label={t} /><CopyLink label="Копировать" url={url} /></div></div>

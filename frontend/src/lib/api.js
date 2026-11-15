@@ -11,12 +11,12 @@ export function setToken(t) {
   try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* хранилище недоступно */ }
 }
 
-export async function request(method, path, body, extra = {}) {
+export async function request(method, path, body, extra = {}, options = {}) {
   const headers = { Accept: "application/json", ...extra };
   const token = getToken();
   if (token) headers["X-Access-Token"] = token;
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const r = await fetch(path, { method, headers, credentials: "same-origin",
+  const r = await fetch(path, { method, headers, credentials: "same-origin", signal: options.signal,
     body: body === undefined ? undefined : JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {

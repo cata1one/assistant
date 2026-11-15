@@ -355,16 +355,30 @@ export function UnitEditor({ id }) {
   const [aiExercise, setAiExercise] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [assign, setAssign] = useState(false);
+  const savedSnapshot = useRef(null);
+  const dirty = useRef(false);
+  dirty.current = !!unit && savedSnapshot.current !== null && JSON.stringify(unit) !== savedSnapshot.current;
   const audios = (useApi("/site/v1/materials").data?.materials || []).filter((m) => m.mime?.startsWith("audio/"));
   useEffect(() => {
     if (isNew) {
       const d = pendingDraft || { title: "Новое занятие", blocks: [] };
-      setUnit({ ...d, blocks: d.blocks.map(toEdit) });
+      const initial = { ...d, blocks: d.blocks.map(toEdit) };
+      savedSnapshot.current = JSON.stringify(initial); setUnit(initial);
       if (d.notice) setMsg(d.notice);
       return;
     }
-    request("GET", `/site/v1/units/${id}`).then((u) => setUnit({ ...u, blocks: u.blocks.map(toEdit) })).catch(setError);
+    request("GET", `/site/v1/units/${id}`).then((u) => { const initial = { ...u, blocks: u.blocks.map(toEdit) }; savedSnapshot.current = JSON.stringify(initial); setUnit(initial); }).catch(setError);
   }, [id, isNew]);
+  useEffect(() => {
+    const beforeUnload = (event) => { if (dirty.current) { event.preventDefault(); event.returnValue = ""; } };
+    const beforeLink = (event) => {
+      const href = event.target.closest?.("a")?.getAttribute("href");
+      if (dirty.current && href?.startsWith("#/") && !window.confirm("В занятии есть несохранённые изменения. Выйти без сохранения?")) { event.preventDefault(); event.stopPropagation(); }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", beforeLink, true);
+    return () => { window.removeEventListener("beforeunload", beforeUnload); document.removeEventListener("click", beforeLink, true); };
+  }, []);
   if (error && !unit) return <ErrorBox error={error} />;
   if (!unit) return <Loading />;
   const setBlock = (i, b) => setUnit({ ...unit, blocks: unit.blocks.map((x, j) => (j === i ? b : x)) });
@@ -374,10 +388,12 @@ export function UnitEditor({ id }) {
     try {
       const body = { title: unit.title, language: unit.language, level: unit.level, blocks: unit.blocks.map(fromEdit), source: unit.source };
       const saved = await request("POST", isNew ? "/site/v1/units" : `/site/v1/units/${id}`, body);
+      const edited = { ...saved, blocks: saved.blocks.map(toEdit) };
+      savedSnapshot.current = JSON.stringify(edited); dirty.current = false;
       pendingDraft = null;
       setMsg(saved.blocks.length === 0 || saved.blocks.some((block) => block.incomplete) ? "Черновик сохранён. Заполните задания перед выдачей ученику." : "Сохранено");
       if (isNew) window.location.hash = `#/app/units/${saved.id}`;
-      else setUnit({ ...saved, blocks: saved.blocks.map(toEdit) });
+      else setUnit(edited);
       return saved;
     } catch (x) { setError(x); return null; }
   };
@@ -436,12 +452,12 @@ export function UnitEditor({ id }) {
           </div>
           <div className="flex flex-wrap gap-2 pb-4">
             <button type="button" className="btn-brand" onClick={save}><BookOpenCheck size={16} /> Сохранить</button>
-            {!isNew && role === "tutor" && <button type="button" className="btn-light" onClick={() => setAssign(true)}><Send size={16} /> Выдать ученику</button>}
+            {!isNew && role === "tutor" && <button type="button" className="btn-light" onClick={async () => { const saved = await save(); if (saved) setAssign(saved); }}><Send size={16} /> Выдать ученику</button>}
           </div>
           </div>
         </div>
       )}
-      {assign && <AssignModal unit={{ id, title: unit.title }} onClose={() => setAssign(false)} />}
+      {assign && <AssignModal unit={assign} onClose={() => setAssign(false)} />}
       {aiExercise && <Modal open onClose={() => !aiBusy && setAiExercise(null)} title="Создать задание с ИИ">
         <form className="grid gap-3" onSubmit={async (event) => {
           event.preventDefault(); setError(null); setAiBusy(true);

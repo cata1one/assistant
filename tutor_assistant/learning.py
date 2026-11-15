@@ -380,6 +380,9 @@ class Learning:
                 raise PortalError(403, "нет доступа к словарю")
             return [chat_id]
         chats = [a.chat_id for a in self.portal.accesses(viewer) if a.role == STUDENT]
+        account = self.storage.get_account(viewer.user_id) if viewer.user_id.startswith("a_") else None
+        if account and account["role"] == "student":
+            chats.append(f"personal:{viewer.user_id}")
         if not chats:
             raise PortalError(403, "словарь и карточки – у ученика")
         return chats
@@ -392,6 +395,8 @@ class Learning:
         seen: set[str] = set()
         out = []
         for c in chats:
+            if c.startswith("personal:"):
+                continue
             for w in self.portal.words(viewer, c)["words"]:
                 key = word_key(w["word"])
                 if key not in seen and key not in hidden:
@@ -412,15 +417,16 @@ class Learning:
         from .units import parse_words
         body = body if isinstance(body, dict) else {}
         chats = self._vocab_chats(viewer, body.get("chat_id") if isinstance(body.get("chat_id"), str) else None)
-        access = self.portal._access(viewer, chats[0])
-        if access.role == PARENT:
+        role = STUDENT if chats[0] == f"personal:{viewer.user_id}" else self.portal._access(viewer, chats[0]).role
+        if role == PARENT:
             raise PortalError(403, "слова добавляют ученик и преподаватель")
         text = _lines(body, "text", 3000, required=True) or ""
-        self._check_text(chats[0], text)
+        if not chats[0].startswith("personal:"):
+            self._check_text(chats[0], text)
         words = parse_words(text)
         if not words:
             raise PortalError(400, "по одному слову в строке: «kitchen – кухня»")
-        added = self._save_words(chats[0], words, "tutor" if access.role == TUTOR else "student")
+        added = self._save_words(chats[0], words, "tutor" if role == TUTOR else "student")
         return {"added": added, **self.vocab(viewer, body.get("chat_id"))}
 
     def delete_word(self, viewer: Viewer, body: Any) -> dict[str, Any]:
@@ -430,14 +436,15 @@ class Learning:
             raise PortalError(400, "нужно поле key")
         chat = body.get("chat_id") if isinstance(body.get("chat_id"), str) else None
         chats = self._vocab_chats(viewer, chat)
-        if self.portal._access(viewer, chats[0]).role == PARENT:
+        if not chats[0].startswith("personal:") and self.portal._access(viewer, chats[0]).role == PARENT:
             raise PortalError(403, "убрать слово могут ученик и преподаватель")
         for c in chats:
             self.storage.hide_student_word(c, key, str(body.get("word") or key)[:80])
         return {"ok": True}
 
     def _student_words(self, viewer: Viewer) -> list[dict[str, Any]]:
-        if not any(a.role == STUDENT for a in self.portal.accesses(viewer)):
+        account = self.storage.get_account(viewer.user_id) if viewer.user_id.startswith("a_") else None
+        if not (account and account["role"] == "student") and not any(a.role == STUDENT for a in self.portal.accesses(viewer)):
             raise PortalError(403, "карточки – для учеников")
         return self.word_list(viewer)
 

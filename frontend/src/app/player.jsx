@@ -23,14 +23,13 @@ const Mark = ({ ok }) => (ok ? <CheckCircle2 size={16} className="inline text-mi
 function Gaps({ parts, bank, value = [], onChange, result, answers }) {
   const [focus, setFocus] = useState(0);
   const set = (i, v) => { const next = [...value]; next[i] = v; onChange(next); };
-  const used = new Set(value.filter(Boolean));
   return (
     <>
       {bank?.length > 0 && !result && (
         <div className="mb-3 flex flex-wrap gap-2">
           {bank.map((w, i) => (
-            <button key={i} type="button" disabled={used.has(w)} onClick={() => { set(focus, w); setFocus(Math.min(parts.length - 2, focus + 1)); }}
-              className={`chip !text-sm ${used.has(w) ? "opacity-40" : "hover:border-brand"}`}>{w}</button>
+            <button key={i} type="button" disabled={bank.slice(0, i + 1).filter((word) => word === w).length <= value.filter((word) => word === w).length} onClick={() => { set(focus, w); setFocus(Math.min(parts.length - 2, focus + 1)); }}
+              className="chip !text-sm disabled:opacity-40 hover:border-brand">{w}</button>
           ))}
         </div>
       )}

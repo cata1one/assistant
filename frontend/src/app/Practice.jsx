@@ -36,6 +36,7 @@ function LiveRoom({ id, onExit }) {
   const [remote, setRemote] = useState({});
   const [audioOn, setAudioOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
+  const [mediaNotice, setMediaNotice] = useState("");
   useEffect(() => {
     let alive = true, timer, stream, cursor = 0, polling = false;
     const peers = new Map();
@@ -47,6 +48,8 @@ function LiveRoom({ id, onExit }) {
       const entry = { pc, pending: [] };
       peers.set(pid, entry);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      if (!stream.getAudioTracks().length) pc.addTransceiver("audio", { direction: "recvonly" });
+      if (!stream.getVideoTracks().length) pc.addTransceiver("video", { direction: "recvonly" });
       pc.onicecandidate = (e) => { if (e.candidate) send(pid, "ice", e.candidate.toJSON()).catch(setError); };
       pc.ontrack = (e) => { if (alive && e.streams[0]) setRemote((old) => ({ ...old, [pid]: e.streams[0] })); };
       return entry;
@@ -89,7 +92,12 @@ function LiveRoom({ id, onExit }) {
     };
     (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        try { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true }); }
+        catch {
+          try { stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true }); }
+          catch { stream = new MediaStream(); }
+          if (alive) setMediaNotice(stream.getAudioTracks().length ? "Камера недоступна. Вы вошли с микрофоном." : "Камера и микрофон недоступны. Вы можете слушать и пользоваться заданиями; для разговора разрешите микрофон и войдите снова.");
+        }
         if (!alive) { stream.getTracks().forEach((t) => t.stop()); return; }
         setLocal(stream);
         await request("POST", api + "/join", {});
@@ -108,12 +116,13 @@ function LiveRoom({ id, onExit }) {
   return <div className="grid gap-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1>{room?.title || "Комната"}</h1><p className="text-ink-mute">{room?.topic}</p></div><button className="btn-light" onClick={onExit}>Выйти</button></div>
     <ErrorBox error={error} />
+    {mediaNotice && <p role="status" className="rounded-xl bg-brand-tint p-3 text-sm text-ink-soft">{mediaNotice}</p>}
     {room && <p className="text-sm text-ink-soft">В комнате: {room.peers.map((p) => p.name).join(", ")} · {langById(room.language).flag} {langById(room.language).title}</p>}
     {local && <div className="flex flex-wrap gap-2">
-      <button type="button" className="btn-light btn-sm" aria-pressed={audioOn} onClick={() => { const next = !audioOn; local.getAudioTracks().forEach((track) => { track.enabled = next; }); setAudioOn(next); }}>{audioOn ? "Выключить микрофон" : "Включить микрофон"}</button>
-      <button type="button" className="btn-light btn-sm" aria-pressed={videoOn} onClick={() => { const next = !videoOn; local.getVideoTracks().forEach((track) => { track.enabled = next; }); setVideoOn(next); }}>{videoOn ? "Выключить камеру" : "Включить камеру"}</button>
+      {local.getAudioTracks().length > 0 && <button type="button" className="btn-light btn-sm" aria-pressed={audioOn} onClick={() => { const next = !audioOn; local.getAudioTracks().forEach((track) => { track.enabled = next; }); setAudioOn(next); }}>{audioOn ? "Выключить микрофон" : "Включить микрофон"}</button>}
+      {local.getVideoTracks().length > 0 && <button type="button" className="btn-light btn-sm" aria-pressed={videoOn} onClick={() => { const next = !videoOn; local.getVideoTracks().forEach((track) => { track.enabled = next; }); setVideoOn(next); }}>{videoOn ? "Выключить камеру" : "Включить камеру"}</button>}
     </div>}
-    <div className="grid gap-3 sm:grid-cols-2">{local && <Video stream={local} name="Вы" muted />}{Object.entries(remote).map(([pid, stream]) => <Video key={pid} stream={stream} name={room?.peers.find((p) => p.id === pid)?.name || "Участник"} />)}</div>
+    <div className="grid gap-3 sm:grid-cols-2">{local?.getVideoTracks().length > 0 && <Video stream={local} name="Вы" muted />}{Object.entries(remote).map(([pid, stream]) => <Video key={pid} stream={stream} name={room?.peers.find((p) => p.id === pid)?.name || "Участник"} />)}</div>
     <div className="card"><p className="font-semibold">Игра для разговора</p><p className="my-3">{(promptsByLanguage[room?.language] || englishPrompts)[(room?.prompt || 0) % (promptsByLanguage[room?.language] || englishPrompts).length]}</p><button className="btn-light btn-sm" onClick={() => request("POST", `/site/v1/practice/${id}/prompt`, {}).catch(setError)}>Другая тема</button></div>
   </div>;
 }
