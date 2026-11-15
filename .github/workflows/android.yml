@@ -9,6 +9,9 @@ on:
   push:
     paths: ["mobile/**", ".github/workflows/android.yml"]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -60,3 +63,13 @@ jobs:
             mobile/bright.apk
             mobile/bright.aab
           if-no-files-found: error
+
+      - name: Publish test APK for direct installation
+        if: github.ref == 'refs/heads/codex/bright-classroom-tools'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view bright-android-preview >/dev/null 2>&1; then
+            gh release create bright-android-preview --target "${GITHUB_SHA}" --prerelease --title "Bright Android — test build" --notes "Test APK signed with a debug key unless release secrets are configured."
+          fi
+          gh release upload bright-android-preview mobile/bright.apk --clobber
