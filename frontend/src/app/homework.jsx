@@ -75,7 +75,7 @@ function EditHomework({ h, onClose, reload }) {
   );
 }
 
-function HomeworkItem({ h, reload }) {
+export function HomeworkItem({ h, reload }) {
   const [answer, setAnswer] = useState(h.answer || "");
   const [error, setError] = useState(null);
   const [edit, setEdit] = useState(false);
@@ -144,11 +144,14 @@ function HomeworkItem({ h, reload }) {
   );
 }
 
-function AssignForm({ onDone }) {
-  const students = useApi("/site/v1/students").data?.students?.filter((s) => s.joined) || [];
-  const materials = useApi("/site/v1/materials").data?.materials || [];
-  const units = useApi("/site/v1/units").data?.units || [];
-  const [f, setF] = useState({ chat_id: "", text: "", words: "", due: "", materials: [], unit_id: "" });
+export function AssignForm({ onDone, student = null }) {
+  const studentsRequest = useApi(student ? null : "/site/v1/students");
+  const students = student ? (student.joined ? [student] : []) : (studentsRequest.data?.students?.filter((s) => s.joined) || []);
+  const materialsRequest = useApi("/site/v1/materials");
+  const unitsRequest = useApi("/site/v1/units");
+  const materials = materialsRequest.data?.materials || [];
+  const units = unitsRequest.data?.units || [];
+  const [f, setF] = useState({ chat_id: student?.chat_id || "", text: "", words: "", due: "", materials: [], unit_id: "" });
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
   const submit = async (e) => {
@@ -160,15 +163,18 @@ function AssignForm({ onDone }) {
       onDone();
     } catch (x) { setError(x); }
   };
-  if (!students.length) return <Notice>Задание можно выдать, когда ученик подключится по ссылке.</Notice>;
+  if (!student && studentsRequest.error) return <ErrorBox error={studentsRequest.error} />;
+  if (!student && !studentsRequest.data) return <Loading />;
+  if (!students.length) return <Notice>Задание можно выдать, когда ученик подключится по коду или ссылке.</Notice>;
   const toggle = (id) => setF({ ...f, materials: f.materials.includes(id) ? f.materials.filter((x) => x !== id) : [...f.materials, id].slice(0, 10) });
   return (
     <form onSubmit={submit} className="card grid gap-3">
       <h2 className="text-lg">Новое задание</h2>
+      <ErrorBox error={materialsRequest.error || unitsRequest.error} />
       <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
-        <select className="field" value={f.chat_id} onChange={(e) => setF({ ...f, chat_id: e.target.value })} aria-label="Ученик">
+        {student ? <div className="field flex items-center font-semibold" aria-label="Ученик">{student.name}</div> : <select className="field" value={f.chat_id} onChange={(e) => setF({ ...f, chat_id: e.target.value })} aria-label="Ученик">
           {students.map((s) => <option key={s.chat_id} value={s.chat_id}>{s.name}</option>)}
-        </select>
+        </select>}
         <input className="field" type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} aria-label="Срок" />
       </div>
       {units.length > 0 && (
@@ -209,7 +215,7 @@ export function HomeworkPage() {
         {role === "tutor" && <AssignForm onDone={reload} />}
         <div className="grid gap-3">
           <ErrorBox error={error} />
-          {!data ? <Loading /> : !list.length ? <Empty icon={NotebookPen} title="Заданий пока нет" text={role === "tutor" ? "Выдайте первое задание." : "Когда преподаватель задаст ДЗ, оно появится здесь."} />
+          {!data && !error ? <Loading /> : !data ? null : !list.length ? <Empty icon={NotebookPen} title="Заданий пока нет" text={role === "tutor" ? "Выдайте первое задание." : "Когда преподаватель задаст ДЗ, оно появится здесь."} />
             : list.map((h) => <HomeworkItem key={h.id} h={h} reload={reload} />)}
         </div>
       </div>

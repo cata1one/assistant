@@ -15,6 +15,7 @@ import { Avatar, copy, Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Stat 
 import { LessonList, LiveBanner, Panel, shortDate, startLesson, useApi } from "./common.jsx";
 import { Vocab } from "./vocab.jsx";
 import { LANGS } from "../lib/langs.js";
+import StudentWorkspace from "./StudentWorkspace.jsx";
 
 function CopyLink({ label, url }) {
   const [done, setDone] = useState(false);
@@ -106,7 +107,7 @@ export function TutorHome() {
                   <li key={s.pair_id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-cream">
                     <ProfileAvatar photo={s.photo} name={s.name} size={38} />
                     <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold"><span className="truncate">{s.name}</span> <MoodChip mood={s.mood} /></span>
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold"><a className="truncate hover:text-brand" href={`#/app/students/${s.pair_id}`}>{s.name}</a> <MoodChip mood={s.mood} /></span>
                       <span className="block truncate text-[13px] text-ink-mute">{s.joined ? (LANGS.find((l) => l.id === s.language)?.title || "") : "ждём по ссылке"}{s.balance ? ` · оплачено: ${s.balance}` : ""}</span>
                     </span>
                     {s.joined && <StartButton chatId={s.chat_id} active={s.active_lesson} small />}
@@ -176,7 +177,7 @@ function StudyGroups({ students }) {
         <p className="text-sm text-ink-mute">{g.members.map((id) => students.find((s) => s.pair_id === id)?.name).filter(Boolean).join(", ") || "Пока нет учеников"}</p>
         {g.members.length > 0 && <details className="mt-3 border-t border-line pt-3"><summary className="cursor-pointer text-sm font-semibold">Ученики класса</summary>
           <div className="mt-2 grid gap-2">{g.members.map((id) => students.find((student) => student.pair_id === id)).filter(Boolean).map((student) => <div key={student.pair_id} className="flex flex-wrap items-center gap-3 rounded-xl bg-cream p-2">
-            <ProfileAvatar photo={student.photo} name={student.name} size={32} /><span className="min-w-0 flex-1 text-sm font-medium">{student.name}</span>
+            <ProfileAvatar photo={student.photo} name={student.name} size={32} /><a href={`#/app/students/${student.pair_id}`} className="min-w-0 flex-1 text-sm font-medium hover:text-brand">{student.name}</a>
             {student.joined ? <StartButton chatId={student.chat_id} active={student.active_lesson} small /> : <CopyLink label="Приглашение" url={student.invite?.url} />}
           </div>)}</div></details>}
         <div className="mt-3 flex flex-wrap gap-2"><a href="#/app/units/new" className="btn-light btn-sm">Создать урок</a><a href="#/app/materials?tab=units" className="btn-light btn-sm">Мои занятия</a></div>
@@ -198,7 +199,7 @@ function StudyGroups({ students }) {
 }
 
 // == Ученики ==================================================================================
-export function StudentsPage() {
+export function StudentsPage({ route }) {
   const { data, error, reload } = useApi("/site/v1/students");
   const [name, setName] = useState("");
   const [added, setAdded] = useState(null);
@@ -219,6 +220,13 @@ export function StudentsPage() {
     reload();
   };
   const list = data?.students || [];
+  const studentId = route?.parts?.[2];
+  if (studentId) {
+    if (error) return <ErrorBox error={error} />;
+    if (!data) return <Loading />;
+    const selected = list.find((student) => student.pair_id === studentId);
+    return selected ? <StudentWorkspace key={studentId} student={selected} route={route} /> : <Empty icon={Users} title="Ученик не найден" text="Карточка недоступна или ученик удалён." action={<a href="#/app/students" className="btn-light">Все ученики</a>} />;
+  }
   return (
     <>
       <PageTitle title="Ученики" text="Ученик и родитель подключаются по ссылкам и видят только ваше имя."
@@ -234,11 +242,12 @@ export function StudentsPage() {
             <div key={s.pair_id} className="flex flex-wrap items-center gap-3 p-4">
               <ProfileAvatar photo={s.photo} name={s.name} size={44} />
               <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 font-semibold">{s.name} <MoodChip mood={s.mood} /></p>
+                <p className="flex flex-wrap items-center gap-2 font-semibold"><a className="hover:text-brand hover:underline" href={`#/app/students/${s.pair_id}`}>{s.name}</a> <MoodChip mood={s.mood} /></p>
                 <p className="text-[13px] text-ink-mute">{s.joined ? "подключён" : "ещё не подключился"} · родителей: {s.parents}{s.balance ? ` · оплачено занятий: ${s.balance}` : ""}</p>
                 {!s.joined && s.invite?.code && <p className="mt-1 break-all text-sm">Код ученика: <strong>{s.invite.code}</strong></p>}
               </div>
               <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
+                <a href={`#/app/students/${s.pair_id}`} className="btn-light btn-sm">Карточка</a>
                 {s.joined ? <StartButton chatId={s.chat_id} active={s.active_lesson} small /> : <CopyLink label="Ссылка ученику" url={s.invite?.url} />}
                 {!s.joined && <CopyLink label="Скопировать код" url={s.invite?.code} />}
                 <CopyLink label="Родителю" url={s.parent_invite?.url} />
