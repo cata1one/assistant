@@ -17,6 +17,7 @@ import { LANGS } from "../lib/langs.js";
 import StudentWorkspace from "./StudentWorkspace.jsx";
 import { HomeworkPage } from "./homework.jsx";
 import { LessonPayPage } from "./lessonpay.jsx";
+import Schedule from "./Schedule.jsx";
 
 function CopyLink({ label, url }) {
   const [done, setDone] = useState(false);
@@ -97,6 +98,7 @@ export function TutorHome() {
       <HolidayBanner />
       <LiveBanner lessons={lessons} />
       {data && <Checklist students={students} lessons={lessons} />}
+      <Schedule students={students} />
       <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
         <div className="grid content-start gap-4">
           <Panel title="Начать урок" icon={Video} actions={<a href="#/app/students" className="text-[13px] font-medium text-ink-mute hover:text-ink">Все ученики</a>}>

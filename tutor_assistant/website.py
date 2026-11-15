@@ -39,6 +39,7 @@ from .learning import Learning
 from .lesson_pay import LessonPay
 from .portal import Portal, PortalError
 from .spark import Spark
+from .schedule import Schedule
 from .units import Units, student_view
 from .yookassa import PlanPayments
 
@@ -149,6 +150,10 @@ class Website:
         ("GET", re.compile(r"^/site/v1/groups$"), "groups", True),
         ("POST", re.compile(r"^/site/v1/groups$"), "group_save", True),
         ("POST", re.compile(r"^/site/v1/groups/(?P<id>[0-9a-f]+)/delete$"), "group_delete", True),
+        ("GET", re.compile(r"^/site/v1/schedule$"), "schedule_list", True),
+        ("POST", re.compile(r"^/site/v1/schedule$"), "schedule_create", True),
+        ("POST", re.compile(r"^/site/v1/schedule/(?P<id>[0-9a-f]{24})$"), "schedule_update", True),
+        ("POST", re.compile(r"^/site/v1/schedule/(?P<id>[0-9a-f]{24})/delete$"), "schedule_delete", True),
         ("GET", re.compile(r"^/site/v1/students$"), "students", True),
         ("POST", re.compile(r"^/site/v1/students$"), "student_add", True),
         ("POST", re.compile(r"^/site/v1/students/(?P<id>[0-9a-f]+)/remove$"), "student_remove", True),
@@ -224,6 +229,7 @@ class Website:
         self.units_service = Units(self.learning)
         self.plan_pay = PlanPayments(portal)
         self.spark = Spark(portal, self.learning, self.accounts)
+        self.schedule = Schedule(portal)
         self.lesson_pay = LessonPay(portal)
         self.classroom.pay = self.lesson_pay
 
@@ -512,6 +518,18 @@ class Website:
 
     def group_delete(self, viewer: Any, id: str, **_: Any) -> Any:
         return self.accounts.delete_group(viewer, id)
+
+    def schedule_list(self, viewer: Any, query: Any, **_: Any) -> Any:
+        return self.schedule.list(viewer, query)
+
+    def schedule_create(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.schedule.save(viewer, body)
+
+    def schedule_update(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.schedule.save(viewer, body, id)
+
+    def schedule_delete(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.schedule.delete(viewer, id)
 
     def students(self, viewer: Any, **_: Any) -> Any:
         return self.accounts.students(viewer)

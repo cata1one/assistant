@@ -31,7 +31,7 @@ import { CoursesPage, DoUnit, UnitEditor } from "./units.jsx";
  */
 const NAV = {
   tutor: [
-    ["home", "Сегодня", Home, TutorHome, 1],
+    ["home", "Рабочий стол", Home, TutorHome, 1],
     ["students", "Ученики", Users, StudentsPage, 2],
     ["lessons", "Уроки и доски", BookOpen, LessonsHub, 3],
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
@@ -173,7 +173,7 @@ function TabBar({ items, current, unread, role }) {
           <a key={id} href={hrefOf(id, href)} aria-current={currentNav === id ? "page" : undefined}
             className={`relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10.5px] font-medium ${currentNav === id ? "text-ink" : "text-ink-mute"}`}>
             <Icon size={22} strokeWidth={currentNav === id ? 2.2 : 1.7} />
-            <span className="w-full truncate text-center">{title.split(" ")[0]}</span>
+            <span className="w-full truncate text-center">{id === "home" && role === "tutor" ? "Обзор" : title.split(" ")[0]}</span>
             {id === "messages" && unread > 0 && <span className="absolute right-[22%] top-0.5 h-2 w-2 rounded-full bg-teach" />}
           </a>
         ))}
@@ -189,7 +189,7 @@ function TabBar({ items, current, unread, role }) {
 function MobileTop({ session, title }) {
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-white/95 px-4 pb-2.5 pt-[calc(.625rem+env(safe-area-inset-top))] backdrop-blur lg:hidden">
-      <a href="#/app" aria-label="Сегодня"><Logo size={26} school={session.role === "school"} /></a>
+      <a href="#/app" aria-label={session.role === "tutor" ? "Рабочий стол" : "Сегодня"}><Logo size={26} school={session.role === "school"} /></a>
       <span className="ml-1 min-w-0 flex-1 truncate text-sm font-semibold text-ink-mute">{title}</span>
       <a href="#/" aria-label="Главное меню сайта" title="Главное меню сайта" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Globe2 size={19} /></a>
       {session.role === "school" && <a href="#/app/pay" aria-label="Оплата занятий" title="Оплата занятий" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Wallet size={19} /></a>}
