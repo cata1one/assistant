@@ -49,6 +49,9 @@ jobs:
       - name: Studio and screenshot checks
         working-directory: frontend
         run: node scripts/studio-check.mjs
+      - name: Check teaching workspace
+        working-directory: frontend
+        run: node scripts/workspace-check.mjs
       - name: Encode refreshed screenshots
         run: python frontend/scripts/render-shots.py
       - name: Build verified frontend
