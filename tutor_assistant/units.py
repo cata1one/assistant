@@ -159,9 +159,20 @@ def require_ready(unit: dict[str, Any]) -> None:
     blocks = unit.get("blocks") or []
     if not blocks:
         raise PortalError(400, "Добавьте и заполните хотя бы одно задание перед просмотром или выдачей ученику.")
+    hints = {
+        "text": "добавьте текст",
+        "words": "добавьте хотя бы одно слово",
+        "gap": "укажите правильный ответ в [квадратных скобках]",
+        "match": "заполните не менее двух пар полностью",
+        "choice": "добавьте вопрос, два варианта и отметьте правильный звёздочкой",
+        "listening": "добавьте запись или текст и хотя бы один вопрос или пропуск",
+        "write": "напишите формулировку задания",
+        "video": "добавьте поддерживаемую ссылку на видео",
+    }
     for index, block in enumerate(blocks):
         if block.get("incomplete"):
-            raise PortalError(400, f"Задание {index + 1} ещё не заполнено. Откройте его и добавьте содержание.")
+            hint = hints.get(block.get("type"), "заполните содержание")
+            raise PortalError(400, f"Задание {index + 1}: {hint}. Черновик сохранён.")
 
 
 def _gap_answers(text: str) -> list[list[str]]:
