@@ -33,6 +33,7 @@ from typing import Any
 from . import catalog
 from .accounts import Accounts
 from .classroom import Classroom
+from .practice_rooms import PracticeRooms
 from .community import Community
 from .learning import Learning
 from .lesson_pay import LessonPay
@@ -96,6 +97,12 @@ class Website:
         ("GET", re.compile(r"^/site/v1/admin/applications$"), "applications", True),
         ("POST", re.compile(r"^/site/v1/admin/applications/(?P<id>\d+)$"), "application_status", True),
         ("POST", re.compile(r"^/site/v1/admin/classroom$"), "classroom", True),
+        ("GET", re.compile(r"^/site/v1/practice$"), "practice_list", True),
+        ("POST", re.compile(r"^/site/v1/practice$"), "practice_create", True),
+        ("POST", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)/join$"), "practice_join", True),
+        ("POST", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)/leave$"), "practice_leave", True),
+        ("GET", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)$"), "practice_state", True),
+        ("POST", re.compile(r"^/site/v1/practice/(?P<id>[0-9a-f]+)/signal$"), "practice_signal", True),
         ("POST", re.compile(r"^/site/v1/rooms$"), "room_start", True),
         ("GET", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)$"), "room_state", True),
         ("POST", re.compile(r"^/site/v1/rooms/(?P<id>[\w-]+)/signal$"), "room_signal", True),
@@ -208,6 +215,7 @@ class Website:
         self.portal = portal
         self.web_dir = web_dir
         self.classroom = classroom or Classroom(portal)
+        self.practice = PracticeRooms(portal, self.classroom)
         self.community = Community(portal)
         self.accounts = Accounts(portal)
         self.learning = Learning(portal)
@@ -350,6 +358,28 @@ class Website:
         return self.portal.admin_set_classroom(viewer, body["chat_id"], url or None)
 
     # -- онлайн-класс ------------------------------------------------------------------
+    def practice_list(self, viewer: Any, query: Any, **_: Any) -> Any:
+        return self.practice.list(viewer, query)
+
+    def practice_create(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.practice.create(viewer, body)
+
+    def practice_join(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.practice.join(viewer, id)
+
+    def practice_leave(self, viewer: Any, id: str, **_: Any) -> Any:
+        return self.practice.leave(viewer, id)
+
+    def practice_state(self, viewer: Any, id: str, query: Any, **_: Any) -> Any:
+        try:
+            since = max(0, int(query.get("since", 0)))
+        except (TypeError, ValueError):
+            raise PortalError(400, "неверный номер сигнала") from None
+        return self.practice.state(viewer, id, since)
+
+    def practice_signal(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.practice.signal(viewer, id, body)
+
     def room_start(self, viewer: Any, body: Any, **_: Any) -> Any:
         if not isinstance(body, dict) or not isinstance(body.get("chat_id"), str):
             raise PortalError(400, "нужно поле chat_id")

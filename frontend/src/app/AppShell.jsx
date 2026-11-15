@@ -15,6 +15,7 @@ import Lesson from "./Lesson.jsx";
 import { LessonPayPage } from "./lessonpay.jsx";
 import { MaterialsHub } from "./materials.jsx";
 import Room from "./Room.jsx";
+import PracticePage from "./Practice.jsx";
 import { AdminPage, SchoolHome, SchoolLessonsPage, SignalsPage, SystemPage, TutorsPage } from "./school.jsx";
 import { SparkPage } from "./spark.jsx";
 import Iskorka from "./Iskorka.jsx";
@@ -37,6 +38,7 @@ const NAV = {
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["materials", "Материалы", FileStack, MaterialsHub, 0],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
+    ["practice", "Разговорные комнаты", MessagesSquare, PracticePage, 0],
     ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["pay", "Оплата занятий", Wallet, LessonPayPage, 0],
     ["find", "Заявки учеников", Search, null, 0, "#/market?tab=students"],
@@ -50,6 +52,7 @@ const NAV = {
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
     ["courses", "Учебники", GraduationCap, CoursesPage, 0],
+    ["practice", "Разговорные комнаты", MessagesSquare, PracticePage, 0],
     ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["find", "Найти преподавателя", Search, null, 0, "#/market"],
     ["profile", "Профиль и оформление", Settings, ProfilePage, 0],
