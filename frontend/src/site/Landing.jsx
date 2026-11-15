@@ -93,6 +93,12 @@ export default function Landing() {
         </div>
       </section>
 
+      <div className="language-ribbon" aria-label="Языки объединяют: приветствия на разных языках">
+        <div className="language-ribbon-track">{[0, 1].map((copy) => <div className="language-ribbon-group" aria-hidden={copy ? true : undefined} key={copy}>
+          {["Hello", "Привет", "你好", "Hola", "Bonjour", "Ciao", "Olá", "مرحبا", "नमस्ते", "Γεια σου"].map((word) => <span key={word} dir="auto">{word}<i aria-hidden="true">✳</i></span>)}
+        </div>)}</div>
+      </div>
+
       <div className="studio-strip" aria-label="Возможности Bright">
         <span><i className="studio-pill studio-pill-coral">01</i>Урок с видео и доской</span>
         <span><i className="studio-pill studio-pill-blue">02</i>Практика с понятной целью</span>

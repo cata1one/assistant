@@ -55,7 +55,7 @@ const FACES = {
 export default function Iskorka({ mood = "happy", size = 64, still = false, className = "", title }) {
   const [eyes, mouth, extra] = FACES[mood] || FACES.happy;
   return (
-    <span className={`isk relative inline-block shrink-0 ${still ? "" : `isk-live isk-${mood}`} ${className}`} style={{ width: size, height: size }}
+    <span className={`isk isk-halo relative inline-block shrink-0 ${still ? "" : `isk-live isk-${mood}`} ${className}`} style={{ width: size, height: size }}
       role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
       <img src="/static/fe-2b50.webp" alt="" draggable="false" className="isk-body h-full w-full select-none" />
       <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full">

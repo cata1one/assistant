@@ -24,7 +24,7 @@ export function SparkMark({ size = 36, mood = "happy", still = true }) {
   return <Iskorka size={size} mood={mood} still={still} />;
 }
 
-export function SparkPage() {
+export function SparkPage({ compact = false }) {
   const { role } = useSession();
   const [data, setData] = useState(null);
   const [text, setText] = useState("");
@@ -62,7 +62,7 @@ export function SparkPage() {
   if (!data) return error ? <ErrorBox error={error} /> : <Loading />;
   const ideas = IDEAS[role] || IDEAS.student;
   return (
-    <div className="panel flex h-[calc(100dvh-9.5rem)] min-h-[460px] flex-col lg:h-[calc(100dvh-5rem)]">
+    <div className={compact ? "flex h-[min(32rem,60dvh)] min-h-[280px] flex-col" : "panel flex h-[calc(100dvh-9.5rem)] min-h-[460px] flex-col lg:h-[calc(100dvh-5rem)]"}>
       <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
         <Iskorka size={46} mood={mood} />
         <div className="min-w-0 flex-1">
@@ -74,7 +74,7 @@ export function SparkPage() {
       <div ref={box} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {!data.messages.length && (
           <div className="mx-auto max-w-md py-4 text-center">
-            <Iskorka size={132} mood="happy" />
+            <Iskorka size={compact ? 76 : 132} mood="happy" />
             <div className="relative mx-auto mt-3 w-fit rounded-2xl bg-sun-soft px-4 py-2.5 text-[15px] font-semibold before:absolute before:-top-1.5 before:left-1/2 before:h-3 before:w-3 before:-translate-x-1/2 before:rotate-45 before:bg-sun-soft">Привет! Я Искорка ✨</div>
             <p className="mt-3 text-sm text-ink-mute">Спросите текстом или запишите голосовое. Вот с чего можно начать:</p>
             <div className="mt-4 grid gap-2">

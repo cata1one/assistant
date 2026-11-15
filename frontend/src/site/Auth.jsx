@@ -160,7 +160,8 @@ export default function Auth({ route }) {
       const res = await request("POST", mode === "login" ? "/site/v1/auth/login" : "/site/v1/auth/register", body);
       await session.signIn(res.token);
       // Выбравшим оплату сразу сразу открываем страницу оплаты, остальным кабинет
-      window.location.hash = mode === "register" && ["tutor", "school"].includes(role) && start === "pay" ? "#/app/plan?pay=1" : "#/app";
+      window.location.hash = route.params.get("next") === "practice" && ["tutor", "student"].includes(res.account?.role)
+        ? "#/practice" : mode === "register" && ["tutor", "school"].includes(role) && start === "pay" ? "#/app/plan?pay=1" : "#/app";
     } catch (err) { setError(err); setBusy(false); }
   };
 
@@ -201,7 +202,10 @@ export default function Auth({ route }) {
 
   const login = mode === "login";
   const invited = !!info;
-  const q = code ? `?code=${encodeURIComponent(code)}` : "";
+  const query = new URLSearchParams();
+  if (code) query.set("code", code);
+  if (route.params.get("next") === "practice") query.set("next", "practice");
+  const q = query.toString() ? `?${query}` : "";
   const typo = !login && f.email.includes("@") ? typoOf(f.email) : null;
   const pays = ["tutor", "school"].includes(role) && !invited;
   return (
