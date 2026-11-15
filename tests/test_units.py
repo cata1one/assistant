@@ -198,3 +198,40 @@ def test_quick_create_keeps_teacher_brackets():
     assert "[have been]" in gap["text"]
     view = student_view({"id": "x", "title": "t", **u})
     assert "have been" not in str(view["blocks"][0].get("parts"))  # ответ ученику не виден
+
+
+def test_lesson_drafts_preserve_unfinished_exercises_and_cannot_be_assigned(env):
+    units, learning, tutor = env["u"], env["l"], env["tutor"]
+    empty = units.save(tutor, {"title": "Черновик", "blocks": []})
+    assert empty["blocks"] == []
+    with pytest.raises(PortalError):
+        learning.assign(tutor, {"chat_id": env["chat"], "unit_id": empty["id"]})
+
+    partial = units.save(tutor, {"title": "Черновик", "blocks": [
+        {"type": "gap", "text": "She works here."},
+        {"type": "match", "pairs": [], "editor": {"pairsText": "one – один\ntwo"}},
+    ]}, empty["id"])
+    assert len(partial["blocks"]) == 2
+    assert all(block["incomplete"] for block in partial["blocks"])
+    assert partial["blocks"][1]["editor"]["pairsText"] == "one – один\ntwo"
+    assert units.get(tutor, empty["id"])["blocks"] == partial["blocks"]
+    with pytest.raises(PortalError, match="Задание 1"):
+        learning.assign(tutor, {"chat_id": env["chat"], "unit_id": empty["id"]})
+
+    complete = units.save(tutor, {"title": "Готово", "blocks": [
+        {"type": "gap", "text": "She [works] here."},
+        {"type": "match", "pairs": [["one", "один"], ["two", "два"]]},
+    ]}, empty["id"])
+    assert not any(block["incomplete"] for block in complete["blocks"])
+    assignment = learning.assign(tutor, {"chat_id": env["chat"], "unit_id": empty["id"]})
+    assert assignment["id"]
+    assert student_view(env["a"].storage.get_unit(empty["id"]))["blocks"][0]["parts"] == ["She ", " here."]
+    with pytest.raises(PortalError, match="уже выдано"):
+        units.save(tutor, {"title": "Готово", "blocks": []}, empty["id"])
+
+
+def test_whitespace_only_gap_is_an_unfinished_draft():
+    blocks = validate_blocks([{"type": "gap", "text": "She [   ] here.", "bank": True}], allow_drafts=True)
+    assert blocks[0]["incomplete"] is True
+    with pytest.raises(PortalError):
+        validate_blocks([{"type": "gap", "text": "She [   ] here.", "bank": True}])
