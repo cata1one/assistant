@@ -67,19 +67,11 @@
 .safe-bottom { padding-bottom: max(.5rem, env(safe-area-inset-bottom)); }
 
 /* Искорка: покачивание, моргание, радость */
-.isk-halo { isolation: isolate; }
-.isk-halo::before { content: ""; position: absolute; inset: 10%; border-radius: 50%; background: #d9e9ff; box-shadow: 0 0 0 1px #b7cfea; z-index: -1; }
-.isk-body { filter: grayscale(1) brightness(1.28) drop-shadow(0 0 1px #2b65ad) drop-shadow(0 2px 3px #8aa9d6); }
+.isk-body { filter: grayscale(1) brightness(1.28) drop-shadow(0 0 1.5px #3268a9) drop-shadow(0 2px 2px #9bb6da); }
 .spark-helper-public, .spark-helper-app { bottom: calc(5.25rem + env(safe-area-inset-bottom)); }
 .spark-helper-immersive { top: calc(4.5rem + env(safe-area-inset-top)); }
 @media (min-width: 1024px) { .spark-helper-app { bottom: 1.25rem; } }
 @media (min-width: 768px) { .spark-helper-public { bottom: 1.25rem; } }
-.isk-live .isk-body { animation: isk-float 3.2s ease-in-out infinite; }
-.isk-live svg { animation: isk-float 3.2s ease-in-out infinite; }
-.isk-live .isk-eyes { transform-box: fill-box; transform-origin: center; animation: isk-blink 4.6s infinite; }
-.isk-joy .isk-body, .isk-joy svg { animation: isk-hop .7s cubic-bezier(.3,1.6,.5,1) 2; }
-.isk-oops .isk-body, .isk-oops svg { animation: isk-shake .5s ease-in-out 1; }
-.isk-think .isk-body, .isk-think svg { animation: isk-tilt 1.6s ease-in-out infinite; }
 .isk-sparks i { position: absolute; width: 22%; height: 22%; background: radial-gradient(circle, #4f90eb 0 30%, transparent 32%),
   conic-gradient(from 45deg, transparent 0 20%, #317de8 20% 30%, transparent 30% 45%, #317de8 45% 55%, transparent 55% 70%, #317de8 70% 80%, transparent 80%);
   clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); animation: isk-pop .9s ease-out both; }

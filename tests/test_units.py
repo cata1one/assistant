@@ -45,6 +45,24 @@ def keys(env, who="student"):
     return {w["word"] for w in env["l"].vocab(env[who], None if who == "student" else env["chat"])["words"]}
 
 
+def test_independent_student_can_use_cards_and_keeps_words_after_joining(env):
+    account = Accounts(env["portal"])
+    result = account.register({"role": "student", "name": "Лена", "email": "independent@example.test",
+                               "password": "secret123", "consent": True}, "2")
+    student = env["portal"].viewer(result["token"])
+    assert env["l"].cards(student)["stats"]["total"] == 0
+    assert env["l"].add_words(student, {"text": "apple – яблоко"})["added"] == 1
+    assert [word["word"] for word in env["l"].cards(student)["queue"]] == ["apple"]
+    invitation = account.add_student(env["tutor"], {"name": "Лена"})["invite"]["code"]
+    assert len(invitation) == 12 and invitation.isalnum() and invitation.isupper()
+    account.join(student, invitation)
+    assert [word["word"] for word in env["l"].vocab(student)["words"]] == ["apple"]
+    assert env["l"].vocab(env["student"])["words"] == []
+    word = env["l"].vocab(student)["words"][0]
+    env["l"].delete_word(student, {"key": word["key"], "word": "apple"})
+    assert env["l"].cards(student)["stats"]["total"] == 0
+
+
 def test_homework_words_become_cards(env):
     lrn, chat = env["l"], env["chat"]
     out = lrn.assign(env["tutor"], {"chat_id": chat, "text": "Выучить новые слова: apple — яблоко, table — стол",

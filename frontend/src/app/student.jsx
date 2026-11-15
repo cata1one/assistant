@@ -14,7 +14,8 @@ import { speak } from "./player.jsx";
 
 // == Ученик: «Сегодня» ==========================================================================
 export function StudentHome() {
-  const { account, me } = useSession();
+  const session = useSession();
+  const { account, me } = session;
   const cards = useApi("/site/v1/cards").data;
   const hw = useApi("/site/v1/homework").data?.homework || [];
   const titles = Object.fromEntries((me?.chats || []).map((c) => [c.chat_id, c.title]));
@@ -29,6 +30,7 @@ export function StudentHome() {
       <DecorHeader prefs={account?.prefs} name={account?.name} greeting={`Привет, ${name}!`}
         sub={tutors.length ? `Преподаватель: ${tutors.map((t) => t.title).join(", ")}` : null} />
       {!tutors.length && <><NotConnected /><a href="#/app/courses" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#06469E] p-5 text-white"><span><span className="block text-lg font-semibold">Начните заниматься самостоятельно</span><span className="mt-1 block text-sm text-white/80">Выберите учебник и попробуйте задания с проверкой.</span></span><span className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#06469E]">Открыть учебники →</span></a></>}
+      <JoinTeacher onJoined={session.reload} />
       <LiveBanner lessons={lessons} />
       {tutors.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -73,6 +75,29 @@ export function StudentHome() {
   );
 }
 
+function JoinTeacher({ onJoined }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [joined, setJoined] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setBusy(true); setError(null); setJoined(false);
+    try {
+      const entered = code.trim();
+      const normalized = /^[a-z2-9]{12}$/i.test(entered) ? entered.toUpperCase() : entered;
+      await request("POST", `/site/v1/invites/${encodeURIComponent(normalized)}/join`, {});
+      await onJoined(); setCode(""); setJoined(true);
+    } catch (err) { setError(err); }
+    setBusy(false);
+  };
+  return <details className="panel mb-5 p-4"><summary className="cursor-pointer font-semibold">Подключиться к преподавателю по коду</summary>
+    <form className="mt-3 grid gap-3 sm:flex sm:items-end" onSubmit={submit}>
+      <label className="label flex-1">Код от преподавателя<input className="field" value={code} required maxLength={100} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setCode(e.target.value)} placeholder="Введите код точно как получили" /></label>
+      <button type="submit" className="btn-brand" disabled={busy}>{busy ? "Подключаем…" : "Подключиться"}</button>
+    </form><ErrorBox error={error} />{joined && <p role="status" className="mt-2 text-sm text-brand">Преподаватель подключён.</p>}
+  </details>;
+}
+
 /** Слова: повторение карточками и весь словарь – в одном разделе. */
 export function WordsHub({ route }) {
   const [tab, setTab] = useState(route?.parts?.[1] === "cards" ? "cards" : route?.parts?.[1] === "words" && route?.parts?.[2] === "all" ? "all" : "cards");
@@ -110,14 +135,27 @@ export function CardsPage({ embedded, onAdd }) {
   const [i, setI] = useState(0);
   const [shown, setShown] = useState(false);
   const [done, setDone] = useState(0);
-  const load = () => request("GET", "/site/v1/cards").then((d) => { setData(d); setI(0); setShown(false); }).catch(setError);
-  useEffect(() => { load(); }, []);
+  const [retry, setRetry] = useState(0);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController(); let active = true;
+    const timer = setTimeout(() => controller.abort(), 15000);
+    setError(null); setData(null);
+    request("GET", "/site/v1/cards", undefined, {}, { signal: controller.signal })
+      .then((d) => { if (active) { setData(d); setI(0); setShown(false); } })
+      .catch((err) => { if (active) setError(err.name === "AbortError" ? new Error("Не удалось загрузить слова. Проверьте интернет и попробуйте ещё раз.") : err); })
+      .finally(() => clearTimeout(timer));
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [retry]);
   const card = data?.queue[i];
   const grade = async (g) => {
-    try { await request("POST", "/site/v1/cards/review", { key: card.key, grade: g }); } catch (x) { setError(x); return; }
+    if (busy) return;
+    setBusy(true); setError(null);
+    try { await request("POST", "/site/v1/cards/review", { key: card.key, grade: g }); } catch (x) { setError(x); setBusy(false); return; }
     setDone((n) => n + 1); setShown(false);
     if (g === "again") setData((d) => ({ ...d, queue: [...d.queue, card] })); // вернётся в конце сессии
     setI((n) => n + 1);
+    setBusy(false);
   };
   useEffect(() => {
     const on = (e) => {
@@ -132,7 +170,7 @@ export function CardsPage({ embedded, onAdd }) {
     <>
       {!embedded && <PageTitle title="Карточки" />}
       <ErrorBox error={error} />
-      {!data ? <Loading /> : !data.stats.total ? <Empty icon={Layers} title="Слов пока нет" text="Карточки пополняются сами: слова с уроков, из домашних заданий и занятий. Свои слова можно добавить в словаре." action={<button type="button" className="btn-light" onClick={onAdd}>Добавить слова</button>} /> : !card ? (
+      {!data && error ? <button type="button" className="btn-light" onClick={() => setRetry((n) => n + 1)}>Попробовать снова</button> : !data ? <Loading /> : !data.stats.total ? <Empty icon={Layers} title="Слов пока нет" text="Карточки пополняются сами: слова с уроков, из домашних заданий и занятий. Свои слова можно добавить в словаре." action={<button type="button" className="btn-light" onClick={onAdd}>Добавить слова</button>} /> : !card ? (
         <Empty icon={PartyPopper} title={done ? `Отлично! Повторено: ${done}` : "На сегодня всё"} text="Следующие карточки появятся, когда подойдёт время повторения." action={<button type="button" className="btn-light" onClick={onAdd}>Открыть словарь</button>} />
       ) : (
         <div className="mx-auto max-w-xl">
@@ -151,7 +189,7 @@ export function CardsPage({ embedded, onAdd }) {
           <div className="mt-3 flex justify-center"><button type="button" className="btn-ghost btn-sm" onClick={() => speak(card.word.replace(/\s*\(.*\)$/, ""), ttsOf(langOf(card.word, card.chat_id, me?.chats)))}><Volume2 size={15} /> Произнести</button></div>
           {shown && (
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {GRADES.map(([g, t, cls], n) => <button key={g} type="button" onClick={() => grade(g)} className={`rounded-2xl px-3 py-3.5 font-semibold transition ${cls}`}>{t}<span className="hidden text-[10px] font-medium opacity-60 sm:block">{n + 1}</span></button>)}
+              {GRADES.map(([g, t, cls], n) => <button key={g} type="button" disabled={busy} onClick={() => grade(g)} className={`rounded-2xl px-3 py-3.5 font-semibold transition disabled:opacity-50 ${cls}`}>{t}<span className="hidden text-[10px] font-medium opacity-60 sm:block">{n + 1}</span></button>)}
             </div>
           )}
         </div>

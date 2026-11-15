@@ -314,7 +314,11 @@ class Accounts:
         pair = self.relay.create_pair(first_name(tutor["name"]), name, created_by=tutor["id"])
         self.storage.bind_pair_user(pair.id, TUTOR, tutor["id"])
         self.storage.set_pair_language(pair.id, _language(body))
-        code = secrets.token_urlsafe(10)
+        # Читаемый код без похожих символов; существующие ссылки остаются действительными.
+        alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        code = "".join(secrets.choice(alphabet) for _ in range(12))
+        while self.storage.get_invite(code):
+            code = "".join(secrets.choice(alphabet) for _ in range(12))
         self.storage.add_invite(code, "student", pair.id, tutor["id"])
         pair = self.relay.get(pair.id)
         return {"pair_id": pair.id, "invite": self._links(code), "parent_invite": self._links(self._parent_code(pair))}
@@ -505,17 +509,19 @@ class Accounts:
     def join(self, viewer: Viewer, code: Any) -> dict[str, Any]:
         if not isinstance(code, str) or not code:
             raise PortalError(400, "нет кода приглашения")
+        self._throttle(f"invite-user:{viewer.user_id}")
         info = self.invite_info(code)
         acc = self.account(viewer)
         if info["kind"] == "student":
             if acc["role"] != "student":
                 raise PortalError(409, "это приглашение для ученика – войдите как ученик")
             inv = self.storage.get_invite(code)
-            pair = self.relay.get(inv["target"])
-            if pair.student_user_id and pair.student_user_id != acc["id"]:
-                raise PortalError(409, "приглашение уже использовано")
-            self.storage.bind_pair_user(pair.id, STUDENT, acc["id"])
-            self.storage.use_invite(code)
+            with self.storage._lock:
+                pair = self.relay.get(inv["target"])
+                if pair.student_user_id and pair.student_user_id != acc["id"]:
+                    raise PortalError(409, "приглашение уже использовано")
+                self.storage.bind_pair_user(pair.id, STUDENT, acc["id"])
+                self.storage.use_invite(code)
             self.portal.telegram(pair.tutor_user_id, f"🔔 Ученик «{pair.student_alias}» подключился на сайте.")
             return {"kind": "student", "chat_id": pair.chat_id, "tutor": pair.tutor_alias}
         if info["kind"] == "tutor":
