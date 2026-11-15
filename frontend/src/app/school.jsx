@@ -38,6 +38,11 @@ export function SchoolHome() {
         <Stat value={data.lessons.filter((l) => new Date(l.started_at).getTime() > week).length} label="уроков за неделю" />
         <Stat value={data.signals.filter((s) => new Date(s.created_at).getTime() > week).length} label="сигналов за неделю" accent={data.signals.some((s) => new Date(s.created_at).getTime() > week)} />
       </div>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <a href="#/app/tutors" className="btn-brand">Преподаватели и ученики</a>
+        <a href="#/app/lessons" className="btn-light">Уроки школы</a>
+        <a href="#/app/materials" className="btn-light">Общие материалы</a>
+      </div>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Panel title="Пригласить преподавателя" icon={Users}>
           <p className="mb-3 text-sm text-ink-soft">Отправьте ссылку преподавателю: он зарегистрируется и попадёт в вашу школу. Его ученики, уроки и переписка будут видны вам.</p>

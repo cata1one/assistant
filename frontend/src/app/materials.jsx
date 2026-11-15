@@ -1,5 +1,5 @@
 import { BookOpen, Clapperboard, File, FileText, FolderOpen, Image, Link2, Plus, Search, Trash2, Upload } from "lucide-react";
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { getToken, request } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Tabs } from "../ui/kit.jsx";
@@ -28,8 +28,10 @@ const KIND_TITLE = { pdf: "Учебники и PDF", image: "Картинки", 
 /** Материалы: свои файлы и учебники, интерактивные занятия и готовые курсы Bright – в одном разделе. */
 export function MaterialsHub({ route }) {
   const { role } = useSession();
-  const initial = route?.parts?.[1] === "units" ? "units" : "files";
+  const requested = route?.params?.get("tab");
+  const initial = route?.parts?.[1] === "units" || requested === "units" ? "units" : requested === "library" ? "library" : "files";
   const [tab, setTab] = useState(initial);
+  useEffect(() => { if (requested === "units" || requested === "library") setTab(requested); }, [requested]);
   return (
     <>
       <PageTitle title={role === "school" ? "Материалы школы" : "Материалы"}

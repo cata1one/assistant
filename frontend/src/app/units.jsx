@@ -17,6 +17,16 @@ const TYPES = {
   text: "Текст или правило", words: "Новые слова", gap: "Вставить слова в текст", match: "Пары: слово и значение",
   choice: "Тест с вариантами", listening: "Аудирование", write: "Свободный ответ", video: "Видео",
 };
+const TYPE_EXAMPLES = {
+  text: "Объяснение, история или текст для чтения",
+  words: "Слова и перевод для изучения",
+  gap: "Пропуски с ответами в [скобках]",
+  match: "Соединить слова и определения",
+  choice: "Вопросы с вариантами ответа",
+  listening: "Запись или озвученный текст",
+  write: "Ответ в свободной форме",
+  video: "Видео и вопросы к нему",
+};
 const KIND_SHORT = { gap: "пропуски", match: "пары", choice: "тест", listening: "аудирование", words: "слова", write: "письмо", text: "текст", video: "видео" };
 
 // Черновик от генератора передаём в редактор без сохранения на сервере
@@ -71,7 +81,7 @@ function BlockEditor({ b, onChange, audios }) {
   return (
     <div className="grid gap-3">
       <input className="field" value={b.title || ""} onChange={set("title")} placeholder="Заголовок задания" aria-label="Заголовок" />
-      {["gap", "choice", "listening", "write"].includes(b.type) && <details className="rounded-xl border border-line p-3">
+      {["gap", "choice", "listening", "write"].includes(b.type) && <details open className="rounded-xl border border-line p-3">
         <summary className="cursor-pointer text-sm font-semibold">Контекст и инструкция к заданию</summary>
         <div className="mt-3 grid gap-3"><label className="label">Ситуация или исходный текст{area("context", "Этот текст останется рядом с вопросом в режиме ученика.", 5)}</label>
         <label className="label">Что нужно сделать{area("instruction", "Укажите форму ответа, ограничения и критерии.", 3)}</label></div>
@@ -389,9 +399,15 @@ export function UnitEditor({ id }) {
         <UnitPlayer key={studentView.id + JSON.stringify(unit.blocks).length} unit={studentView} submitLabel="Проверить (пробный прогон)"
           onSubmit={(answers) => request("POST", `/site/v1/units/${studentView.id}/check`, { answers })} />
       ) : (
-        <div className="grid gap-3">
+        <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="rounded-2xl border border-line bg-white p-4 xl:sticky xl:top-5" aria-label="Структура урока">
+            <p className="text-xs font-bold uppercase tracking-wider text-ink-mute">Структура урока</p>
+            <p className="mt-1 text-sm text-ink-soft">{unit.blocks.length ? `Заданий: ${unit.blocks.length}` : "Добавьте первое задание"}</p>
+            <ol className="mt-3 grid gap-1">{unit.blocks.map((b, i) => <li key={i}><a href={`#exercise-${i}`} onClick={(e) => { e.preventDefault(); document.getElementById(`exercise-${i}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }} className="block rounded-lg px-2 py-2 text-sm text-ink-soft hover:bg-cream"><b className="mr-2 text-brand">{i + 1}.</b>{b.title || TYPES[b.type]}</a></li>)}</ol>
+          </aside>
+          <div className="grid min-w-0 gap-4">
           {unit.blocks.map((b, i) => (
-            <div key={i} className="card !p-4">
+            <div key={i} id={`exercise-${i}`} className="card !p-4 md:!p-6">
               <div className="mb-3 flex items-center gap-2">
                 <span className="chip chip-brand">{i + 1}. {TYPES[b.type]}</span>
                 <span className="ml-auto flex gap-1">
@@ -406,15 +422,20 @@ export function UnitEditor({ id }) {
           ))}
           <div className="card !p-4">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">Добавить задание</p><button type="button" className="btn-light btn-sm" onClick={() => { setError(null); setAiExercise({ type: "gap", topic: unit.title || "", wishes: "" }); }}><Wand2 size={14} /> Создать с ИИ</button></div>
-            <div className="flex flex-wrap gap-2">
+            <p className="mb-4 text-sm text-ink-soft">Выберите формат. Настроить содержимое можно после добавления.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
               {Object.entries(TYPES).map(([t, label]) => (
-                <button key={t} type="button" className="btn-light btn-sm" onClick={() => setUnit({ ...unit, blocks: [...unit.blocks, { type: t, title: label, lang: ttsOf(unit.language) }] })}><Plus size={13} /> {label}</button>
+                <button key={t} type="button" className="group rounded-xl border border-line bg-white p-3 text-left transition hover:border-brand hover:bg-brand-tint" onClick={() => setUnit({ ...unit, blocks: [...unit.blocks, { type: t, title: label, lang: ttsOf(unit.language) }] })}>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-ink"><Plus size={15} className="text-brand" />{label}</span>
+                  <span className="mt-1 block pl-6 text-xs leading-relaxed text-ink-soft">{TYPE_EXAMPLES[t]}</span>
+                </button>
               ))}
             </div>
           </div>
-          <div className="sticky bottom-24 z-10 flex flex-wrap gap-2 rounded-3xl bg-cream/90 py-2 backdrop-blur lg:bottom-4">
+          <div className="flex flex-wrap gap-2 pb-4">
             <button type="button" className="btn-brand" onClick={save}><BookOpenCheck size={16} /> Сохранить</button>
             {!isNew && role === "tutor" && <button type="button" className="btn-light" onClick={() => setAssign(true)}><Send size={16} /> Выдать ученику</button>}
+          </div>
           </div>
         </div>
       )}

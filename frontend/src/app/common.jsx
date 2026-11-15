@@ -114,6 +114,11 @@ export function LessonsHub({ route }) {
     <>
       <PageTitle title={parent ? "Отчёты об уроках" : "Уроки"} text={parent ? "После каждого урока здесь появляется отчёт преподавателя." : null}
         actions={!parent && <Tabs label="Раздел" value={tab} onChange={setTab} items={[{ id: "lessons", title: "Уроки" }, { id: "boards", title: "Доски" }]} />} />
+      {role === "tutor" && <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <a href="#/app/units/new" className="rounded-2xl bg-[#06469E] p-5 text-white"><span className="text-xs font-semibold uppercase tracking-wider text-white/70">Подготовка</span><span className="mt-2 block text-lg font-semibold">Создать урок →</span><span className="mt-1 block text-sm text-white/80">Соберите задания под ученика</span></a>
+        <a href="#/app/materials?tab=units" className="rounded-2xl border border-line bg-white p-5 hover:border-brand"><span className="text-xs font-semibold uppercase tracking-wider text-ink-mute">Под рукой</span><span className="mt-2 block text-lg font-semibold">Мои занятия →</span><span className="mt-1 block text-sm text-ink-soft">Открыть или выдать готовый урок</span></a>
+        <a href="#/app/materials?tab=library" className="rounded-2xl border border-line bg-white p-5 hover:border-brand"><span className="text-xs font-semibold uppercase tracking-wider text-ink-mute">Идеи</span><span className="mt-2 block text-lg font-semibold">Библиотека Bright →</span><span className="mt-1 block text-sm text-ink-soft">Выбрать готовый материал</span></a>
+      </div>}
       {tab === "boards" && !parent ? <BoardsPage /> : (
         <>
           <LiveBanner lessons={lessons} />

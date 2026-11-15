@@ -28,7 +28,7 @@ export function StudentHome() {
       <HolidayBanner student />
       <DecorHeader prefs={account?.prefs} name={account?.name} greeting={`Привет, ${name}!`}
         sub={tutors.length ? `Преподаватель: ${tutors.map((t) => t.title).join(", ")}` : null} />
-      {!tutors.length && <NotConnected />}
+      {!tutors.length && <><NotConnected /><a href="#/app/courses" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#06469E] p-5 text-white"><span><span className="block text-lg font-semibold">Начните заниматься самостоятельно</span><span className="mt-1 block text-sm text-white/80">Выберите учебник и попробуйте задания с проверкой.</span></span><span className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#06469E]">Открыть учебники →</span></a></>}
       <LiveBanner lessons={lessons} />
       {tutors.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">

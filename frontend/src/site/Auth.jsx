@@ -1,6 +1,7 @@
 import { ArrowRight, Building2, Eye, EyeOff, GraduationCap, PenTool, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { request } from "../lib/api.js";
+import { useConfig } from "../lib/config.js";
 import { firstMonth, PRICE } from "../lib/pricing.js";
 import { brandOf, useSession } from "../lib/session.js";
 import { ErrorBox, Loading, Notice } from "../ui/kit.jsx";
@@ -129,11 +130,13 @@ function Reset({ route }) {
 
 export default function Auth({ route }) {
   const session = useSession();
+  const cfg = useConfig();
   const mode = route.parts[0]; // login | register | join | forgot | reset
   const code = route.params.get("code") || "";
   const { info, error: inviteError } = useInvite(code);
   const [role, setRole] = useState(route.params.get("role") || "");
-  const [start, setStart] = useState(route.params.get("start") === "pay" ? "pay" : "trial"); // 3 дня бесплатно или оплата сразу
+  const requestedStart = route.params.get("start");
+  const [start, setStart] = useState("trial"); // 3 дня бесплатно или оплата сразу
   const [f, setF] = useState({ name: "", email: mode === "login" ? lastEmail() : "", password: "", school_name: "", consent: false });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -141,6 +144,7 @@ export default function Auth({ route }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
   useEffect(() => { if (info?.role) setRole(info.role); }, [info]);
+  useEffect(() => { if (cfg.online_payments && requestedStart === "pay") setStart("pay"); }, [cfg.online_payments, requestedStart]);
   const brand = ROLES.find((r) => r.id === role)?.brand || (session.role ? brandOf(session.role) : "study");
   useEffect(() => { document.documentElement.dataset.brand = brand; }, [brand]);
 
@@ -232,7 +236,7 @@ export default function Auth({ route }) {
           {pays && (
             <div role="radiogroup" aria-label="Как начать" className="grid gap-2 sm:grid-cols-2">
               {[["trial", `${PRICE.trialDays} дня бесплатно`, "Все функции, без карты"],
-                ["pay", role === "school" ? "Сразу оплатить" : `Сразу за ${firstMonth()} ₽`, role === "school" ? "Откроется страница оплаты" : `Первый месяц на ${PRICE.firstDiscount}% дешевле`]].map(([id, t, d]) => (
+                ...(cfg.online_payments ? [["pay", role === "school" ? "Сразу оплатить" : `Сразу за ${firstMonth()} ₽`, role === "school" ? "Откроется страница оплаты" : `Первый месяц на ${PRICE.firstDiscount}% дешевле`]] : [])].map(([id, t, d]) => (
                 <button key={id} type="button" role="radio" aria-checked={start === id} onClick={() => setStart(id)}
                   className={`rounded-2xl border-2 px-4 py-3 text-left transition ${start === id ? "border-brand bg-brand-tint" : "border-line bg-white"}`}>
                   <span className="block font-bold">{t}</span><span className="text-xs text-ink-mute">{d}</span>

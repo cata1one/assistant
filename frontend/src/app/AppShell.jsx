@@ -101,14 +101,22 @@ function Sidebar({ items, current, session }) {
   return (
     <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-white px-3 py-5 lg:flex">
       <a href="#/" className="px-2.5" aria-label="На сайт"><Logo size={28} school={session.role === "school"} /></a>
-      <nav aria-label="Кабинет" className="mt-7 grid gap-0.5">
-        {items.map(([id, title, Icon, , , href]) => (
+      <nav aria-label="Кабинет" className="mt-7 grid gap-0.5 overflow-y-auto">
+        {items.filter((item) => item[4] || ["materials", "homework"].includes(item[0])).map(([id, title, Icon, , , href]) => (
           <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined}
             className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-[14px] font-medium transition ${current === id ? "bg-cream text-ink" : "text-ink-soft hover:bg-cream/70 hover:text-ink"}`}>
             <Icon size={18} strokeWidth={current === id ? 2.2 : 1.8} className={current === id ? "text-brand" : ""} />{title}
             {id === "messages" && <Badge n={unread} />}
           </a>
         ))}
+        <details open={items.some((item) => !item[4] && !["materials", "homework"].includes(item[0]) && item[0] === current)} className="mt-2">
+          <summary className="cursor-pointer rounded-xl px-2.5 py-2 text-sm font-semibold text-ink-soft hover:bg-cream">Ещё разделы</summary>
+          <div className="grid gap-0.5">{items.filter((item) => !item[4] && !["materials", "homework"].includes(item[0])).map(([id, title, Icon, , , href]) => (
+            <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium ${current === id ? "bg-cream text-ink" : "text-ink-soft hover:bg-cream/70"}`}>
+              <Icon size={18} />{title}
+            </a>
+          ))}</div>
+        </details>
       </nav>
       <div className="mt-auto grid gap-2">
         {["tutor", "school"].includes(session.role) && b?.state && b.state !== "free" && !b.by_school && (
@@ -231,7 +239,7 @@ export default function AppShell({ route }) {
       <div className="min-w-0 flex-1">
         <MobileTop session={session} title={title} />
         <main className={`mx-auto px-4 pb-28 pt-5 md:px-8 md:pt-8 lg:pb-12 ${area === "board" ? "max-w-none" : "max-w-[1120px]"}`}>
-          {area === "app" && current === "home" && <GettingStarted key={session.account?.id || session.role} session={session} />}
+          {area === "app" && current === "home" && session.role === "student" && <GettingStarted key={session.account?.id || session.role} session={session} />}
           {["tutor", "school"].includes(session.role) && session.account?.billing?.state === "expired" && area === "app" && sub !== "plan" && <BillingStatus billing={session.account?.billing} compact />}
           {area === "lesson" && rawSub ? <Lesson id={rawSub} /> : area === "board" ? <BoardPage params={route.params} />
             : rawSub === "units" && third ? <UnitEditor id={third} /> : rawSub === "do" && third ? <DoUnit hwId={third} /> : <Page route={route} />}

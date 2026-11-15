@@ -93,7 +93,7 @@ class PracticeRooms:
             if not room or viewer.user_id not in room["peers"]:
                 raise PortalError(404, "комната закрыта или вы вышли")
             room["peers"][viewer.user_id]["seen"] = time.monotonic()
-            return {"id": rid, "title": room["title"], "topic": room["topic"], "me": viewer.user_id,
+            return {"id": rid, "title": room["title"], "topic": room["topic"], "language": room["language"], "me": viewer.user_id,
                     "peers": [{"id": k, "name": v["name"]} for k, v in room["peers"].items()],
                     "signals": [s for s in room["signals"] if s["to"] == viewer.user_id and s["id"] > since],
                     "ice_servers": self.classroom.ice_servers(), "prompt": room["prompt"]}
