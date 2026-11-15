@@ -340,6 +340,8 @@ export function UnitEditor({ id }) {
   const [msg, setMsg] = useState(null);
   const [mode, setMode] = useState("edit");
   const [studentView, setStudentView] = useState(null);
+  const [aiExercise, setAiExercise] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
   const [assign, setAssign] = useState(false);
   const audios = (useApi("/site/v1/materials").data?.materials || []).filter((m) => m.mime?.startsWith("audio/"));
   useEffect(() => {
@@ -403,7 +405,7 @@ export function UnitEditor({ id }) {
             </div>
           ))}
           <div className="card !p-4">
-            <p className="mb-2 text-sm font-semibold">Добавить задание</p>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">Добавить задание</p><button type="button" className="btn-light btn-sm" onClick={() => { setError(null); setAiExercise({ type: "gap", topic: unit.title || "", wishes: "" }); }}><Wand2 size={14} /> Создать с ИИ</button></div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(TYPES).map(([t, label]) => (
                 <button key={t} type="button" className="btn-light btn-sm" onClick={() => setUnit({ ...unit, blocks: [...unit.blocks, { type: t, title: label, lang: ttsOf(unit.language) }] })}><Plus size={13} /> {label}</button>
@@ -417,6 +419,23 @@ export function UnitEditor({ id }) {
         </div>
       )}
       {assign && <AssignModal unit={{ id, title: unit.title }} onClose={() => setAssign(false)} />}
+      {aiExercise && <Modal open onClose={() => !aiBusy && setAiExercise(null)} title="Создать задание с ИИ">
+        <form className="grid gap-3" onSubmit={async (event) => {
+          event.preventDefault(); setError(null); setAiBusy(true);
+          try {
+            const result = await request("POST", "/site/v1/units/generate-exercise", { ...aiExercise, language: unit.language, level: unit.level });
+            setUnit((current) => ({ ...current, blocks: [...current.blocks, toEdit(result.block)] }));
+            setAiExercise(null);
+          } catch (e) { setError(e); }
+          finally { setAiBusy(false); }
+        }}>
+          <label className="label">Тема<input className="field" required maxLength={200} value={aiExercise.topic} onChange={(e) => setAiExercise({ ...aiExercise, topic: e.target.value })} /></label>
+          <label className="label">Тип задания<select className="field" value={aiExercise.type} onChange={(e) => setAiExercise({ ...aiExercise, type: e.target.value })}>{Object.entries(TYPES).filter(([key]) => key !== "video").map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+          <label className="label">Пожелания<textarea className="field" maxLength={1000} value={aiExercise.wishes} onChange={(e) => setAiExercise({ ...aiExercise, wishes: e.target.value })} placeholder="Например: пять предложений для подростка, тема путешествия" /></label>
+          <ErrorBox error={error} />
+          <button className="btn-brand" disabled={aiBusy}>{aiBusy ? "Создаём…" : "Создать черновик"}</button>
+        </form>
+      </Modal>}
     </>
   );
 }

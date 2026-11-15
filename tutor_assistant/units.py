@@ -489,6 +489,8 @@ class Units:
         language = _s(body.get("language"), 10) or "en"
         words_text, text, extra = _s(body.get("words"), 3000), _s(body.get("text"), 5000), _s(body.get("wishes"), 1000)
         level = _s(body.get("level"), 20)
+        if body.get("mode") == "ai" and not self.ai.provider:
+            raise PortalError(503, "ИИ на сервере не настроен. Можно создать занятие вручную.")
         if body.get("mode") != "offline" and self.ai.provider:
             if not topic:
                 raise PortalError(400, "укажите тему занятия")
@@ -510,6 +512,35 @@ class Units:
         return {**draft, "level": level, "generated_by": "offline",
                 "notice": "Собрано без ИИ из ваших слов и текста." if self.ai.provider is None else
                 "ИИ не ответил – собрано из ваших слов и текста."}
+
+    def generate_exercise(self, viewer: Any, body: Any) -> dict[str, Any]:
+        """Generate one editable exercise; answers stay in the teacher draft."""
+        self._owner(viewer)
+        if not isinstance(body, dict):
+            raise PortalError(400, "нужны параметры задания")
+        kind = _s(body.get("type"), 20)
+        topic = _s(body.get("topic"), 200)
+        language = _s(body.get("language"), 10) or "en"
+        level = _s(body.get("level"), 20)
+        wishes = _s(body.get("wishes"), 1000)
+        if kind not in ("text", "words", "gap", "match", "choice", "listening", "write"):
+            raise PortalError(400, "выберите тип задания")
+        if not topic:
+            raise PortalError(400, "укажите тему задания")
+        if not self.ai.provider:
+            raise PortalError(503, "ИИ на сервере не настроен. Задание можно создать вручную.")
+        system = AI_PROMPT + f"\nВерни ровно один блок типа {kind}. Обязательно добавь контекст и инструкцию."
+        answer = self.ai.complete(system, ai_user_prompt(topic, language, level, "", wishes),
+                                  timeout=min(self.portal.settings.ai_timeout, 300))
+        data = parse_ai_json(answer or "")
+        try:
+            blocks = validate_blocks(data.get("blocks")) if data else []
+        except PortalError:
+            blocks = []
+        blocks = [block for block in blocks if block["type"] == kind]
+        if not blocks:
+            raise PortalError(502, "ИИ не вернул корректное задание. Попробуйте ещё раз.")
+        return {"block": blocks[0]}
 
     def from_lesson(self, viewer: Any, lesson_id: str, body: Any) -> dict[str, Any]:
         """Упражнения по пройденной теме: слова и тема урока превращаются в занятие, которое можно сразу выдать ученику."""

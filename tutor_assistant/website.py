@@ -195,6 +195,7 @@ class Website:
         ("POST", re.compile(r"^/site/v1/lessons/(?P<id>[\w-]+)/report$"), "report_edit", True),
         ("GET", re.compile(r"^/site/v1/units$"), "units", True),
         ("POST", re.compile(r"^/site/v1/units$"), "unit_create", True),
+        ("POST", re.compile(r"^/site/v1/units/generate-exercise$"), "unit_generate_exercise", True),
         ("POST", re.compile(r"^/site/v1/units/generate$"), "unit_generate", True),
         ("POST", re.compile(r"^/site/v1/units/library/(?P<lib>[\w-]+)$"), "unit_copy", True),
         ("GET", re.compile(r"^/site/v1/library$"), "library", True),
@@ -579,6 +580,9 @@ class Website:
 
     def unit_create(self, viewer: Any, body: Any, **_: Any) -> Any:
         return self.units_service.save(viewer, body)
+
+    def unit_generate_exercise(self, viewer: Any, body: Any, **_: Any) -> Any:
+        return self.units_service.generate_exercise(viewer, body)
 
     def unit_generate(self, viewer: Any, body: Any, **_: Any) -> Any:
         return self.units_service.generate(viewer, body)
