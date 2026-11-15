@@ -191,6 +191,22 @@ CREATE TABLE IF NOT EXISTS study_group_members (
     PRIMARY KEY (group_id, pair_id)
 );
 
+-- Личные записи расписания преподавателя; время хранится в UTC.
+CREATE TABLE IF NOT EXISTS teacher_schedule (
+    id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    pair_id TEXT,
+    group_id TEXT,
+    title TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK ((pair_id IS NOT NULL AND group_id IS NULL) OR (pair_id IS NULL AND group_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_teacher_schedule_owner_time ON teacher_schedule(owner_id, starts_at);
+
 CREATE TABLE IF NOT EXISTS classrooms (
     chat_id TEXT PRIMARY KEY,
     url TEXT NOT NULL,

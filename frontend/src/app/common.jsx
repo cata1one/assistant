@@ -243,20 +243,22 @@ function Bubble({ m, mine }) {
   );
 }
 
-function Conversation({ chatId, title, onBack }) {
+export function Conversation({ chatId, title, onBack }) {
   const [data, setData] = useState({ messages: [] });
   const [text, setText] = useState("");
   const [warn, setWarn] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const box = useRef(null);
   const last = useRef(0);
   const pull = async () => {
     const d = await request("GET", `/site/v1/chats/${encodeURIComponent(chatId)}/messages?since=${last.current}`);
+    setLoadError(null);
     if (d.messages.length) last.current = d.messages[d.messages.length - 1].id;
     setData((old) => ({ ...d, messages: [...old.messages, ...d.messages.filter((m) => !old.messages.some((o) => o.id === m.id))] }));
   };
   useEffect(() => {
     let stop = false;
-    const tick = () => { if (!stop && document.visibilityState !== "hidden") pull().catch(() => {}); };
+    const tick = () => { if (!stop && document.visibilityState !== "hidden") pull().catch(() => { if (!stop) setLoadError("Не удалось загрузить сообщения. Проверим соединение ещё раз."); }); };
     tick();
     const t = setInterval(tick, 4000);
     return () => { stop = true; clearInterval(t); };
@@ -287,6 +289,7 @@ function Conversation({ chatId, title, onBack }) {
         {!data.messages.length && <p className="py-6 text-center text-sm text-ink-mute">Напишите первое сообщение или отправьте голосовое.</p>}
         {data.messages.map((m) => <Bubble key={m.id} m={m} mine={m.role === data.role} />)}
       </div>
+      {loadError && <Notice tone="warn" className="mx-3 mb-2">{loadError}</Notice>}
       {warn && <Notice tone="warn" className="mx-3 mb-2">{warn}</Notice>}
       {data.can_write === false ? <p className="border-t border-line px-4 py-3 text-sm text-ink-mute">Школа видит переписку, но не пишет в неё.</p> : (
         <form onSubmit={send} className="relative flex items-center gap-2 border-t border-line p-2.5">
