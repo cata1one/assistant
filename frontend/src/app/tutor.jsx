@@ -1,5 +1,5 @@
 import {
-  Check, CheckCircle2, Clapperboard, Copy, File, FileStack, Gift, Link2, NotebookPen, PenTool, Plus, Search, Trash2, Upload,
+  Check, CheckCircle2, ChevronRight, Clapperboard, Copy, File, FileStack, Gift, Link2, NotebookPen, PenTool, Plus, Search, Upload,
   UserPlus, Users, Video,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -13,9 +13,10 @@ import { HolidayBanner, MoodChip } from "./extras.jsx";
 import { SparkMark } from "./spark.jsx";
 import { Avatar, copy, Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Stat } from "../ui/kit.jsx";
 import { LessonList, LiveBanner, Panel, shortDate, startLesson, useApi } from "./common.jsx";
-import { Vocab } from "./vocab.jsx";
 import { LANGS } from "../lib/langs.js";
 import StudentWorkspace from "./StudentWorkspace.jsx";
+import { HomeworkPage } from "./homework.jsx";
+import { LessonPayPage } from "./lessonpay.jsx";
 
 function CopyLink({ label, url }) {
   const [done, setDone] = useState(false);
@@ -84,8 +85,8 @@ export function TutorHome() {
   const review = lessons.filter((l) => l.on_review);
   const todo = [
     ...review.map((l) => ({ key: `r${l.id}`, text: `Проверить и отправить конспект: ${l.with || l.title}`, href: `#/lesson/${l.id}`, cta: "Открыть" })),
-    ...(toCheck.length ? [{ key: "hw", text: `Проверить домашку: ${toCheck.length}`, href: "#/app/homework", cta: "Проверить" }] : []),
-    ...(pay?.pending_total ? [{ key: "pay", text: `Подтвердить оплату: ${pay.pending_total}`, href: "#/app/pay", cta: "Посмотреть" }] : []),
+    ...(toCheck.length ? [{ key: "hw", text: `Проверить домашку: ${toCheck.length}`, href: "#/app/students?view=homework", cta: "Проверить" }] : []),
+    ...(pay?.pending_total ? [{ key: "pay", text: `Подтвердить оплату: ${pay.pending_total}`, href: "#/app/students?view=pay", cta: "Посмотреть" }] : []),
     ...(me?.unread ? [{ key: "msg", text: `Новые сообщения: ${me.unread}`, href: "#/app/messages", cta: "Ответить" }] : []),
   ];
   const today = new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
@@ -203,21 +204,12 @@ export function StudentsPage({ route }) {
   const { data, error, reload } = useApi("/site/v1/students");
   const [name, setName] = useState("");
   const [added, setAdded] = useState(null);
-  const [words, setWords] = useState(null);
   const [lang, setLang] = useState("en");
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState(null);
-  const setStudentLang = async (s, language) => {
-    try { await request("POST", `/site/v1/students/${s.pair_id}/language`, { language }); reload(); } catch (x) { setErr(x); }
-  };
   const add = async (e) => {
     e.preventDefault(); setErr(null);
     try { setAdded({ name, ...(await request("POST", "/site/v1/students", { name, language: lang })) }); setName(""); setAdding(false); reload(); } catch (x) { setErr(x); }
-  };
-  const remove = async (s) => {
-    if (!window.confirm(`Удалить ученика «${s.name}»? Уроки и конспекты сохранятся в архиве.`)) return;
-    await request("POST", `/site/v1/students/${s.pair_id}/remove`, {}).catch(setErr);
-    reload();
   };
   const list = data?.students || [];
   const studentId = route?.parts?.[2];
@@ -225,39 +217,35 @@ export function StudentsPage({ route }) {
     if (error) return <ErrorBox error={error} />;
     if (!data) return <Loading />;
     const selected = list.find((student) => student.pair_id === studentId);
-    return selected ? <StudentWorkspace key={studentId} student={selected} route={route} /> : <Empty icon={Users} title="Ученик не найден" text="Карточка недоступна или ученик удалён." action={<a href="#/app/students" className="btn-light">Все ученики</a>} />;
+    return selected ? <StudentWorkspace key={studentId} student={selected} route={route} onUpdated={reload} /> : <Empty icon={Users} title="Ученик не найден" text="Карточка недоступна или ученик удалён." action={<a href="#/app/students" className="btn-light">Все ученики</a>} />;
   }
+  const requestedView = route?.params?.get("view");
+  const view = ["classes", "homework", "pay"].includes(requestedView) ? requestedView : "students";
+  const sections = [["students", "Ученики", "#/app/students"], ["classes", "Классы", "#/app/students?view=classes"], ["homework", "Домашние задания", "#/app/students?view=homework"], ["pay", "Оплата занятий", "#/app/students?view=pay"], ["find", "Заявки", "#/market?tab=students"]];
+  const tabs = <nav aria-label="Работа с учениками" className="mb-6 flex flex-wrap gap-1.5 border-b border-line pb-3">{sections.map(([id, label, href]) => <a key={id} href={href} aria-current={view === id ? "page" : undefined} className={`rounded-xl px-3 py-2 text-sm font-semibold ${view === id ? "bg-brand-tint text-brand-deep" : "text-ink-soft hover:bg-cream"}`}>{label}</a>)}</nav>;
+  if (view === "homework") return <>{tabs}<HomeworkPage /></>;
+  if (view === "pay") return <>{tabs}<LessonPayPage /></>;
+  if (view === "classes") return <><PageTitle title="Классы" text="Объединяйте учеников для занятий и заданий." />{tabs}<ErrorBox error={error} />{data ? <StudyGroups students={list} /> : !error && <Loading />}</>;
   return (
     <>
       <PageTitle title="Ученики" text="Ученик и родитель подключаются по ссылкам и видят только ваше имя."
         actions={<button type="button" className="btn-brand" onClick={() => setAdding(true)}><UserPlus size={16} /> Добавить ученика</button>} />
+      {tabs}
       <ErrorBox error={error || err} />
-      {data && <StudyGroups students={list} />}
-      {!data ? <Loading /> : !list.length ? (
+      {!data && !error ? <Loading /> : !data ? null : !list.length ? (
         <Empty icon={Users} title="Учеников пока нет" text="Добавьте ученика и отправьте ему ссылку в любом мессенджере. Регистрация у него займёт минуту."
           action={<button type="button" className="btn-brand" onClick={() => setAdding(true)}><UserPlus size={16} /> Добавить ученика</button>} />
       ) : (
         <div className="panel divide-y divide-line">
           {list.map((s) => (
-            <div key={s.pair_id} className="flex flex-wrap items-center gap-3 p-4">
+            <a key={s.pair_id} href={`#/app/students/${s.pair_id}`} className="flex items-center gap-3 p-4 transition hover:bg-brand-tint/50">
               <ProfileAvatar photo={s.photo} name={s.name} size={44} />
               <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 font-semibold"><a className="hover:text-brand hover:underline" href={`#/app/students/${s.pair_id}`}>{s.name}</a> <MoodChip mood={s.mood} /></p>
+                <p className="flex flex-wrap items-center gap-2 font-semibold">{s.name} <MoodChip mood={s.mood} /></p>
                 <p className="text-[13px] text-ink-mute">{s.joined ? "подключён" : "ещё не подключился"} · родителей: {s.parents}{s.balance ? ` · оплачено занятий: ${s.balance}` : ""}</p>
-                {!s.joined && s.invite?.code && <p className="mt-1 break-all text-sm">Код ученика: <strong>{s.invite.code}</strong></p>}
               </div>
-              <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
-                <a href={`#/app/students/${s.pair_id}`} className="btn-light btn-sm">Карточка</a>
-                {s.joined ? <StartButton chatId={s.chat_id} active={s.active_lesson} small /> : <CopyLink label="Ссылка ученику" url={s.invite?.url} />}
-                {!s.joined && <CopyLink label="Скопировать код" url={s.invite?.code} />}
-                <CopyLink label="Родителю" url={s.parent_invite?.url} />
-                {s.joined && <button type="button" className="btn-ghost btn-sm" onClick={() => setWords(s)}>Слова</button>}
-                <select className="field !h-8 !w-auto !py-0 !text-[13px]" value={s.language} onChange={(e) => setStudentLang(s, e.target.value)} aria-label={`Язык ученика ${s.name}`}>
-                  {LANGS.map((l) => <option key={l.id} value={l.id}>{l.flag} {l.title}</option>)}
-                </select>
-                <button type="button" className="btn-ghost btn-sm !px-2" onClick={() => remove(s)} aria-label={`Удалить ${s.name}`}><Trash2 size={15} /></button>
-              </div>
-            </div>
+              <ChevronRight size={18} className="shrink-0 text-ink-mute" />
+            </a>
           ))}
         </div>
       )}
@@ -269,9 +257,6 @@ export function StudentsPage({ route }) {
           </label>
           <button type="submit" className="btn-brand"><UserPlus size={16} /> Добавить и получить код</button>
         </form>
-      </Modal>
-      <Modal open={!!words} onClose={() => setWords(null)} title={`Словарь: ${words?.name || ""}`} wide>
-        {words && <Vocab chatId={words.chat_id} tutorView />}
       </Modal>
       <Modal open={!!added} onClose={() => setAdded(null)} title={`${added?.name || "Ученик"} добавлен`}>
         <p className="text-ink-soft">Отправьте ученику код: он сможет ввести его в своём кабинете на сайте или в приложении. Можно также отправить ссылку.</p>

@@ -97,14 +97,15 @@ function Badge({ n }) {
 function Sidebar({ items, current, session }) {
   const unread = session.me?.unread || 0;
   const b = session.account?.billing;
+  const currentNav = session.role === "tutor" && ["homework", "pay"].includes(current) ? "students" : current;
   return (
     <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-white px-3 py-5 lg:flex">
       <a href="#/" className="px-2.5" aria-label="На сайт"><Logo size={28} school={session.role === "school"} /></a>
       <a href="#/" className="mt-3 px-2.5 text-sm font-medium text-brand hover:underline">← Главное меню сайта</a>
       <nav aria-label="Кабинет" className="mt-5 min-h-0 flex-1 overflow-y-auto">
-        {session.role === "tutor" ? <div className="grid gap-0.5">{[["Главное", ["home", "students", "lessons", "materials", "messages"]], ["Работа с учениками", ["homework", "pay"]], ["Другие возможности", ["practice", "spark", "find", "plan"]]].map(([group, ids]) => <div key={group} className="mb-3">
+        {session.role === "tutor" ? <div className="grid gap-0.5">{[["Рабочее пространство", ["home", "students", "lessons", "materials", "messages"]], ["Аккаунт", ["plan"]]].map(([group, ids]) => <div key={group} className="mb-3">
           <p className="px-2.5 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-ink-mute">{group}</p>
-          {ids.map((id) => items.find((item) => item[0] === id)).filter(Boolean).map(([id, title, Icon, , , href]) => <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-[14px] font-medium transition ${current === id ? "bg-brand-tint text-brand-deep" : "text-ink-soft hover:bg-cream/70 hover:text-ink"}`}><Icon size={18} />{title}{id === "messages" && <Badge n={unread} />}</a>)}
+          {ids.map((id) => items.find((item) => item[0] === id)).filter(Boolean).map(([id, title, Icon, , , href]) => <a key={id} href={hrefOf(id, href)} aria-current={currentNav === id ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-[14px] font-medium transition ${currentNav === id ? "bg-brand-tint text-brand-deep" : "text-ink-soft hover:bg-cream/70 hover:text-ink"}`}><Icon size={18} />{title}{id === "messages" && <Badge n={unread} />}</a>)}
         </div>)}</div> : <div className="grid gap-0.5">
         {items.filter((item) => item[4] || ["materials", "homework", "pay"].includes(item[0])).map(([id, title, Icon, , , href]) => (
           <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined}
@@ -124,7 +125,7 @@ function Sidebar({ items, current, session }) {
         </div>}
       </nav>
       <div className="mt-auto grid gap-2">
-        {["tutor", "school"].includes(session.role) && b?.state && b.state !== "free" && !b.by_school && (
+        {session.role === "school" && b?.state && b.state !== "free" && !b.by_school && (
           <a href="#/app/plan" className={`rounded-xl px-3 py-2.5 text-[13px] font-medium ${b.state === "expired" ? "bg-teach-tint text-teach-deep" : "bg-cream text-ink-soft"}`}>
             {{ trial: `Пробный период: ${b.days_left + 1} дн.`, active: `Тариф до ${new Date(b.until).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}`, expired: "Тариф закончился. Продлить" }[b.state]}
           </a>
@@ -144,10 +145,11 @@ function Sidebar({ items, current, session }) {
 }
 
 /** Нижняя панель на телефоне: четыре главных раздела и «Ещё» со всем остальным. */
-function TabBar({ items, current, unread }) {
+function TabBar({ items, current, unread, role }) {
   const [open, setOpen] = useState(false);
   const tabs = items.filter((x) => x[4]).sort((a, b) => a[4] - b[4]);
-  const more = items.filter((x) => !x[4]);
+  const more = items.filter((x) => !x[4] && !(role === "tutor" && ["homework", "pay", "spark", "profile", "practice", "find"].includes(x[0])));
+  const currentNav = role === "tutor" && ["homework", "pay"].includes(current) ? "students" : current;
   useEffect(() => setOpen(false), [current]);
   const moreActive = more.some(([id]) => id === current);
   return (
@@ -168,9 +170,9 @@ function TabBar({ items, current, unread }) {
       )}
       <nav aria-label="Кабинет" className="safe-bottom fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-white/95 px-1 pt-1 backdrop-blur lg:hidden">
         {tabs.map(([id, title, Icon, , , href]) => (
-          <a key={id} href={hrefOf(id, href)} aria-current={current === id ? "page" : undefined}
-            className={`relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10.5px] font-medium ${current === id ? "text-ink" : "text-ink-mute"}`}>
-            <Icon size={22} strokeWidth={current === id ? 2.2 : 1.7} />
+          <a key={id} href={hrefOf(id, href)} aria-current={currentNav === id ? "page" : undefined}
+            className={`relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10.5px] font-medium ${currentNav === id ? "text-ink" : "text-ink-mute"}`}>
+            <Icon size={22} strokeWidth={currentNav === id ? 2.2 : 1.7} />
             <span className="w-full truncate text-center">{title.split(" ")[0]}</span>
             {id === "messages" && unread > 0 && <span className="absolute right-[22%] top-0.5 h-2 w-2 rounded-full bg-teach" />}
           </a>
@@ -190,7 +192,7 @@ function MobileTop({ session, title }) {
       <a href="#/app" aria-label="Сегодня"><Logo size={26} school={session.role === "school"} /></a>
       <span className="ml-1 min-w-0 flex-1 truncate text-sm font-semibold text-ink-mute">{title}</span>
       <a href="#/" aria-label="Главное меню сайта" title="Главное меню сайта" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Globe2 size={19} /></a>
-      {["tutor", "school"].includes(session.role) && <a href="#/app/pay" aria-label="Оплата занятий" title="Оплата занятий" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Wallet size={19} /></a>}
+      {session.role === "school" && <a href="#/app/pay" aria-label="Оплата занятий" title="Оплата занятий" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-cream"><Wallet size={19} /></a>}
       <a href="#/app/profile" aria-label="Настройки профиля" className="flex min-w-0 items-center gap-2"><span className="hidden max-w-24 truncate text-sm font-medium text-ink-soft sm:block">{session.account?.name}</span><ProfileAvatar prefs={session.account?.prefs} name={session.account?.name || "?"} size={30} /><Settings size={18} /></a>
     </header>
   );
@@ -239,6 +241,9 @@ export default function AppShell({ route }) {
   let current = area === "app" ? (rawSub === "do" ? "homework" : rawSub === "units" && third ? "materials" : sub || "home") : area === "board" ? "lessons" : "lessons";
   let Page = items.find(([id]) => id === current)?.[3];
   if (!Page && area === "app") { current = "home"; Page = items[0][3]; }
+  const consolidated = session.role === "tutor" && area === "app" && ["homework", "pay"].includes(rawSub) && !third;
+  const pageRoute = consolidated ? { ...route, parts: ["app", "students"], params: new URLSearchParams({ view: rawSub }) } : route;
+  if (consolidated) Page = StudentsPage;
   const title = items.find(([id]) => id === current)?.[1] || "";
   const student = session.role === "student";
   return (
@@ -250,10 +255,10 @@ export default function AppShell({ route }) {
           {area === "app" && current === "home" && session.role === "student" && <GettingStarted key={session.account?.id || session.role} session={session} />}
           {["tutor", "school"].includes(session.role) && session.account?.billing?.state === "expired" && area === "app" && sub !== "plan" && <BillingStatus billing={session.account?.billing} compact />}
           {area === "lesson" && rawSub ? <Lesson id={rawSub} /> : area === "board" ? <BoardPage params={route.params} />
-            : rawSub === "units" && third ? <UnitEditor id={third} /> : rawSub === "do" && third ? <DoUnit hwId={third} /> : <Page route={route} />}
+            : rawSub === "units" && third ? <UnitEditor id={third} /> : rawSub === "do" && third ? <DoUnit hwId={third} /> : <Page route={pageRoute} />}
         </main>
       </div>
-      <TabBar items={items} current={current} unread={session.me?.unread || 0} />
+      <TabBar items={items} current={current} unread={session.me?.unread || 0} role={session.role} />
     </div>
   );
 }
