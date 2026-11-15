@@ -139,6 +139,52 @@ export function TutorHome() {
   );
 }
 
+function StudyGroups({ students }) {
+  const { data, error, reload } = useApi("/site/v1/groups");
+  const [draft, setDraft] = useState(null);
+  const [problem, setProblem] = useState(null);
+  const save = async (event) => {
+    event.preventDefault();
+    try {
+      setProblem(null);
+      await request("POST", "/site/v1/groups", draft);
+      setDraft(null);
+      reload();
+    } catch (e) { setProblem(e); }
+  };
+  const remove = async (group) => {
+    if (!window.confirm(`Удалить класс «${group.title}»? Ученики и их задания сохранятся.`)) return;
+    try { await request("POST", `/site/v1/groups/${group.id}/delete`, {}); reload(); }
+    catch (e) { setProblem(e); }
+  };
+  return <section className="mb-5 rounded-2xl border border-line bg-white p-4">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="text-lg font-semibold">Классы</h2>
+      <button type="button" className="btn-light btn-sm" onClick={() => setDraft({ title: "", members: [] })}><Plus size={14} /> Создать класс</button>
+    </div>
+    <p className="mt-1 text-sm text-ink-mute">Объединяйте своих учеников, чтобы выдавать им занятия.</p>
+    <ErrorBox error={error || problem} />
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {(data?.groups || []).map((g) => <div key={g.id} className="rounded-xl border border-line p-3">
+        <p className="font-semibold">{g.title}</p>
+        <p className="text-sm text-ink-mute">{g.members.map((id) => students.find((s) => s.pair_id === id)?.name).filter(Boolean).join(", ") || "Пока нет учеников"}</p>
+        <div className="mt-2 flex gap-2"><button type="button" className="btn-light btn-sm" onClick={() => setDraft(g)}>Изменить</button>
+        <button type="button" className="btn-ghost btn-sm" onClick={() => remove(g)}>Удалить</button></div>
+      </div>)}
+    </div>
+    <Modal open={!!draft} onClose={() => setDraft(null)} title={draft?.id ? "Изменить класс" : "Новый класс"}>
+      {draft && <form className="grid gap-3" onSubmit={save}>
+        <label className="label">Название<input className="field" required maxLength={100} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
+        <p className="text-sm font-semibold">Ученики</p>
+        <div className="grid max-h-60 gap-2 overflow-y-auto">{students.map((student) => <label key={student.pair_id} className="flex gap-2 text-sm">
+          <input type="checkbox" checked={draft.members.includes(student.pair_id)} onChange={(e) => setDraft({ ...draft, members: e.target.checked ? [...draft.members, student.pair_id] : draft.members.filter((id) => id !== student.pair_id) })} />{student.name}
+        </label>)}</div>
+        <ErrorBox error={problem} /><button type="submit" className="btn-brand">Сохранить класс</button>
+      </form>}
+    </Modal>
+  </section>;
+}
+
 // == Ученики ==================================================================================
 export function StudentsPage() {
   const { data, error, reload } = useApi("/site/v1/students");
@@ -166,6 +212,7 @@ export function StudentsPage() {
       <PageTitle title="Ученики" text="Ученик и родитель подключаются по ссылкам и видят только ваше имя."
         actions={<button type="button" className="btn-brand" onClick={() => setAdding(true)}><UserPlus size={16} /> Добавить ученика</button>} />
       <ErrorBox error={error || err} />
+      {data && <StudyGroups students={list} />}
       {!data ? <Loading /> : !list.length ? (
         <Empty icon={Users} title="Учеников пока нет" text="Добавьте ученика и отправьте ему ссылку в любом мессенджере. Регистрация у него займёт минуту."
           action={<button type="button" className="btn-brand" onClick={() => setAdding(true)}><UserPlus size={16} /> Добавить ученика</button>} />

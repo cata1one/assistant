@@ -85,7 +85,15 @@ function BlockEditor({ b, onChange, audios }) {
             <button type="button" className="btn-light btn-sm" onClick={hide} title="Выделите слово в тексте и нажмите"><Eye size={14} /> Скрыть выделенное в [ ]</button>
             <button type="button" className="btn-light btn-sm" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button>
           </div>
-          <p className="text-xs text-ink-mute">Правильный ответ – в квадратных скобках. Несколько верных вариантов – через «|»: [have been|'ve been].</p>
+          <p className="text-xs text-ink-mute">Правильный ответ – в квадратных скобках. Например: I [work] here. Несколько верных вариантов – через «|»: [have been|'ve been].</p>
+          {!!b.text && <div className="rounded-xl border border-line bg-paper p-4">
+            <p className="mb-2 text-xs font-semibold text-ink-mute">Предпросмотр для ученика</p>
+            <p className="whitespace-pre-wrap leading-loose">{b.text.split(/(\[[^\[\]\n]{1,80}\])/g).map((part, i) =>
+              /^\[[^\[\]\n]{1,80}\]$/.test(part)
+                ? <input key={i} className="mx-1 inline-block w-28 rounded-md border border-line bg-white px-2 py-1 align-baseline text-sm" aria-label={`Пропуск ${Math.ceil(i / 2)}`} placeholder="Ответ" disabled />
+                : <span key={i}>{part}</span>
+            )}</p>
+          </div>}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!b.bank} onChange={set("bank")} /> Показать слова для вставки (банк слов)</label>
         </>
       )}
@@ -132,6 +140,7 @@ function BlockEditor({ b, onChange, audios }) {
 function AssignModal({ unit, onClose }) {
   const students = useApi("/site/v1/students").data?.students?.filter((s) => s.joined);
   const [chat, setChat] = useState("");
+  const groups = useApi("/site/v1/groups").data?.groups || [];
   const [text, setText] = useState("");
   const [due, setDue] = useState("");
   const [msg, setMsg] = useState(null);
@@ -139,8 +148,12 @@ function AssignModal({ unit, onClose }) {
   const send = async (e) => {
     e.preventDefault(); setError(null);
     try {
-      const r = await request("POST", "/site/v1/homework", { chat_id: chat || students[0].chat_id, unit_id: unit.id, text: text || null, due: due || null });
-      setMsg(`Занятие выдано${r.words_added ? `, в карточки добавлено слов: ${r.words_added}` : ""}.`);
+      const selected = chat.startsWith("group:") ? groups.find((g) => g.id === chat.slice(6)) : null;
+      const recipients = selected ? students.filter((s) => selected.members.includes(s.pair_id)) : [students.find((s) => s.chat_id === chat) || students[0]];
+      if (!recipients.length) throw new Error("В классе пока нет подключившихся учеников.");
+      const results = await Promise.allSettled(recipients.map((s) => request("POST", "/site/v1/homework", { chat_id: s.chat_id, unit_id: unit.id, text: text || null, due: due || null })));
+      const failed = results.flatMap((r, i) => r.status === "rejected" ? [recipients[i].name] : []);
+      setMsg(failed.length ? `Выдано: ${recipients.length - failed.length} из ${recipients.length}. Не удалось выдать: ${failed.join(", ")}. Повторите выдачу этим ученикам отдельно.` : `Занятие выдано ученикам: ${recipients.length}.`);
     } catch (x) { setError(x); }
   };
   return (
@@ -149,7 +162,7 @@ function AssignModal({ unit, onClose }) {
         <div className="grid gap-3"><Notice tone="ok">{msg}</Notice><button type="button" className="btn-light w-fit" onClick={onClose}>Готово</button></div>
       ) : (
         <form onSubmit={send} className="grid gap-3">
-          <select className="field" value={chat} onChange={(e) => setChat(e.target.value)} aria-label="Ученик">{students.map((s) => <option key={s.chat_id} value={s.chat_id}>{s.name}</option>)}</select>
+          <select className="field" value={chat} onChange={(e) => setChat(e.target.value)} aria-label="Ученик">{students.map((s) => <option key={s.chat_id} value={s.chat_id}>{s.name}</option>)}{groups.map((g) => <option key={g.id} value={`group:${g.id}`}>Класс: {g.title}</option>)}</select>
           <input className="field" value={text} onChange={(e) => setText(e.target.value)} maxLength={500} placeholder="Комментарий (необязательно)" aria-label="Комментарий" />
           <input className="field" type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Срок" />
           <ErrorBox error={error} />
@@ -327,6 +340,8 @@ export function UnitEditor({ id }) {
   const [msg, setMsg] = useState(null);
   const [mode, setMode] = useState("edit");
   const [studentView, setStudentView] = useState(null);
+  const [aiExercise, setAiExercise] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
   const [assign, setAssign] = useState(false);
   const audios = (useApi("/site/v1/materials").data?.materials || []).filter((m) => m.mime?.startsWith("audio/"));
   useEffect(() => {
@@ -382,6 +397,7 @@ export function UnitEditor({ id }) {
                 <span className="ml-auto flex gap-1">
                   <button type="button" className="btn-ghost !p-1.5" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Выше"><ArrowUp size={15} /></button>
                   <button type="button" className="btn-ghost !p-1.5" disabled={i === unit.blocks.length - 1} onClick={() => move(i, 1)} aria-label="Ниже"><ArrowDown size={15} /></button>
+                  <button type="button" className="btn-ghost !p-1.5" onClick={() => setUnit({ ...unit, blocks: [...unit.blocks.slice(0, i + 1), structuredClone(b), ...unit.blocks.slice(i + 1)] })} aria-label="Копировать задание"><Copy size={15} /></button>
                   <button type="button" className="btn-ghost !p-1.5" onClick={() => setUnit({ ...unit, blocks: unit.blocks.filter((_, j) => j !== i) })} aria-label="Удалить задание"><Trash2 size={15} /></button>
                 </span>
               </div>
@@ -389,7 +405,7 @@ export function UnitEditor({ id }) {
             </div>
           ))}
           <div className="card !p-4">
-            <p className="mb-2 text-sm font-semibold">Добавить задание</p>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">Добавить задание</p><button type="button" className="btn-light btn-sm" onClick={() => { setError(null); setAiExercise({ type: "gap", topic: unit.title || "", wishes: "" }); }}><Wand2 size={14} /> Создать с ИИ</button></div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(TYPES).map(([t, label]) => (
                 <button key={t} type="button" className="btn-light btn-sm" onClick={() => setUnit({ ...unit, blocks: [...unit.blocks, { type: t, title: label, lang: ttsOf(unit.language) }] })}><Plus size={13} /> {label}</button>
@@ -403,6 +419,23 @@ export function UnitEditor({ id }) {
         </div>
       )}
       {assign && <AssignModal unit={{ id, title: unit.title }} onClose={() => setAssign(false)} />}
+      {aiExercise && <Modal open onClose={() => !aiBusy && setAiExercise(null)} title="Создать задание с ИИ">
+        <form className="grid gap-3" onSubmit={async (event) => {
+          event.preventDefault(); setError(null); setAiBusy(true);
+          try {
+            const result = await request("POST", "/site/v1/units/generate-exercise", { ...aiExercise, language: unit.language, level: unit.level });
+            setUnit((current) => ({ ...current, blocks: [...current.blocks, toEdit(result.block)] }));
+            setAiExercise(null);
+          } catch (e) { setError(e); }
+          finally { setAiBusy(false); }
+        }}>
+          <label className="label">Тема<input className="field" required maxLength={200} value={aiExercise.topic} onChange={(e) => setAiExercise({ ...aiExercise, topic: e.target.value })} /></label>
+          <label className="label">Тип задания<select className="field" value={aiExercise.type} onChange={(e) => setAiExercise({ ...aiExercise, type: e.target.value })}>{Object.entries(TYPES).filter(([key]) => key !== "video").map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+          <label className="label">Пожелания<textarea className="field" maxLength={1000} value={aiExercise.wishes} onChange={(e) => setAiExercise({ ...aiExercise, wishes: e.target.value })} placeholder="Например: пять предложений для подростка, тема путешествия" /></label>
+          <ErrorBox error={error} />
+          <button className="btn-brand" disabled={aiBusy}>{aiBusy ? "Создаём…" : "Создать черновик"}</button>
+        </form>
+      </Modal>}
     </>
   );
 }

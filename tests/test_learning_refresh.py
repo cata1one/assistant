@@ -129,3 +129,29 @@ def test_role_conflict_does_not_grant_other_owner_access(tmp_path):
         assert storage.account_by_email("teacher@example.test") is None
     finally:
         storage.close()
+def test_generate_one_exercise_uses_teacher_instructions(tmp_path):
+    from tutor_assistant.learning import Learning
+    from tutor_assistant.units import Units
+
+    storage = Storage(":memory:")
+    try:
+        storage.add_account(id="a_owner", email="owner@example.test", password_hash="x", name="Teacher",
+                            role="tutor")
+        portal = Portal(TutorAssistant(Settings(llm_mode="off", stt_mode="off"), storage))
+        units = Units(Learning(portal, tmp_path))
+
+        class FakeAI:
+            provider = "test"
+            def complete(self, system, user, timeout=None):
+                assert "gap" in system
+                assert "travel" in user and "teenagers" in user
+                return '{"blocks":[{"type":"gap","text":"I [travel] by train."}]}'
+
+        units.ai = FakeAI()
+        result = units.generate_exercise(Viewer("a_owner", False), {
+            "type": "gap", "topic": "travel", "language": "en", "level": "B1", "wishes": "teenagers"
+        })
+        assert result["block"]["text"] == "I [travel] by train."
+        assert student_view({"id": "x", "title": "x", "blocks": [result["block"]]})["blocks"][0]["parts"] == ["I ", " by train."]
+    finally:
+        storage.close()

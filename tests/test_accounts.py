@@ -333,3 +333,22 @@ def test_tutor_comments_homework(env):
     lrn.update_homework(tutor, hw, {"comment": "Отлично, но повтори Past Simple"})
     assert lrn.homework(student)["homework"][0]["comment"] == "Отлично, но повтори Past Simple"
     assert lrn.homework(parent)["homework"][0]["comment"]
+
+def test_groups_are_private_to_their_teacher(env):
+    owner, _ = reg(env, "tutor", "owner@example.test")
+    other, _ = reg(env, "tutor", "other@example.test")
+    student = env["acc"].add_student(owner, {"name": "Иван", "language": "en"})
+    pair_id = student["pair_id"]
+    group_id = env["acc"].save_group(owner, {"title": "English B1", "members": [pair_id]})["id"]
+    assert env["acc"].groups(owner)["groups"][0]["members"] == [pair_id]
+    assert env["acc"].groups(other)["groups"] == []
+    with pytest.raises(PortalError):
+        env["acc"].save_group(other, {"id": group_id, "title": "Other", "members": []})
+    with pytest.raises(PortalError):
+        env["acc"].save_group(other, {"title": "Other", "members": [pair_id]})
+    with pytest.raises(PortalError):
+        env["acc"].delete_group(other, group_id)
+    env["acc"].save_group(owner, {"id": group_id, "title": "Updated", "members": []})
+    assert env["acc"].groups(owner)["groups"][0]["members"] == []
+    env["acc"].delete_group(owner, group_id)
+    assert env["acc"].groups(owner)["groups"] == []

@@ -23,6 +23,7 @@ from . import billing
 from .billing import PLANS
 from .portal import ADMIN, PARENT, Portal, PortalError, Viewer, _field
 from .relay import STUDENT, TUTOR, Pair, RelayService
+from .storage import utcnow
 
 ROLES = ("tutor", "student", "parent", "school")
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
@@ -252,6 +253,57 @@ class Accounts:
                         "active_lesson": active["id"] if active else None})
         limit = None  # на тарифе – без ограничения числа учеников
         return {"students": out, "limit": limit}
+
+    def groups(self, viewer: Viewer) -> dict[str, Any]:
+        tutor = self._tutor(viewer)
+        groups = self.storage._all("SELECT id, title FROM study_groups WHERE owner_id=? ORDER BY title", (tutor["id"],))
+        for group in groups:
+            group["members"] = [r["pair_id"] for r in self.storage._all(
+                "SELECT pair_id FROM study_group_members WHERE group_id=?", (group["id"],))]
+        return {"groups": groups}
+
+    def save_group(self, viewer: Viewer, body: Any) -> dict[str, Any]:
+        tutor = self._tutor(viewer)
+        if not isinstance(body, dict):
+            raise PortalError(400, "нужен JSON-объект")
+        title = str(body.get("title") or "").strip()
+        members = body.get("members", [])
+        if not title or len(title) > 100 or not isinstance(members, list) or len(members) > 100:
+            raise PortalError(400, "укажите название и список учеников")
+        if any(not isinstance(member, str) for member in members):
+            raise PortalError(400, "неверный список учеников")
+        allowed = {p["id"] for p in self.storage.tutor_pairs(tutor["id"])}
+        if not set(members) <= allowed:
+            raise PortalError(403, "можно добавлять только своих учеников")
+        group_id = str(body.get("id") or secrets.token_hex(12))
+        if not re.fullmatch(r"[0-9a-f]{24}", group_id):
+            raise PortalError(400, "неверный идентификатор класса")
+        with self.storage._lock:
+            db = self.storage._conn
+            try:
+                current = db.execute("SELECT owner_id FROM study_groups WHERE id=?", (group_id,)).fetchone()
+                if current and current["owner_id"] != tutor["id"]:
+                    raise PortalError(404, "класс не найден")
+                if current:
+                    db.execute("UPDATE study_groups SET title=? WHERE id=?", (title, group_id))
+                    db.execute("DELETE FROM study_group_members WHERE group_id=?", (group_id,))
+                else:
+                    db.execute("INSERT INTO study_groups(id, owner_id, title, created_at) VALUES (?,?,?,?)",
+                               (group_id, tutor["id"], title, utcnow()))
+                db.executemany("INSERT INTO study_group_members(group_id, pair_id) VALUES (?,?)",
+                               [(group_id, member) for member in dict.fromkeys(members)])
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+        return {"id": group_id}
+
+    def delete_group(self, viewer: Viewer, group_id: str) -> dict[str, Any]:
+        tutor = self._tutor(viewer)
+        result = self.storage._exec("DELETE FROM study_groups WHERE id=? AND owner_id=?", (group_id, tutor["id"]))
+        if not result.rowcount:
+            raise PortalError(404, "класс не найден")
+        return {"ok": True}
 
     def add_student(self, viewer: Viewer, body: Any) -> dict[str, Any]:
         tutor = self._tutor(viewer)
