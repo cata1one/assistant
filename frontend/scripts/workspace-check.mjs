@@ -30,7 +30,7 @@ try {
   await mkdir("../docs/previews", { recursive: true });
   await page.goto("http://127.0.0.1:5174/static/#/app");
   await page.getByRole("heading", { name: /Здравствуйте, Анна/ }).waitFor();
-  await page.getByText("Добавьте ученика, чтобы начать работу").waitFor();
+  await page.getByText("Здесь появятся задания и сообщения, когда ученик подключится.").waitFor();
   await page.screenshot({ path: "../docs/previews/teacher-workspace.png" });
   await page.goto("http://127.0.0.1:5174/static/#/app/units/new");
   await page.getByText("Структура урока").waitFor();
@@ -43,7 +43,7 @@ try {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Editor overflows on mobile");
   await page.screenshot({ path: "../docs/previews/lesson-editor-mobile.png" });
   await page.goto("http://127.0.0.1:5174/static/#/pricing");
-  assert.equal(await page.getByText("Онлайн-оплата временно недоступна.").count(), 1);
+  await page.getByText("Онлайн-оплата временно недоступна.").waitFor();
   assert.equal(await page.getByRole("link", { name: /Сразу оплатить/ }).count(), 0);
   assert.deepEqual(errors, []);
   console.log("Teaching workspace, editor preview, mobile layout and disabled payment state checked.");

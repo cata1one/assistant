@@ -83,14 +83,14 @@ function BlockEditor({ b, onChange, audios }) {
       <input className="field" value={b.title || ""} onChange={set("title")} placeholder="Заголовок задания" aria-label="Заголовок" />
       {["gap", "choice", "listening", "write"].includes(b.type) && <details open className="rounded-xl border border-line p-3">
         <summary className="cursor-pointer text-sm font-semibold">Контекст и инструкция к заданию</summary>
-        <div className="mt-3 grid gap-3"><label className="label">Ситуация или исходный текст{area("context", "Этот текст останется рядом с вопросом в режиме ученика.", 5)}</label>
-        <label className="label">Что нужно сделать{area("instruction", "Укажите форму ответа, ограничения и критерии.", 3)}</label></div>
+        <div className="mt-3 grid gap-3"><label className="label">Ситуация или исходный текст{area("context", "Этот текст останется рядом с вопросом в режиме ученика.", 3)}</label>
+        <label className="label">Что нужно сделать{area("instruction", "Укажите форму ответа, ограничения и критерии.", 2)}</label></div>
       </details>}
       {b.type === "text" && <>{area("body", "Текст, правило или инструкция", 6)}<button type="button" className="btn-light btn-sm w-fit" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button></>}
       {b.type === "words" && <>{area("itemsText", "kitchen – кухня\nwardrobe – шкаф", 5)}<p className="text-xs text-ink-mute">При выдаче занятия эти слова сразу попадут в карточки ученика.</p></>}
       {b.type === "gap" && (
         <>
-          <textarea ref={field} className="field font-normal" rows={6} dir="auto" value={b.text || ""} onChange={set("text")} placeholder="I [have been] to London. She [has|'s] got a cat." />
+          <textarea ref={field} className="field font-normal" rows={4} dir="auto" value={b.text || ""} onChange={set("text")} placeholder="I [have been] to London. She [has|'s] got a cat." />
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-light btn-sm" onClick={hide} title="Выделите слово в тексте и нажмите"><Eye size={14} /> Скрыть выделенное в [ ]</button>
             <button type="button" className="btn-light btn-sm" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button>

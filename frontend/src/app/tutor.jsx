@@ -76,7 +76,6 @@ export function TutorHome() {
   const toCheck = hw.filter((h) => h.status === "done");
   const review = lessons.filter((l) => l.on_review);
   const todo = [
-    ...(!students.length ? [{ key: "first-student", text: "Добавьте ученика, чтобы начать работу", href: "#/app/students", cta: "Добавить" }] : []),
     ...review.map((l) => ({ key: `r${l.id}`, text: `Проверить и отправить конспект: ${l.with || l.title}`, href: `#/lesson/${l.id}`, cta: "Открыть" })),
     ...(toCheck.length ? [{ key: "hw", text: `Проверить домашку: ${toCheck.length}`, href: "#/app/homework", cta: "Проверить" }] : []),
     ...(pay?.pending_total ? [{ key: "pay", text: `Подтвердить оплату: ${pay.pending_total}`, href: "#/app/pay", cta: "Посмотреть" }] : []),
@@ -120,7 +119,7 @@ export function TutorHome() {
                   <span className="h-2 w-2 shrink-0 rounded-full bg-teach" /><span className="min-w-0 flex-1 text-[15px]">{t.text}</span><span className="text-[13px] font-medium text-ink-mute">{t.cta}</span>
                 </a></li>))}
               </ul>
-            ) : <p className="py-1 text-sm text-ink-mute">Всё сделано. Хорошего дня!</p>}
+            ) : <p className="py-1 text-sm text-ink-mute">{students.length ? "Пока нет заданий на проверку или новых сообщений." : "Здесь появятся задания и сообщения, когда ученик подключится."}</p>}
           </Panel>
           <div className="grid grid-cols-2 gap-3">
             <Stat value={students.length} label="учеников" href="#/app/students" />
