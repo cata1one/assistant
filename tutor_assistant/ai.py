@@ -26,7 +26,6 @@ class AIClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.last_error: str | None = None
-        self._timeout = settings.ai_timeout
 
     @property
     def provider(self) -> str | None:
@@ -40,12 +39,12 @@ class AIClient:
     def complete(self, system: str, user: str, timeout: float | None = None) -> str | None:
         """Ответ модели текстом или None (ошибка – в last_error)."""
         self.last_error = None
-        self._timeout = timeout or self.settings.ai_timeout
+        request_timeout = timeout or self.settings.ai_timeout
         try:
             if self.provider == "openai":
-                return self._openai(system, user)
+                return self._openai(system, user, request_timeout)
             if self.provider == "claude":
-                return self._claude(system, user)
+                return self._claude(system, user, request_timeout)
         except Exception as exc:  # сеть, лимиты, неверный ключ
             self.last_error = str(exc)[:300]
             log.warning("ИИ недоступен: %s", self.last_error)
@@ -54,12 +53,12 @@ class AIClient:
     def chat(self, system: str, messages: list[dict[str, str]], timeout: float | None = None) -> str | None:
         """Диалог: messages – [{"role": "user"|"assistant", "content": ...}] по порядку."""
         self.last_error = None
-        self._timeout = timeout or self.settings.ai_timeout
+        request_timeout = timeout or self.settings.ai_timeout
         try:
             if self.provider == "openai":
-                return self._openai_messages([{"role": "system", "content": system}, *messages])
+                return self._openai_messages([{"role": "system", "content": system}, *messages], request_timeout)
             if self.provider == "claude":
-                client = anthropic.Anthropic(timeout=self._timeout, max_retries=1)
+                client = anthropic.Anthropic(timeout=request_timeout, max_retries=1)
                 msg = client.messages.create(model=self.settings.llm_model, max_tokens=2000, system=system, messages=messages)
                 return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
         except Exception as exc:  # сеть, лимиты, неверный ключ
@@ -67,7 +66,7 @@ class AIClient:
             log.warning("ИИ недоступен: %s", self.last_error)
         return None
 
-    def _openai_messages(self, messages: list[dict[str, str]]) -> str | None:
+    def _openai_messages(self, messages: list[dict[str, str]], timeout: float) -> str | None:
         s = self.settings
         body = json.dumps({"model": s.ai_model, "temperature": 0.5, "messages": messages})
         headers = {"Content-Type": "application/json"}
@@ -75,13 +74,13 @@ class AIClient:
             headers["Authorization"] = f"Bearer {s.ai_key}"
         req = urllib.request.Request(f"{s.ai_url}/chat/completions", data=body.encode(), headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as r:  # noqa: S310 – адрес задаёт администратор
+            with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 – адрес задаёт администратор
                 data = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             raise RuntimeError(f"сервис ИИ ответил {exc.code}: {exc.read()[:200].decode('utf-8', 'replace')}") from None
         return data["choices"][0]["message"]["content"]
 
-    def _openai(self, system: str, user: str) -> str | None:
+    def _openai(self, system: str, user: str, timeout: float) -> str | None:
         s = self.settings
         body = json.dumps({"model": s.ai_model, "temperature": 0.4,
                            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
@@ -90,14 +89,14 @@ class AIClient:
             headers["Authorization"] = f"Bearer {s.ai_key}"
         req = urllib.request.Request(f"{s.ai_url}/chat/completions", data=body.encode(), headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as r:  # noqa: S310 – адрес задаёт администратор
+            with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 – адрес задаёт администратор
                 data = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             raise RuntimeError(f"сервис ИИ ответил {exc.code}: {exc.read()[:200].decode('utf-8', 'replace')}") from None
         return data["choices"][0]["message"]["content"]
 
-    def _claude(self, system: str, user: str) -> str | None:
-        client = anthropic.Anthropic(timeout=self._timeout, max_retries=1)
+    def _claude(self, system: str, user: str, timeout: float) -> str | None:
+        client = anthropic.Anthropic(timeout=timeout, max_retries=1)
         msg = client.messages.create(model=self.settings.llm_model, max_tokens=8000, system=system,
                                      messages=[{"role": "user", "content": user}])
         return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")

@@ -306,6 +306,9 @@ sudo bash /opt/better-study/deploy/enable-ai.sh        # выключить: ena
 #   curl -fsSL https://ollama.com/install.sh | sh && ollama pull qwen2.5:7b
 TUTOR_AI_URL=http://127.0.0.1:11434/v1
 TUTOR_AI_MODEL=qwen2.5:7b
+# Число одновременных ответов Искорки на один процесс (по умолчанию 1).
+# Для внешнего API после проверки можно установить 4; для локальной Ollama оставить 1.
+# TUTOR_AI_SPARK_PARALLEL=4
 # или OpenRouter: ключ на openrouter.ai, модель из списка с фильтром Free (название с «:free»)
 # TUTOR_AI_URL=https://openrouter.ai/api/v1
 # TUTOR_AI_KEY=...

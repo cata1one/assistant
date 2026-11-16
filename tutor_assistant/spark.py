@@ -78,7 +78,7 @@ class Spark:
         self.learning = learning
         self.accounts = accounts
         self.ai = AIClient(portal.settings)
-        self._busy = threading.Semaphore(1)  # ИИ на процессоре: по одному ответу за раз
+        self._busy = threading.Semaphore(max(1, min(16, self.settings.ai_spark_parallel)))
 
     # -- кто спрашивает --------------------------------------------------------------------------------
     def _who(self, viewer: Viewer) -> tuple[str, str]:
