@@ -242,7 +242,7 @@ function CreateModal({ ai, onClose }) {
         <ErrorBox error={error} />
         <div className="flex flex-wrap gap-2">
           {ai && <button type="button" className="btn-brand" disabled={busy || !f.topic.trim()} onClick={() => go("ai")}><Wand2 size={16} /> {busy ? "ИИ составляет занятие…" : "Создать с ИИ"}</button>}
-          <button type="button" className="btn-light" disabled={busy || !f.topic.trim()} onClick={goLocal}><Wand2 size={16} /> {busy ? localProgress === null ? "Создаю черновик…" : `Загрузка ИИ: ${Math.round(localProgress * 100)}%` : "Создать бесплатно на устройстве"}</button>
+          <button type="button" className="btn-light" disabled={busy || !f.topic.trim()} onClick={goLocal}><Wand2 size={16} /> {busy ? localProgress === null ? "Создаю черновик…" : `Этап загрузки ИИ: ${Math.round(localProgress * 100)}%` : "Создать бесплатно на устройстве"}</button>
           <button type="button" className={ai ? "btn-light" : "btn-brand"} disabled={busy} onClick={() => go("offline")}><Sparkles size={16} /> Собрать из моих слов и текста</button>
           <button type="button" className="btn-ghost" onClick={() => { pendingDraft = { title: f.topic || "Новое занятие", language: f.language, level: f.level, blocks: [] }; window.location.hash = "#/app/units/new"; }}>Пустое занятие</button>
         </div>

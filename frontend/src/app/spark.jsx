@@ -107,7 +107,7 @@ export function SparkPage({ compact = false }) {
       </div>
       <div className="border-b border-line px-4 py-2 text-sm">
         {localMode ? <div className="flex flex-wrap items-center justify-between gap-2"><span>Ответы создаются на устройстве. Проверяйте материалы перед уроком.</span><button type="button" disabled={busy} className="btn-ghost btn-sm" onClick={() => { localEngine.current?.close(); localEngine.current = null; setLocalChat([]); setLocalMode(false); }}>Выключить</button></div>
-          : <div><button type="button" className="btn-light btn-sm" disabled={localLoading || busy || pending} onClick={enableLocal}>{localLoading ? `Загружаю ИИ: ${Math.round(progress * 100)}%` : "Включить бесплатный ИИ на устройстве"}</button><p className="mt-1 text-xs text-ink-mute">Около 900 МБ при первой загрузке. Нужен совместимый браузер и достаточно памяти. Локальная переписка не сохраняется после закрытия.</p></div>}
+          : <div><button type="button" className="btn-light btn-sm" disabled={localLoading || busy || pending} onClick={enableLocal}>{localLoading ? `Этап загрузки ИИ: ${Math.round(progress * 100)}%` : "Включить бесплатный ИИ на устройстве"}</button><p className="mt-1 text-xs text-ink-mute">Около 900 МБ при первой загрузке. Подготовка состоит из нескольких этапов. Нужен совместимый браузер и достаточно памяти. Локальная переписка не сохраняется после закрытия.</p></div>}
       </div>
       <div ref={box} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {!messages.length && (
