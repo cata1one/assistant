@@ -142,7 +142,7 @@ function MatchGame({ s, answers, setAnswers, check, onDone, onMiss }) {
   );
 }
 
-export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
+export default function Quest({ unit, onCheck, onSubmit, onExit, onProgress, title }) {
   const steps = useMemo(() => buildSteps(unit), [unit]);
   const [queue, setQueue] = useState(() => steps.map((s) => s.n));
   const [pos, setPos] = useState(0);
@@ -218,6 +218,12 @@ export default function Quest({ unit, onCheck, onSubmit, onExit, title }) {
   };
 
   const next = async () => {
+    if (busy) return;
+    if (onProgress && Object.keys(first.current).length) {
+      setBusy(true); setError(null);
+      try { await onProgress(first.current); } catch (x) { setError(x); setBusy(false); return; }
+      setBusy(false);
+    }
     setFeedback(null);
     if (s?.kind === "gap" || s?.kind === "choice") { // при повторе поле снова пустое
       setAnswers((a) => (s.kind === "gap" ? withGaps(a, s, getGaps(a, s).map((v, g) => (s.gaps.includes(g) ? "" : v)))

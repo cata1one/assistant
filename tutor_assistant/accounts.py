@@ -242,6 +242,8 @@ class Accounts:
             invite = next(iter(self.storage.invites_for(pair.id, "student")), None)
             parents = self.storage.parents_for(pair.chat_id)
             active = self.storage.active_lesson(pair.chat_id)
+            placement = self.storage._one("SELECT level, completed_at FROM placement_results WHERE user_id=?", (pair.student_user_id,)) if pair.student_user_id else None
+            duolingo = self.storage._one("SELECT score_min, score_max, kind, completed_at FROM duolingo_results WHERE user_id=?", (pair.student_user_id,)) if pair.student_user_id else None
             out.append({"pair_id": pair.id, "chat_id": pair.chat_id, "name": pair.student_alias,
                         "joined": bool(pair.student_user_id), "parents": len(parents),
                         "invite": self._links(invite["code"]) if invite and not pair.student_user_id else None,
@@ -249,6 +251,8 @@ class Accounts:
                         "language": row.get("language") or self.portal.settings.target_language,
                         "mood": self.visible_mood(pair.student_user_id),
                         "photo": self._photo(pair.student_user_id),
+                        "english_placement": placement,
+                        "duolingo_result": duolingo,
                         "balance": row.get("balance", 0),
                         "active_lesson": active["id"] if active else None})
         limit = None  # на тарифе – без ограничения числа учеников

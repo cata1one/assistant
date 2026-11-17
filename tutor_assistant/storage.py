@@ -317,6 +317,28 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 CREATE INDEX IF NOT EXISTS idx_accounts_org ON accounts(org_id);
 
+CREATE TABLE IF NOT EXISTS placement_results (
+    user_id TEXT PRIMARY KEY,
+    level TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    completed_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS homework_progress (
+    assignment_id INTEGER PRIMARY KEY REFERENCES assignments(id) ON DELETE CASCADE,
+    answers TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS board_miro (
+    board_id TEXT PRIMARY KEY REFERENCES boards(id) ON DELETE CASCADE,
+    miro_id TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS duolingo_results (
+    user_id TEXT PRIMARY KEY,
+    score_min INTEGER NOT NULL,
+    score_max INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    completed_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS orgs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

@@ -1,6 +1,8 @@
 """Слова в карточки из ДЗ, фото к ДЗ, правка ДЗ и отчётов, конструктор занятий."""
 
 import json
+from io import BytesIO
+from zipfile import ZipFile
 
 import pytest
 
@@ -43,6 +45,51 @@ def env(tmp_path):
 
 def keys(env, who="student"):
     return {w["word"] for w in env["l"].vocab(env[who], None if who == "student" else env["chat"])["words"]}
+
+
+def test_english_placement_is_optional_private_and_persisted(env):
+    from tutor_assistant.placement import QUESTIONS, get_test, submit_test
+
+    accounts = Accounts(env["portal"])
+    test = get_test(accounts, env["student"])
+    assert test["result"] is None
+    assert all("answer" not in question for question in test["questions"])
+    with pytest.raises(PortalError):
+        get_test(accounts, env["tutor"])
+    with pytest.raises(PortalError):
+        submit_test(accounts, env["student"], {"answers": [True] * len(QUESTIONS)})
+    result = submit_test(accounts, env["student"], {"answers": [q[2] for q in QUESTIONS]})
+    assert result["level"] == "C1"
+    assert get_test(accounts, env["student"])["result"]["level"] == "C1"
+    assert accounts.students(env["tutor"])["students"][0]["english_placement"]["level"] == "C1"
+
+
+def test_duolingo_self_report_visible_only_to_linked_teacher(env):
+    from tutor_assistant.placement import get_duolingo, save_duolingo
+    accounts = Accounts(env["portal"])
+    student = env["student"]
+    with pytest.raises(PortalError):
+        save_duolingo(accounts, student, {"score_min": 120, "score_max": 110, "kind": "practice"})
+    with pytest.raises(PortalError):
+        save_duolingo(accounts, env["tutor"], {"score_min": 100, "score_max": 120, "kind": "practice"})
+    save_duolingo(accounts, student, {"score_min": 100, "score_max": 120, "kind": "practice"})
+    assert get_duolingo(accounts, student)["result"]["score_max"] == 120
+    assert accounts.students(env["tutor"])["students"][0]["duolingo_result"]["score_min"] == 100
+
+
+def test_docx_import_preserves_paragraphs_and_rejects_unsafe_input():
+    from tutor_assistant.document_import import docx_text
+    def make_docx(xml):
+        output = BytesIO()
+        with ZipFile(output, "w") as doc:
+            doc.writestr("word/document.xml", xml)
+        return output.getvalue()
+    xml = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t></w:r><w:r><w:t> world</w:t></w:r></w:p><w:p><w:r><w:t>Second</w:t></w:r></w:p></w:body></w:document>'
+    assert docx_text(make_docx(xml)) == "Hello world\nSecond"
+    with pytest.raises(PortalError):
+        docx_text(b"not a docx")
+    with pytest.raises(PortalError):
+        docx_text(make_docx('<!DOCTYPE x [<!ENTITY x "hello">]><x>&x;</x>'))
 
 
 def test_independent_student_can_use_cards_and_keeps_words_after_joining(env):
@@ -171,7 +218,14 @@ def test_units_flow(env):
     data = u.homework_unit(env["student"], hw["id"])
     assert data["result"] is None and "answer" not in json.dumps(data["unit"]["blocks"])
     match_i = next(i for i, b in enumerate(saved["blocks"]) if b["type"] == "match")
+    progress = {str(match_i): ["яблоко", "хлеб"]}
+    with pytest.raises(PortalError):
+        u.save_progress(env["tutor"], hw["id"], {"answers": progress})
+    assert u.save_progress(env["student"], hw["id"], {"answers": progress})["saved"]
+    assert u.homework_unit(env["tutor"], hw["id"])["progress"]["answers"] == progress
+    assert lrn.homework(env["tutor"])["homework"][0]["status"] == "open"
     res = u.submit(env["student"], hw["id"], {"answers": {str(match_i): ["яблоко", "хлеб"]}})
+    assert u.homework_unit(env["tutor"], hw["id"])["progress"] is None
     assert res["blocks"][str(match_i)]["pairs"] == [True, True]
     item = lrn.homework(env["tutor"])["homework"][0]
     assert item["status"] == "done" and item["score"]["score"] == 2 and item["unit"]["title"] == "Еда"

@@ -37,13 +37,14 @@ function Lobby({ onJoin, error }) {
   const [mediaError, setMediaError] = useState(null);
   useEffect(() => {
     let stream;
+    let closed = false;
     if (!navigator.mediaDevices?.getUserMedia) {
       setMediaError(new Error("Браузер не даёт доступ к камере и микрофону. Нужен адрес https:// и браузер Chrome, Edge, Firefox или Safari."));
       return undefined;
     }
-    getMedia().then((s) => { stream = s; setPreview(s); })
-      .catch(() => setMediaError(new Error("Нет доступа к микрофону. Разрешите доступ в настройках браузера (значок замка в адресной строке) и обновите страницу.")));
-    return () => { if (stream && !stream.__joined) stream.getTracks().forEach((t) => t.stop()); };
+    getMedia().then((s) => { if (closed) { s.getTracks().forEach((t) => t.stop()); return; } stream = s; setPreview(s); })
+      .catch(() => { if (!closed) setMediaError(new Error("Нет доступа к микрофону. Разрешите доступ в настройках браузера (значок замка в адресной строке) и обновите страницу.")); });
+    return () => { closed = true; if (stream && !stream.__joined) stream.getTracks().forEach((t) => t.stop()); };
   }, []);
   return (
     <div className="mx-auto grid max-w-5xl items-center gap-6 lg:grid-cols-[1.3fr_1fr]">
@@ -54,7 +55,7 @@ function Lobby({ onJoin, error }) {
       <div className="card">
         <h2 className="text-2xl">Готовы начать?</h2>
         <ul className="mt-4 grid gap-3 text-sm text-ink-soft">
-          <li className="flex gap-3"><Circle size={16} className="mt-0.5 shrink-0 fill-teach text-teach" />Речь расшифровывается в текст для конспекта. Видео и звук не сохраняются.</li>
+          <li className="flex gap-3"><Circle size={16} className="mt-0.5 shrink-0 fill-teach text-teach" />При подключённом распознавании речь может использоваться для конспекта. Доступность зависит от настроек платформы.</li>
           <li className="flex gap-3"><PenLine size={16} className="mt-0.5 shrink-0 text-brand" />Доска, материалы и видео – прямо в уроке, без демонстрации экрана.</li>
           <li className="flex gap-3"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-mint" />После урока конспект, слова и ДЗ появятся в кабинете.</li>
         </ul>
@@ -155,7 +156,7 @@ export default function Room({ id }) {
   const screen = useRef(null);
   const timer = useTimer(state?.started_at);
 
-  useEffect(() => () => { client.current?.leave(); }, []);
+  useEffect(() => () => { client.current?.leave(); screen.current?.getTracks().forEach((track) => track.stop()); }, []);
   useEffect(() => () => local?.getTracks().forEach((t) => t.stop()), [local]);
   useEffect(() => {
     const warn = (e) => { if (phase === "live") { e.preventDefault(); e.returnValue = ""; } };
@@ -164,7 +165,7 @@ export default function Room({ id }) {
   }, [phase]);
 
   const join = async (stream) => {
-    setLocal(stream); setError(null);
+    setLocal(stream); setCam(stream.getVideoTracks().length > 0); setError(null);
     const c = new RoomClient(id, {
       onState: setState,
       onMessages: (m) => setMessages((old) => [...old, ...m.filter((x) => !old.some((o) => o.id === x.id))]),
@@ -265,6 +266,7 @@ export default function Room({ id }) {
             <button key={k} type="button" onClick={() => setView(k)} className={`items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${k === "chat" ? "flex md:hidden" : "flex"} ${view === k ? "bg-ink text-white" : "text-ink-soft"}`}><I size={14} /><span className="hidden sm:inline">{t}</span></button>
           ))}
         </div>
+        {state?.board_id && <a href={`/#/board?id=${encodeURIComponent(state.board_id)}`} target="_blank" rel="noopener noreferrer" className="btn-light btn-sm" title="Доска откроется в новой вкладке, урок останется здесь">Доска и Miro ↗</a>}
         <button type="button" className="btn-ghost hidden !p-2 md:inline-flex" onClick={() => setSide(!side)} aria-label={side ? "Скрыть панель" : "Показать панель"}><LayoutPanelLeft size={18} /></button>
       </header>
       {error && <div className="px-4 pt-3"><ErrorBox error={error} /></div>}

@@ -55,6 +55,22 @@ def viewer(env, uid):
     return portal.viewer(portal.issue_token(uid, admin=uid == ADMIN_ID))
 
 
+def test_miro_link_is_limited_to_board_participants(env):
+    portal = env["portal"]
+    site = Website(portal)
+    teacher, student = viewer(env, TUTOR_ID), viewer(env, STUDENT_ID)
+    board = portal.create_board(teacher, env["pair"].chat_id, "Урок")
+    board_id = board["id"]
+    assert site.board_miro_save(teacher, board_id, {"url": "https://miro.com/app/board/uXjVOD9zD_k=/"})["miro_id"] == "uXjVOD9zD_k="
+    assert site.board_miro_get(student, board_id)["miro_id"] == "uXjVOD9zD_k="
+    with pytest.raises(PortalError):
+        site.board_miro_save(student, board_id, {"url": ""})
+    with pytest.raises(PortalError):
+        site.board_miro_get(viewer(env, STRANGER_ID), board_id)
+    with pytest.raises(PortalError):
+        site.board_miro_save(teacher, board_id, {"url": "https://miro.com.evil.test/app/board/a/"})
+
+
 # -- каталог ---------------------------------------------------------------------------
 
 def test_catalog_has_all_directions(env):

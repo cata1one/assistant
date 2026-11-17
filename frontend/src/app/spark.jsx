@@ -6,7 +6,7 @@ import { sendVoice } from "../lib/voice.js";
 import { ErrorBox, Loading } from "../ui/kit.jsx";
 import Iskorka from "./Iskorka.jsx";
 import VoiceButton from "./VoiceButton.jsx";
-import { draftFromSpark } from "./units.jsx";
+import { draftFromSpark, lessonFromSpark } from "./units.jsx";
 
 const IDEAS = {
   tutor: ["Составь план урока по Present Perfect для уровня B1", "Придумай упражнение по теме путешествий с ответами", "Объясни разницу между much и many"],
@@ -73,6 +73,7 @@ export function SparkPage() {
           {m.status === "pending" ? "Готовлю ответ…" : m.text}
           {m.voice && <span className="mt-1 block text-xs opacity-60">Голосовое</span>}
           {(role === "tutor" || role === "school") && m.role !== "user" && m.status === "done" && data.ai && <button type="button" className="mt-3 flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-left text-xs font-semibold" onClick={() => draftFromSpark(m.text)}><BookOpen size={14} /> Открыть как черновик занятия</button>}
+          {(role === "tutor" || role === "school") && m.role !== "user" && m.status === "done" && data.ai && <button type="button" className="mt-2 flex items-center gap-1.5 rounded-lg border border-brand/30 px-3 py-2 text-left text-xs font-semibold text-brand" onClick={() => lessonFromSpark(m.text)}><BookOpen size={14} /> Создать задания по этому плану</button>}
         </div>
       </div>)}
     </div>

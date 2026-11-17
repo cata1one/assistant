@@ -71,7 +71,6 @@ export class RoomClient {
     this.pc?.close();
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     this.pc = pc;
-    this.pendingIce = [];
     this.local.getTracks().forEach((t) => pc.addTrack(t, this.local));
     pc.onicecandidate = (e) => e.candidate && this.send("ice", e.candidate.toJSON());
     pc.ontrack = (e) => this.h.onRemoteStream?.(e.streams[0]);
@@ -107,6 +106,7 @@ export class RoomClient {
       } else if (s.kind === "bye") {
         this.pc?.close();
         this.pc = null;
+        this.pendingIce = [];
         this.h.onRemoteStream?.(null);
         this.h.onPeer?.("left");
         if (s.data?.finished) this.h.onFinished?.();

@@ -39,7 +39,7 @@
   .btn-sm { @apply h-8 px-3 text-[13px]; }
   .btn-lg { @apply h-12 px-6 text-[15px]; }
 
-  .field { @apply w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-mute transition focus:border-ink/60 focus:outline-none focus:ring-4 focus:ring-ink/5; }
+  .field { @apply w-full rounded-2xl border border-line bg-white px-4 py-3 text-[15px] leading-relaxed text-ink placeholder:text-ink-mute transition focus:border-brand/60 focus:outline-none focus:ring-4 focus:ring-brand/10; }
   .label { @apply grid gap-1.5 text-[13px] font-medium text-ink-soft; }
   .chip { @apply inline-flex items-center gap-1.5 rounded-md bg-cream px-2 py-0.5 text-xs font-medium text-ink-soft; }
   .chip-brand { @apply bg-brand-tint text-brand-deep; }

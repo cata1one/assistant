@@ -362,8 +362,18 @@ AI_PROMPT = """Ты методист онлайн-школы языков. Со�
 - {"type":"choice","title":"...","questions":[{"q":"вопрос","options":["a","b","c"],"answer":0}]}
 - {"type":"listening","title":"...","script":"Текст для озвучки, пропуски в [скобках]","lang":"en-US","questions":[{"q":"...","options":["..."],"answer":1}]}
 - {"type":"write","title":"...","prompt":"задание на письмо или говорение"}
-Требования: 6–9 блоков, от простого к сложному; ответы однозначные; задания по-русски,
-языковой материал – на изучаемом языке; для китайского добавляй пиньинь в скобках.
+Методика: планируй занятие примерно на 60 минут с преподавателем: разминка (5 минут),
+введение в тему и слова (10), работа с контекстом (10), управляемая практика (15),
+общение или письмо (15), рефлексия (5). Укажи время и цель в названиях блоков.
+Соблюдай план преподавателя, если он дан. Создай 8–12 разнообразных содержательных блоков,
+а не только перечень этапов: включи текст, слова, пропуски, тест, аудирование и открытый ответ.
+Каждое упражнение должно содержать всю информацию, необходимую для выполнения: добавляй
+контекст и инструкцию непосредственно в блок. Сначала вводи лексику и правило, затем проверяй их.
+В вопросах варианты непустые, только один правильный; answer — индекс с нуля. В пропусках
+правильный ответ в квадратных скобках. Для аудирования напиши полный script для озвучки и
+связанные с ним вопросы. В конце проверь соответствие ответов текстам и однозначность.
+Не придумывай содержание недоступных изображений или книг. Соблюдай уровень, возраст и язык.
+Инструкции по-русски, языковой материал – на изучаемом языке; для китайского добавляй пиньинь.
 Никаких ссылок, телефонов и контактов."""
 
 
@@ -530,12 +540,14 @@ class Units:
         language = _s(body.get("language"), 10) or "en"
         words_text, text, extra = _s(body.get("words"), 3000), _s(body.get("text"), 5000), _s(body.get("wishes"), 1000)
         level = _s(body.get("level"), 20)
+        plan = _s(body.get("plan"), 4000)
         if body.get("mode") == "ai" and not self.ai.provider:
             raise PortalError(503, "ИИ на сервере не настроен. Можно создать занятие вручную.")
         if body.get("mode") != "offline" and self.ai.provider:
             if not topic:
                 raise PortalError(400, "укажите тему занятия")
             answer = self.ai.complete(AI_PROMPT, ai_user_prompt(topic, language, level, words_text, extra)
+                                      + (f"План преподавателя (следуй ему):\n{plan}\n" if plan else "")
                                       + (f"Используй этот текст:\n{text}\n" if text else ""),
                                       timeout=min(self.portal.settings.ai_timeout, 300))  # преподаватель ждёт ответа
             data = parse_ai_json(answer or "")
@@ -627,7 +639,31 @@ class Units:
 
     def homework_unit(self, viewer: Any, assignment_id: int) -> dict[str, Any]:
         row, unit, access = self._homework_unit(viewer, assignment_id)
-        return {"unit": student_view(unit), "result": row.get("result"), "role": access.role, "status": row["status"]}
+        progress = self.storage._one("SELECT answers, updated_at FROM homework_progress WHERE assignment_id=?", (assignment_id,))
+        return {"unit": student_view(unit), "result": row.get("result"), "role": access.role, "status": row["status"],
+                "progress": {"answers": json.loads(progress["answers"]), "updated_at": progress["updated_at"]} if progress and not row.get("result") else None}
+
+    def save_progress(self, viewer: Any, assignment_id: int, body: Any) -> dict[str, Any]:
+        from .relay import STUDENT
+        from .storage import utcnow
+        row, unit, access = self._homework_unit(viewer, assignment_id)
+        if access.role != STUDENT:
+            raise PortalError(403, "сохранять ответы может только ученик")
+        if row["status"] != "open":
+            return {"saved": False}
+        answers = body.get("answers") if isinstance(body, dict) else None
+        if not isinstance(answers, dict):
+            raise PortalError(400, "неверные ответы")
+        encoded = json.dumps(answers, ensure_ascii=False)
+        if len(encoded) > 30000:
+            raise PortalError(400, "ответы слишком длинные")
+        result = grade(unit, answers)
+        self.learning._check_text(row["chat_id"], *[r.get("text") for r in result["blocks"].values()])
+        saved = self.storage._exec("INSERT INTO homework_progress(assignment_id, answers, updated_at) "
+                           "SELECT id, ?, ? FROM assignments WHERE id=? AND status='open' "
+                           "ON CONFLICT(assignment_id) DO UPDATE SET answers=excluded.answers, updated_at=excluded.updated_at",
+                           (encoded, utcnow(), assignment_id))
+        return {"saved": bool(saved.rowcount)}
 
     def homework_check(self, viewer: Any, assignment_id: int, body: Any) -> dict[str, Any]:
         """Проверка одного задания по ходу занятия (как в Duolingo): ничего не сохраняет, оценку ставит submit."""
@@ -652,6 +688,7 @@ class Units:
         self.learning._check_text(row["chat_id"], *[r.get("text") for r in result["blocks"].values()])
         self.storage.update_assignment(assignment_id, result=result, status="done",
                                        done_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        self.storage._exec("DELETE FROM homework_progress WHERE assignment_id=?", (assignment_id,))
         if row["status"] != "done":
             self.portal.telegram(access.pair.tutor_user_id, f"✅ {access.pair.student_alias} выполнил занятие "
                                  f"«{unit['title']}»: {result['score']} из {result['total']}")

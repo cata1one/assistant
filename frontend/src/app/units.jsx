@@ -2,7 +2,7 @@ import {
   ArrowDown, ArrowLeft, ArrowUp, BookOpenCheck, Copy, Eye, FileText, Layers, Pencil, Plus, Send, Sparkles, Trash2, Wand2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { request } from "../lib/api.js";
+import { request, uploadRaw } from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 import { Empty, ErrorBox, Loading, Modal, Notice, PageTitle, Tabs } from "../ui/kit.jsx";
 import { LANGS, ttsOf } from "../lib/langs.js";
@@ -31,6 +31,12 @@ const KIND_SHORT = { gap: "пропуски", match: "пары", choice: "тес
 
 // Черновик от генератора передаём в редактор без сохранения на сервере
 let pendingDraft = null;
+let pendingPlan = "";
+
+export function lessonFromSpark(text) {
+  pendingPlan = text.slice(0, 4000);
+  window.location.hash = "#/app/units/new";
+}
 
 // The teacher explicitly chooses an answer; it is only a draft until they save it.
 export function draftFromSpark(text) {
@@ -191,17 +197,27 @@ function AssignModal({ unit, onClose }) {
   );
 }
 
-function CreateModal({ ai, onClose }) {
+function CreateModal({ ai, onClose, initialPlan = "", onGenerated }) {
   const [pdf, setPdf] = useState(false);
-  const [f, setF] = useState({ topic: "", language: "en", level: "A2", words: "", text: "", wishes: "" });
+  const docxInput = useRef(null);
+  const [f, setF] = useState({ topic: "", language: "en", level: "A2", words: "", text: "", wishes: "", plan: initialPlan });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const importDocx = async (file) => {
+    if (!file) return;
+    setBusy(true); setError(null);
+    try {
+      const result = await uploadRaw("/site/v1/units/import-docx", file);
+      setF((current) => ({ ...current, text: `${current.text ? `${current.text}\n\n` : ""}${result.text}`.slice(0, 5000) }));
+    } catch (err) { setError(err); } finally { setBusy(false); }
+  };
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const go = async (mode) => {
     setBusy(true); setError(null);
     try {
-      pendingDraft = await request("POST", "/site/v1/units/generate", { ...f, mode });
-      window.location.hash = "#/app/units/new";
+      const draft = await request("POST", "/site/v1/units/generate", { ...f, mode });
+      if (onGenerated) onGenerated(draft);
+      else { pendingDraft = draft; window.location.hash = "#/app/units/new"; }
     } catch (x) { setError(x); setBusy(false); }
   };
   return (
@@ -212,18 +228,19 @@ function CreateModal({ ai, onClose }) {
           <select className="field" value={f.language} onChange={set("language")} aria-label="Язык">{LANGS.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}</select>
           <input className="field" value={f.level} onChange={set("level")} maxLength={20} placeholder="A2, B1, HSK 2" aria-label="Уровень" />
         </div>
+        {ai && <label className="label">План занятия (необязательно)<textarea className="field font-normal" rows={4} maxLength={4000} value={f.plan} onChange={set("plan")} placeholder="Например: разминка, лексика про путешествия, чтение, обсуждение и домашнее задание" /></label>}
         <label className="label">Слова (необязательно)<textarea className="field font-normal" rows={4} value={f.words} onChange={set("words")} placeholder={"luggage – багаж\nboarding pass – посадочный талон"} /></label>
         <label className="label">Свой текст или упражнение (необязательно)<textarea className="field font-normal" rows={4} value={f.text} onChange={set("text")} placeholder={"Вставьте текст. Правильные ответы пишите в [квадратных скобках]: I [have been] to London. Ученик увидит пропуски, ответы видны только вам."} /></label>
-        <div className="-mt-1 flex flex-wrap items-center gap-3"><button type="button" className="btn-light btn-sm" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button><p className="text-xs text-ink-mute">Скобки не расставили – не страшно: пропуски сделаем из ваших слов.</p></div>
+        <div className="-mt-1 flex flex-wrap items-center gap-3"><button type="button" className="btn-light btn-sm" onClick={() => setPdf(true)}><FileText size={14} /> Вставить из PDF</button><input ref={docxInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onChange={(e) => { importDocx(e.target.files?.[0]); e.target.value = ""; }} /><button type="button" className="btn-light btn-sm" disabled={busy} onClick={() => docxInput.current?.click()}><FileText size={14} /> Вставить из DOCX</button><p className="text-xs text-ink-mute">DOCX до 2 МБ: текст отправится на сервер для чтения. Изображения не распознаются.</p></div>
         <PdfImport open={pdf} onClose={() => setPdf(false)} onInsert={(t) => setF((x) => ({ ...x, text: `${x.text ? `${x.text}\n\n` : ""}${t}`.slice(0, 5000) }))} />
         {ai && <input className="field" value={f.wishes} onChange={set("wishes")} maxLength={1000} placeholder="Пожелания для ИИ: «для подростка, больше говорения»" aria-label="Пожелания" />}
         <ErrorBox error={error} />
         <div className="flex flex-wrap gap-2">
-          {ai && <button type="button" className="btn-brand" disabled={busy || !f.topic.trim()} onClick={() => go("ai")}><Wand2 size={16} /> {busy ? "ИИ составляет занятие…" : "Создать с ИИ"}</button>}
+          {ai && <button type="button" className="btn-brand" disabled={busy || !f.topic.trim()} onClick={() => go("ai")}><Wand2 size={16} /> {busy ? "Искорка составляет занятие…" : "Создать урок на 60 минут"}</button>}
           <button type="button" className={ai ? "btn-light" : "btn-brand"} disabled={busy} onClick={() => go("offline")}><Sparkles size={16} /> Собрать из моих слов и текста</button>
-          <button type="button" className="btn-ghost" onClick={() => { pendingDraft = { title: f.topic || "Новое занятие", language: f.language, level: f.level, blocks: [] }; window.location.hash = "#/app/units/new"; }}>Пустое занятие</button>
+          <button type="button" className="btn-ghost" onClick={() => { const draft = { title: f.topic || "Новое занятие", language: f.language, level: f.level, blocks: [] }; if (onGenerated) onGenerated(draft); else { pendingDraft = draft; window.location.hash = "#/app/units/new"; } }}>Пустое занятие</button>
         </div>
-        <p className="text-xs text-ink-mute">{ai ? "Проверьте созданный ИИ черновик и ответы перед выдачей ученикам." : "ИИ пока не подключён. Можно собрать занятие из своих материалов или создать его вручную."}</p>
+        <p className="text-xs text-ink-mute">{ai ? "Искорка подготовит черновик по теме и вашему плану. Проверьте содержание, время и ответы перед выдачей ученикам. Текст PDF можно вставить выше." : "ИИ пока не подключён. Можно собрать занятие из своих материалов или создать его вручную."}</p>
       </div>
     </Modal>
   );
@@ -361,6 +378,9 @@ export function UnitEditor({ id }) {
   const [aiExercise, setAiExercise] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [assign, setAssign] = useState(false);
+  const [create, setCreate] = useState(() => !!pendingPlan);
+  const [initialPlan] = useState(() => { const plan = pendingPlan; pendingPlan = ""; return plan; });
+  const aiAvailable = useApi("/site/v1/units").data?.ai;
   const savedSnapshot = useRef(null);
   const dirty = useRef(false);
   dirty.current = !!unit && savedSnapshot.current !== null && JSON.stringify(unit) !== savedSnapshot.current;
@@ -412,6 +432,8 @@ export function UnitEditor({ id }) {
   return (
     <>
       <a href="#/app/units" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-ink-mute hover:text-ink"><ArrowLeft size={14} /> Все занятия</a>
+      {isNew && <button type="button" className="btn-light mb-4 ml-4" onClick={() => { if (!dirty.current || window.confirm("Заменить текущий черновик новым занятием?")) setCreate(true); }}><Wand2 size={16} /> Создать по плану с ИИ</button>}
+      {create && <CreateModal ai={aiAvailable} initialPlan={initialPlan} onClose={() => setCreate(false)} onGenerated={(draft) => { const edited = { ...draft, blocks: draft.blocks.map(toEdit) }; savedSnapshot.current = JSON.stringify(edited); setUnit(edited); setMsg(draft.notice || "Проверьте содержание и ответы перед выдачей."); setCreate(false); }} />}
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <input className="field min-w-[220px] flex-1 !text-xl font-bold" value={unit.title} onChange={(e) => setUnit({ ...unit, title: e.target.value })} aria-label="Название занятия" />
         <input className="field w-28" value={unit.level || ""} onChange={(e) => setUnit({ ...unit, level: e.target.value })} placeholder="Уровень" aria-label="Уровень" />
@@ -497,6 +519,7 @@ export function DoUnit({ hwId }) {
     return (
       <Quest unit={data.unit} title
         onCheck={(answers) => request("POST", `/site/v1/homework/${hwId}/unit/check`, { answers })}
+        onProgress={(answers) => request("POST", `/site/v1/homework/${hwId}/unit/progress`, { answers })}
         onSubmit={(answers) => request("POST", `/site/v1/homework/${hwId}/unit`, { answers })}
         onExit={() => { setPlaying(false); reload(); }} />
     );
@@ -517,6 +540,7 @@ export function DoUnit({ hwId }) {
         </div>
       )}
       {!canPlay && <PageTitle title={data.unit.title} text={r ? "Ответы ученика." : "Ученик ещё не выполнил занятие."} />}
+      {!student && data.progress && <div className="panel mb-5 p-5"><h2 className="font-semibold">Работа в процессе</h2><p className="mt-1 text-sm text-ink-mute">Это первые ответы, сохранённые по ходу выполнения. Работа ещё не сдана.</p><div className="mt-3 grid gap-3">{Object.entries(data.progress.answers).map(([index, answer]) => <div key={index} className="rounded-xl bg-cream p-3"><p className="font-medium">{data.unit.blocks[Number(index)]?.title || `Задание ${Number(index) + 1}`}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{typeof answer === "string" ? answer : JSON.stringify(answer)}</p></div>)}</div></div>}
       {r && <UnitPlayer unit={data.unit} result={r} readOnly />}
     </>
   );

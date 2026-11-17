@@ -18,6 +18,7 @@ import PracticePage from "./Practice.jsx";
 import { AdminPage, SchoolHome, SchoolLessonsPage, SignalsPage, SystemPage, TutorsPage } from "./school.jsx";
 import { SparkPage } from "./spark.jsx";
 import Iskorka from "./Iskorka.jsx";
+import Placement from "./placement.jsx";
 
 // Иконка раздела «Искорка» в меню – сама Искорка
 const IskorkaIcon = ({ size = 18 }) => <Iskorka size={size + 6} still className="-m-[3px]" />;
@@ -51,6 +52,7 @@ const NAV = {
     ["messages", "Сообщения", MessagesSquare, MessagesPage, 4],
     ["homework", "Домашка", NotebookPen, HomeworkPage, 0],
     ["courses", "Учебники", GraduationCap, CoursesPage, 0],
+    ["placement", "Уровень английского", GraduationCap, Placement, 0],
     ["practice", "Разговорные комнаты", MessagesSquare, PracticePage, 0, "#/practice"],
     ["spark", "Искорка", IskorkaIcon, SparkPage, 0],
     ["find", "Найти преподавателя", Search, null, 0, "#/market"],

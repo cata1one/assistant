@@ -4,6 +4,17 @@ import { ttsOf } from "../lib/langs.js";
 import { clipBounds } from "../lib/listening.js";
 import { ErrorBox } from "../ui/kit.jsx";
 
+function availableVoices(lang) {
+  return (window.speechSynthesis?.getVoices() || []).filter((v) => v.lang?.replace("_", "-").toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
+}
+
+function preferredVoice(lang) {
+  const voices = availableVoices(lang);
+  let selected;
+  try { selected = localStorage.getItem(`bright-voice-${lang.slice(0, 2)}`); } catch { /* optional storage */ }
+  return voices.find((v) => v.voiceURI === selected) || voices.find((v) => /natural|neural|samantha|zira|aria|jenny|sonia|susan|female/i.test(v.name)) || voices[0];
+}
+
 /** Озвучка браузером (бесплатно, без сервера). Голос зависит от устройства. */
 export function speak(text, lang = "en-US", rate = 0.9) {
   try {
@@ -11,7 +22,7 @@ export function speak(text, lang = "en-US", rate = 0.9) {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     u.rate = rate;
-    const voice = window.speechSynthesis.getVoices().find((v) => v.lang?.replace("_", "-").startsWith(lang.slice(0, 2)));
+    const voice = preferredVoice(lang);
     if (voice) u.voice = voice;
     window.speechSynthesis.speak(u);
     return true;
@@ -79,9 +90,18 @@ function Questions({ questions, value = [], onChange, result, answers }) {
 export function ListeningAudio({ b, text = b.speak, playbackKey = "", disabled = false }) {
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState(null);
+  const [voices, setVoices] = useState([]);
+  const [voiceId, setVoiceId] = useState("");
   const audio = useRef(null);
   const utterance = useRef(null);
   const { start, end } = clipBounds(b);
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth || b.audio) return undefined;
+    const update = () => { const lang = b.lang || "en-US"; setVoices(availableVoices(lang)); setVoiceId(preferredVoice(lang)?.voiceURI || ""); };
+    update(); synth.addEventListener("voiceschanged", update);
+    return () => synth.removeEventListener("voiceschanged", update);
+  }, [b.lang, b.audio]);
   useEffect(() => {
     setPlaying(false); setError(null);
     if (audio.current?.readyState >= 1) audio.current.currentTime = start;
@@ -115,7 +135,7 @@ export function ListeningAudio({ b, text = b.speak, playbackKey = "", disabled =
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = b.lang || "en-US"; u.rate = rate;
-        const voice = window.speechSynthesis.getVoices().find((v) => v.lang?.replace("_", "-").startsWith(u.lang.slice(0, 2)));
+        const voice = preferredVoice(u.lang);
         if (voice) u.voice = voice;
         u.onend = () => { setPlaying(false); utterance.current = null; };
         u.onerror = () => { setPlaying(false); utterance.current = null; };
@@ -144,6 +164,11 @@ export function ListeningAudio({ b, text = b.speak, playbackKey = "", disabled =
         <button type="button" className="btn-light" disabled={disabled} onClick={() => play(0.65)}>Медленнее</button>
         <button type="button" className="btn-ghost" disabled={disabled} onClick={() => { stop(); if (audio.current) audio.current.currentTime = start; }}>Сначала</button>
       </div>
+      {!b.audio && voices.length > 1 && <label className="mt-3 block max-w-sm text-sm text-ink-soft">Голос устройства
+        <select className="field mt-1" value={voiceId} onChange={(e) => { stop(); setVoiceId(e.target.value); try { localStorage.setItem(`bright-voice-${(b.lang || "en-US").slice(0, 2)}`, e.target.value); } catch { /* optional storage */ } }}>
+          {voices.map((voice) => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name} · {voice.lang}</option>)}
+        </select>
+      </label>}
       {error && <p role="alert" className="mt-2 text-sm text-teach-deep">{error}</p>}
     </div>
   );

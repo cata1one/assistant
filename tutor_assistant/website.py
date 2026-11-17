@@ -58,7 +58,7 @@ SECURITY_HEADERS = {
                                 "style-src 'self'; script-src 'self'; connect-src 'self'; "
                                 # Плееры видео для уроков и доски – без демонстрации экрана
                                 "frame-src https://vk.com https://vkvideo.ru https://www.youtube-nocookie.com "
-                                "https://rutube.ru; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
+                                "https://rutube.ru https://miro.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
 }
 
 
@@ -95,6 +95,8 @@ class Website:
         ("POST", re.compile(r"^/site/v1/boards$"), "create_board", True),
         ("GET", re.compile(r"^/site/v1/boards/(?P<id>[0-9a-f]+)/items$"), "board_items", True),
         ("POST", re.compile(r"^/site/v1/boards/(?P<id>[0-9a-f]+)/items$"), "add_board_item", True),
+        ("GET", re.compile(r"^/site/v1/boards/(?P<id>[0-9a-f]+)/miro$"), "board_miro_get", True),
+        ("POST", re.compile(r"^/site/v1/boards/(?P<id>[0-9a-f]+)/miro$"), "board_miro_save", True),
         ("GET", re.compile(r"^/site/v1/admin/applications$"), "applications", True),
         ("POST", re.compile(r"^/site/v1/admin/applications/(?P<id>\d+)$"), "application_status", True),
         ("POST", re.compile(r"^/site/v1/admin/classroom$"), "classroom", True),
@@ -155,6 +157,10 @@ class Website:
         ("POST", re.compile(r"^/site/v1/schedule/(?P<id>[0-9a-f]{24})$"), "schedule_update", True),
         ("POST", re.compile(r"^/site/v1/schedule/(?P<id>[0-9a-f]{24})/delete$"), "schedule_delete", True),
         ("GET", re.compile(r"^/site/v1/students$"), "students", True),
+        ("GET", re.compile(r"^/site/v1/placement/english$"), "placement_get", True),
+        ("POST", re.compile(r"^/site/v1/placement/english$"), "placement_submit", True),
+        ("GET", re.compile(r"^/site/v1/placement/duolingo$"), "duolingo_get", True),
+        ("POST", re.compile(r"^/site/v1/placement/duolingo$"), "duolingo_save", True),
         ("POST", re.compile(r"^/site/v1/students$"), "student_add", True),
         ("POST", re.compile(r"^/site/v1/students/(?P<id>[0-9a-f]+)/remove$"), "student_remove", True),
         ("POST", re.compile(r"^/site/v1/students/(?P<id>[0-9a-f]+)/language$"), "student_language", True),
@@ -194,6 +200,7 @@ class Website:
         ("GET", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit$"), "homework_unit", True),
         ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit$"), "homework_unit_submit", True),
         ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit/check$"), "homework_unit_check", True),
+        ("POST", re.compile(r"^/site/v1/homework/(?P<id>\d+)/unit/progress$"), "homework_unit_progress", True),
         ("GET", re.compile(r"^/site/v1/vocab$"), "vocab", True),
         ("POST", re.compile(r"^/site/v1/vocab$"), "vocab_add", True),
         ("POST", re.compile(r"^/site/v1/vocab/delete$"), "vocab_delete", True),
@@ -202,6 +209,7 @@ class Website:
         ("POST", re.compile(r"^/site/v1/units$"), "unit_create", True),
         ("POST", re.compile(r"^/site/v1/units/generate-exercise$"), "unit_generate_exercise", True),
         ("POST", re.compile(r"^/site/v1/units/generate$"), "unit_generate", True),
+        ("POST", re.compile(r"^/site/v1/units/import-docx$"), "unit_import_docx", True),
         ("POST", re.compile(r"^/site/v1/units/library/(?P<lib>[\w-]+)$"), "unit_copy", True),
         ("GET", re.compile(r"^/site/v1/library$"), "library", True),
         ("POST", re.compile(r"^/site/v1/library/(?P<lib>[\w-]+)/check$"), "library_check", True),
@@ -214,7 +222,7 @@ class Website:
         ("GET", re.compile(r"^/site/v1/cards$"), "cards", True),
         ("POST", re.compile(r"^/site/v1/cards/review$"), "cards_review", True),
     ]
-    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload|account/photo|homework/\d+/attach"
+    RAW_BODY_RE = re.compile(r"^/site/v1/(?:rooms/[\w-]+/audio|materials/upload|units/import-docx|account/photo|homework/\d+/attach"
                              r"|chats/[\w:-]+/voice|spark/voice|admin/stt-test)$")  # тело – файл, а не JSON
     FILE_RE = re.compile(r"^/site/v1/files/(?P<id>[0-9a-f]{24})$")
 
@@ -534,6 +542,54 @@ class Website:
     def students(self, viewer: Any, **_: Any) -> Any:
         return self.accounts.students(viewer)
 
+    def board_miro_get(self, viewer: Any, id: str, **_: Any) -> Any:
+        self.portal._board_access(viewer, id)
+        row = self.portal.storage._one("SELECT miro_id FROM board_miro WHERE board_id=?", (id,))
+        return {"miro_id": row["miro_id"] if row else None}
+
+    def board_miro_save(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        from urllib.parse import urlsplit
+        _, access = self.portal._board_access(viewer, id)
+        if access.role not in ("tutor", "admin"):
+            raise PortalError(403, "подключить доску может преподаватель")
+        url = body.get("url") if isinstance(body, dict) else None
+        if not isinstance(url, str) or len(url) > 1000:
+            raise PortalError(400, "укажите ссылку на доску Miro")
+        if not url.strip():
+            self.portal.storage._exec("DELETE FROM board_miro WHERE board_id=?", (id,))
+            return {"miro_id": None}
+        try:
+            parsed = urlsplit(url.strip())
+        except ValueError:
+            raise PortalError(400, "неверная ссылка на доску Miro") from None
+        match = re.fullmatch(r"/app/(?:board|live-embed)/([A-Za-z0-9_-]+={0,2})/?", parsed.path)
+        if parsed.scheme != "https" or parsed.netloc != "miro.com" or not match:
+            raise PortalError(400, "нужна ссылка https://miro.com/app/board/... или /app/live-embed/...")
+        miro_id = match.group(1)
+        self.portal.storage._exec("INSERT INTO board_miro(board_id, miro_id) VALUES(?,?) ON CONFLICT(board_id) DO UPDATE SET miro_id=excluded.miro_id", (id, miro_id))
+        return {"miro_id": miro_id}
+
+    def unit_import_docx(self, viewer: Any, raw: bytes, **_: Any) -> Any:
+        from .document_import import docx_text
+        self.units_service._owner(viewer)
+        return {"text": docx_text(raw)}
+
+    def placement_get(self, viewer: Any, **_: Any) -> Any:
+        from .placement import get_test
+        return get_test(self.accounts, viewer)
+
+    def placement_submit(self, viewer: Any, body: Any, **_: Any) -> Any:
+        from .placement import submit_test
+        return submit_test(self.accounts, viewer, body)
+
+    def duolingo_get(self, viewer: Any, **_: Any) -> Any:
+        from .placement import get_duolingo
+        return get_duolingo(self.accounts, viewer)
+
+    def duolingo_save(self, viewer: Any, body: Any, **_: Any) -> Any:
+        from .placement import save_duolingo
+        return save_duolingo(self.accounts, viewer, body)
+
     def student_add(self, viewer: Any, body: Any, **_: Any) -> Any:
         return self.accounts.add_student(viewer, body)
 
@@ -576,6 +632,9 @@ class Website:
 
     def homework_unit_check(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
         return self.units_service.homework_check(viewer, int(id), body)
+
+    def homework_unit_progress(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
+        return self.units_service.save_progress(viewer, int(id), body)
 
     def homework_unit_submit(self, viewer: Any, id: str, body: Any, **_: Any) -> Any:
         return self.units_service.submit(viewer, int(id), body)
