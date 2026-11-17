@@ -81,6 +81,7 @@ class Settings:
     ai_key: str = ""
     ai_model: str = ""
     ai_timeout: float = 1200.0  # конспект урока на процессоре без видеокарты может готовиться 10–15 минут
+    ai_spark_parallel: int = 1  # для локальной Ollama оставляем 1; для облачного API можно увеличить
 
     # Контроль контактов
     block_contacts: bool = True  # скрывать сообщения с контактами
@@ -196,6 +197,7 @@ class Settings:
             ai_key=_env("TUTOR_AI_KEY"),
             ai_model=_env("TUTOR_AI_MODEL"),
             ai_timeout=float(_env_int("TUTOR_AI_TIMEOUT", int(cls.ai_timeout))),
+            ai_spark_parallel=max(1, min(16, _env_int("TUTOR_AI_SPARK_PARALLEL", cls.ai_spark_parallel))),
             smtp_host=_env("TUTOR_SMTP_HOST"),
             smtp_port=_env_int("TUTOR_SMTP_PORT", cls.smtp_port),
             smtp_user=_env("TUTOR_SMTP_USER"),

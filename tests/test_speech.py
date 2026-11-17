@@ -19,10 +19,16 @@ from tutor_assistant.api import Api, ApiError, make_handler
 from tutor_assistant.config import Settings
 from tutor_assistant.contact_guard import ContactGuard
 from tutor_assistant.service import TutorAssistant
-from tutor_assistant.speech import Segment, UnavailableTranscriber, make_transcriber, segments_to_transcript
+from tutor_assistant.speech import Segment, UnavailableTranscriber, _real, make_transcriber, segments_to_transcript
 from tutor_assistant.storage import Storage
 
 guard = ContactGuard()
+
+
+def test_hallucination_filter_preserves_real_lesson_context():
+    assert not _real(types.SimpleNamespace(text="Спасибо за просмотр!"))
+    assert _real(types.SimpleNamespace(text="Переведите фразу thank you for watching на русский"))
+    assert _real(types.SimpleNamespace(text="Включите субтитры для этого видео"))
 
 
 # -- контакты, произнесённые вслух ---------------------------------------------------------

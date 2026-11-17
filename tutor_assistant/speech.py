@@ -70,7 +70,10 @@ class Transcription:
 def _real(seg) -> bool:
     """Отбрасываем пустое, «галлюцинации» и то, что модель сама считает тишиной."""
     text = (getattr(seg, "text", "") or "").strip()
-    if not text or HALLUCINATION_RE.search(text):
+    # A normal lesson may discuss subtitles or the phrase "thank you for watching".
+    # Discard a known hallucination only when it is the entire segment.
+    if (not text or HALLUCINATION_RE.fullmatch(text.strip(" .,!?:;–—-\"'«»"))
+            or re.search(r"\b(?:dimatorzok|amara\.org)\b", text, re.I)):
         return False
     no_speech, logprob = getattr(seg, "no_speech_prob", 0.0) or 0.0, getattr(seg, "avg_logprob", 0.0) or 0.0
     return not (no_speech > 0.6 and logprob < -1.0)

@@ -11,6 +11,7 @@ import Iskorka from "./Iskorka.jsx";
 import PdfImport from "./pdfimport.jsx";
 import UnitPlayer from "./player.jsx";
 import Quest from "./quest.jsx";
+import { parseLocalLesson, startLocalSpark } from "../lib/localSpark.js";
 import { BookShelf, BookView } from "./books.jsx";
 
 const TYPES = {
@@ -31,6 +32,12 @@ const KIND_SHORT = { gap: "пропуски", match: "пары", choice: "тес
 
 // Черновик от генератора передаём в редактор без сохранения на сервере
 let pendingDraft = null;
+
+// The teacher explicitly chooses an answer; it is only a draft until they save it.
+export function draftFromSpark(text) {
+  pendingDraft = { title: "Черновик от Искорки", language: "en", level: "", blocks: [{ type: "text", title: "Материал от Искорки", body: text }], notice: "Проверьте содержание и добавьте интерактивные задания перед выдачей." };
+  window.location.hash = "#/app/units/new";
+}
 
 // == формат редактора: блок ↔ простой текст ======================================================
 const splitPair = (line) => {
@@ -190,6 +197,10 @@ function CreateModal({ ai, onClose }) {
   const [f, setF] = useState({ topic: "", language: "en", level: "A2", words: "", text: "", wishes: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [localProgress, setLocalProgress] = useState(null);
+  const localRun = useRef(null);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; localRun.current?.close(); }; }, []);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const go = async (mode) => {
     setBusy(true); setError(null);
@@ -197,6 +208,23 @@ function CreateModal({ ai, onClose }) {
       pendingDraft = await request("POST", "/site/v1/units/generate", { ...f, mode });
       window.location.hash = "#/app/units/new";
     } catch (x) { setError(x); setBusy(false); }
+  };
+  const goLocal = async () => {
+    setBusy(true); setError(null); setLocalProgress(0);
+    let instance;
+    try {
+      instance = await startLocalSpark((n) => { if (alive.current) setLocalProgress(Number.isFinite(n) ? n : 0); });
+      if (!alive.current) { instance.close(); return; }
+      localRun.current = instance;
+      setLocalProgress(null);
+      const system = 'Create a short language lesson as JSON only: {"title":"...","blocks":[{"type":"text","title":"...","body":"..."},{"type":"gap","title":"...","context":"...","instruction":"...","text":"Sentence with [correct answer]."},{"type":"write","title":"...","prompt":"..."}]}. Include unambiguous context and correct answers in brackets. Instructions in Russian; examples in the target language. No markdown. Keep the lesson short.';
+      const user = `Тема: ${f.topic}; язык: ${f.language}; уровень: ${f.level}. Слова: ${f.words.slice(0, 1000)}. Текст: ${f.text.slice(0, 1500)}. Пожелания: ${f.wishes.slice(0, 500)}.`;
+      const result = await instance.engine.chat.completions.create({ messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: 0.3, max_tokens: 1200 });
+      if (!alive.current) return;
+      pendingDraft = parseLocalLesson(result.choices?.[0]?.message?.content || "", f);
+      window.location.hash = "#/app/units/new";
+    } catch (x) { if (alive.current) { setError(x); setBusy(false); setLocalProgress(null); } }
+    finally { instance?.close(); localRun.current = null; }
   };
   return (
     <Modal open onClose={onClose} title="Новое занятие" wide>
@@ -214,10 +242,11 @@ function CreateModal({ ai, onClose }) {
         <ErrorBox error={error} />
         <div className="flex flex-wrap gap-2">
           {ai && <button type="button" className="btn-brand" disabled={busy || !f.topic.trim()} onClick={() => go("ai")}><Wand2 size={16} /> {busy ? "ИИ составляет занятие…" : "Создать с ИИ"}</button>}
+          <button type="button" className="btn-light" disabled={busy || !f.topic.trim()} onClick={goLocal}><Wand2 size={16} /> {busy ? localProgress === null ? "Создаю черновик…" : `Этап загрузки ИИ: ${Math.round(localProgress * 100)}%` : "Создать бесплатно на устройстве"}</button>
           <button type="button" className={ai ? "btn-light" : "btn-brand"} disabled={busy} onClick={() => go("offline")}><Sparkles size={16} /> Собрать из моих слов и текста</button>
           <button type="button" className="btn-ghost" onClick={() => { pendingDraft = { title: f.topic || "Новое занятие", language: f.language, level: f.level, blocks: [] }; window.location.hash = "#/app/units/new"; }}>Пустое занятие</button>
         </div>
-        {!ai && <p className="text-xs text-ink-mute">ИИ на сервере не подключён: занятие собирается из ваших слов и текста – пары, пропуски, тест и аудирование. Как подключить бесплатный ИИ – в README, раздел «Конструктор занятий».</p>}
+        <p className="text-xs text-ink-mute">Бесплатный ИИ работает на вашем устройстве: при первом запуске нужно скачать около 900 МБ и поддержка WebGPU. Проверьте черновик перед выдачей ученикам.</p>
       </div>
     </Modal>
   );
