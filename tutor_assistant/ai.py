@@ -68,7 +68,7 @@ class AIClient:
 
     def _openai_messages(self, messages: list[dict[str, str]], timeout: float) -> str | None:
         s = self.settings
-        body = json.dumps({"model": s.ai_model, "temperature": 0.5, "messages": messages})
+        body = json.dumps({"model": s.ai_model, "temperature": 0.5, "max_tokens": 800, "messages": messages})
         headers = {"Content-Type": "application/json"}
         if s.ai_key:
             headers["Authorization"] = f"Bearer {s.ai_key}"
@@ -77,12 +77,12 @@ class AIClient:
             with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 – адрес задаёт администратор
                 data = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            raise RuntimeError(f"сервис ИИ ответил {exc.code}: {exc.read()[:200].decode('utf-8', 'replace')}") from None
+            raise RuntimeError(f"сервис ИИ временно недоступен (HTTP {exc.code})") from None
         return data["choices"][0]["message"]["content"]
 
     def _openai(self, system: str, user: str, timeout: float) -> str | None:
         s = self.settings
-        body = json.dumps({"model": s.ai_model, "temperature": 0.4,
+        body = json.dumps({"model": s.ai_model, "temperature": 0.4, "max_tokens": 3000,
                            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
         headers = {"Content-Type": "application/json"}
         if s.ai_key:
@@ -92,7 +92,7 @@ class AIClient:
             with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 – адрес задаёт администратор
                 data = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            raise RuntimeError(f"сервис ИИ ответил {exc.code}: {exc.read()[:200].decode('utf-8', 'replace')}") from None
+            raise RuntimeError(f"сервис ИИ временно недоступен (HTTP {exc.code})") from None
         return data["choices"][0]["message"]["content"]
 
     def _claude(self, system: str, user: str, timeout: float) -> str | None:

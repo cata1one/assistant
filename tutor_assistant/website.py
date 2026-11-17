@@ -55,8 +55,7 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
     "Content-Security-Policy": ("default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; "
-                                "style-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; "
-                                "connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co https://raw.githubusercontent.com; "
+                                "style-src 'self'; script-src 'self'; connect-src 'self'; "
                                 # Плееры видео для уроков и доски – без демонстрации экрана
                                 "frame-src https://vk.com https://vkvideo.ru https://www.youtube-nocookie.com "
                                 "https://rutube.ru; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),

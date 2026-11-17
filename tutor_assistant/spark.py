@@ -27,12 +27,12 @@ MAX_TEXT = 2000
 MAX_VOICE = 3 * 1024 * 1024
 
 SYSTEM = (
-    "Ты – Искорка, помощник на платформе Bright для уроков иностранных языков. "
-    "Отвечай по-русски, тепло и по делу, обычно 3–8 предложений. Без таблиц и сложного оформления, "
-    "списки – короткими строками. Не придумывай факты о человеке: используй только сведения ниже. "
-    "Если просят сделать что-то в интерфейсе (начать урок, оплатить, выдать домашку), коротко подскажи, где кнопка. "
-    "Если просят потренировать язык, веди диалог на изучаемом языке, после каждой реплики мягко исправляй ошибки "
-    "и давай перевод трудных слов. Не используй тире «—», только короткое «–»."
+    "Ты Искорка, помощник Bright для преподавания и изучения языков. Отвечай на языке вопроса, "
+    "доброжелательно и по существу. При практике разговора используй изучаемый язык и мягко исправляй ошибки. "
+    "Для заданий давай достаточно контекста, понятные инструкции и проверяемые ответы; учитывай тему и уровень. "
+    "Если данных не хватает, задай уточняющий вопрос. Не выдумывай факты об ученике или возможностях платформы. "
+    "Ты не можешь самостоятельно изменять данные: не утверждай, что сохранила или выдала занятие. "
+    "В важных случаях рекомендуй преподавателю проверить результат. Не используй тире «—», только короткое «–»."
 )
 ROLE_RULES = {
     "tutor": "Собеседник – преподаватель. Помогай готовить уроки: план занятия, упражнения с ответами, объяснения "
@@ -45,8 +45,9 @@ ROLE_RULES = {
               "как устроена платформа. Оценки преподавателю не ставь.",
 }
 UI_HINTS = (
-    "Где что на сайте: «Сегодня» – главная; урок начинает преподаватель кнопкой «Начать урок» у ученика, ученик входит "
-    "кнопкой «Войти в урок»; «Домашка» – задания; «Слова» – карточки; «Материалы» – файлы, учебники и готовые занятия; "
+    "Где что на сайте: у преподавателя «Рабочий стол» – главная; урок начинается кнопкой «Начать урок» у ученика, ученик входит "
+    "кнопкой «Войти в урок»; домашние задания и оплата преподавателя находятся в разделе «Ученики»; "
+    "у ученика «Домашка» – задания, «Слова» – карточки; «Материалы» – файлы, учебники и готовые занятия; "
     "«Сообщения» – переписка, можно отправить голосовое; «Оплата» – оплата занятий; «Профиль» – фото, оформление, пароль."
 )
 
@@ -89,37 +90,30 @@ class Spark:
         return ("tutor" if "tutor" in roles else "parent" if "parent" in roles and "student" not in roles else "student"), ""
 
     def _context(self, viewer: Viewer, role: str, name: str) -> str:
-        lines = [f"Имя: {name.split()[0] if name else 'не указано'}."]
+        # Only include teaching context needed to answer; avoid sending student names and balances to an external model.
+        lines = []
         try:
             me = self.portal.me(viewer)
             if role == "tutor":
                 studs = self.accounts.students(viewer)["students"] if viewer.user_id.startswith("a_") else []
                 if studs:
-                    lines.append("Ученики: " + "; ".join(
-                        f"{s['name']} ({s['language']}{', ещё не подключился' if not s['joined'] else ''}"
-                        f"{', оплачено занятий: ' + str(s.get('balance')) if s.get('balance') else ''})" for s in studs[:25]))
+                    lines.append(f"Количество учеников: {len(studs)}.")
                 hw = self.learning.homework(viewer)["homework"]
                 sent = [h for h in hw if h.get("status") == "done"]
                 if sent:
                     lines.append(f"Домашек ждут проверки: {len(sent)}.")
             if role in ("student", "parent"):
-                tutors = [c["title"] for c in me["chats"] if c["role"] == role]
-                if tutors:
-                    lines.append("Преподаватели: " + ", ".join(tutors) + ".")
                 langs = sorted({c.get("language") for c in me["chats"] if c.get("language")})
                 if langs:
                     lines.append("Изучаемые языки (коды): " + ", ".join(langs) + ".")
             if role == "student":
                 hw = [h for h in self.learning.homework(viewer)["homework"] if h.get("status") == "open"]
                 if hw:
-                    lines.append("Открытая домашка: " + " | ".join(h["text"][:160] for h in hw[:3]))
+                    lines.append(f"Открытых домашних заданий: {len(hw)}.")
                 words = self.learning.word_list(viewer)[:30]
                 if words:
                     lines.append("Слова ученика: " + ", ".join(
                         f"{w['word']} – {w['translation']}" if w.get("translation") else w["word"] for w in words))
-            done = [x["title"] for x in me["lessons"] if x["status"] == "finished"][:5]
-            if done:
-                lines.append("Последние уроки: " + "; ".join(done) + ".")
         except PortalError:
             pass
         return "\n".join(lines)
@@ -127,6 +121,21 @@ class Spark:
     # -- переписка --------------------------------------------------------------------------------------
     def history(self, viewer: Viewer) -> dict[str, Any]:
         rows = self.storage.spark_messages(viewer.user_id)
+        # A restart can leave an old background request marked pending forever.
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=3)
+        for row in rows:
+            if row["status"] != "pending":
+                continue
+            try:
+                created = datetime.fromisoformat(row["created_at"])
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError):
+                continue
+            if created < cutoff:
+                message = "Ответ прервался. Попробуйте отправить вопрос ещё раз."
+                if self.storage.update_spark(row["id"], message, "error"):
+                    row["status"], row["text"] = "error", message
         return {"name": NAME, "ai": self.ai.provider is not None,
                 "messages": [{k: r[k] for k in ("id", "role", "text", "status", "created_at")} | {"voice": bool(r["voice"])}
                              for r in rows]}
@@ -162,28 +171,39 @@ class Spark:
         role, name = self._who(viewer)
         if role == "parent" and not viewer.user_id.startswith("a_"):
             role = "parent"
-        self.storage.add_spark(viewer.user_id, "user", text, voice=voice)
         if self.ai.provider is None:
+            self.storage.add_spark(viewer.user_id, "user", text, voice=voice)
             self.storage.add_spark(viewer.user_id, "spark", self._offline(viewer, role, text))
             return self.history(viewer)
-        pending = self.storage.add_spark(viewer.user_id, "spark", "Думаю…", status="pending")
-        system = "\n\n".join([SYSTEM, ROLE_RULES.get(role, ROLE_RULES["student"]), UI_HINTS,
-                              "Сведения о собеседнике:\n" + self._context(viewer, role, name)])
-        dialog = [{"role": "assistant" if r["role"] == "spark" else "user", "content": r["text"]}
-                  for r in self.storage.spark_messages(viewer.user_id, limit=13)
-                  if r["status"] == "done" and r["id"] != pending][-12:]
-        threading.Thread(target=self._answer, args=(pending, system, dialog), daemon=True).start()
+        if not self._busy.acquire(blocking=False):
+            raise PortalError(429, "Искорка сейчас отвечает другим пользователям. Попробуйте через минуту.")
+        try:
+            self.storage.add_spark(viewer.user_id, "user", text, voice=voice)
+            pending = self.storage.add_spark(viewer.user_id, "spark", "Думаю…", status="pending")
+            system = "\n\n".join([SYSTEM, ROLE_RULES.get(role, ROLE_RULES["student"]), UI_HINTS,
+                                  "Контекст:\n" + self._context(viewer, role, name)])
+            dialog = [{"role": "assistant" if r["role"] == "spark" else "user", "content": r["text"]}
+                      for r in self.storage.spark_messages(viewer.user_id, limit=13)
+                      if r["status"] == "done" and r["id"] != pending][-12:]
+            threading.Thread(target=self._answer, args=(pending, system, dialog), daemon=True).start()
+        except Exception:
+            self._busy.release()
+            raise
         return self.history(viewer)
 
     def _answer(self, pending: int, system: str, dialog: list[dict[str, str]]) -> None:
-        with self._busy:
-            reply = self.ai.chat(system, dialog, timeout=min(self.settings.ai_timeout, 600))
-        if reply and reply.strip():
-            self.storage.update_spark(pending, _clean(reply), "done")
-        else:
-            self.storage.update_spark(pending, "Не получилось ответить: ИИ на сервере не отвечает. Попробуйте ещё раз "
-                                               "через минуту.", "error")
-            log.warning("Искорка не ответила: %s", self.ai.last_error)
+        try:
+            reply = self.ai.chat(system, dialog, timeout=min(self.settings.ai_timeout, 60))
+            if reply and reply.strip():
+                self.storage.update_spark(pending, _clean(reply), "done")
+            else:
+                self.storage.update_spark(pending, "ИИ временно недоступен или дневной лимит исчерпан. Попробуйте позже.", "error")
+                log.warning("Искорка не ответила: %s", self.ai.last_error)
+        except Exception:
+            log.exception("Ошибка ответа Искорки")
+            self.storage.update_spark(pending, "Не получилось ответить. Попробуйте ещё раз.", "error")
+        finally:
+            self._busy.release()
 
     def _offline(self, viewer: Viewer, role: str, text: str) -> str:
         low = text.lower()

@@ -107,7 +107,33 @@ def test_spark_with_ai_answers_in_background(env):
         time.sleep(0.02)
     assert last["text"] == "Present Perfect – это..."  # длинное тире заменено
     system, dialog = calls[0]
-    assert "Миша" in system and dialog[-1] == {"role": "user", "content": "Объясни Present Perfect"}
+    assert "Миша" not in system and "Количество учеников" in system
+    assert dialog[-1] == {"role": "user", "content": "Объясни Present Perfect"}
+
+
+def test_spark_rejects_overload_without_queuing(env):
+    tutor, _, _ = pair(env)
+    sp = env["spark"]
+    sp.ai.settings = Settings(ai_url="http://ai.local/v1", ai_model="qwen")
+    assert sp._busy.acquire(blocking=False)
+    try:
+        with pytest.raises(PortalError) as error:
+            sp.ask(tutor, {"text": "Объясни грамматику"})
+        assert error.value.status == 429
+        assert not sp.history(tutor)["messages"]
+    finally:
+        sp._busy.release()
+
+
+def test_spark_old_pending_reply_expires(env):
+    tutor, _, _ = pair(env)
+    store = env["a"].storage
+    message_id = store.add_spark(tutor.user_id, "spark", "Думаю…", status="pending")
+    store._exec("UPDATE spark_messages SET created_at=? WHERE id=?", ("2020-01-01T00:00:00+00:00", message_id))
+    last = env["spark"].history(tutor)["messages"][-1]
+    assert last["status"] == "error" and "прервался" in last["text"]
+    assert not store.update_spark(message_id, "late reply", "done")
+    assert env["spark"].history(tutor)["messages"][-1]["status"] == "error"
 
 
 def test_spark_rate_limit(env):
