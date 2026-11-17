@@ -5,7 +5,6 @@ import { useConfig } from "../lib/config.js";
 import { useSession } from "../lib/session.js";
 import { ErrorBox, Notice } from "../ui/kit.jsx";
 import Iskorka from "../app/Iskorka.jsx";
-import { SparkPage } from "../app/spark.jsx";
 
 // Быстрые ответы на то, о чём спрашивают чаще всего; роль берётся из кабинета, на сайте показываем общие
 const QUICK = {
@@ -52,6 +51,9 @@ export default function Help({ inApp = false, immersive = false }) {
     setBusy(false);
   };
 
+  // The assistant already fills this page; do not cover its composer with a second mascot.
+  if (window.location.hash.startsWith("#/app/spark") && !open) return null;
+
   return (
     <div className={`spark-helper fixed right-3 z-50 flex flex-col items-end md:right-5 ${immersive ? "spark-helper-immersive" : inApp ? "spark-helper-app" : "spark-helper-public"}`}>
       {open && (
@@ -60,10 +62,10 @@ export default function Help({ inApp = false, immersive = false }) {
             <div className="flex items-center gap-2"><Iskorka size={36} still /><div><p className="text-base font-semibold">Искорка рядом</p><p className="text-xs text-ink-mute">Помогу с вопросами о Bright</p></div></div>
             <button type="button" className="btn-ghost !p-1.5" onClick={() => setOpen(false)} aria-label="Закрыть"><X size={16} /></button>
           </div>
-          {view === "chat" && session.role ? <><SparkPage compact /><button type="button" className="w-full border-t border-line px-4 py-2 text-sm font-semibold text-brand" onClick={() => setView("faq")}>Вопросы о платформе и поддержка</button></> : <div className="max-h-[min(60dvh,32rem)] overflow-y-auto p-4">
+          <div className="max-h-[min(60dvh,32rem)] overflow-y-auto p-4">
             {view === "faq" && (
               <>
-                {session.role ? <button type="button" className="btn-brand mb-4 w-full" onClick={() => setView("chat")}>Спросить Искорку</button>
+                {session.role ? <a className="btn-brand mb-4 w-full" href="#/app/spark" onClick={() => setOpen(false)}>Открыть чат с Искоркой</a>
                   : <div className="mb-4 rounded-2xl bg-brand-tint p-3 text-sm text-ink-soft">Могу подсказать, как устроен Bright. <a className="font-semibold text-brand underline" href="#/login" onClick={() => setOpen(false)}>Войдите</a>, чтобы написать мне в чате.</div>}
                 <div className="grid gap-2">
                   {QUICK[role].map(([q, a]) => (
@@ -107,10 +109,10 @@ export default function Help({ inApp = false, immersive = false }) {
                 <button type="button" className="btn-light" onClick={() => setView("faq")}>Хорошо</button>
               </div>
             )}
-          </div>}
+          </div>
         </div>
       )}
-      <button type="button" onClick={() => { setOpen(!open); if (!open) setView(session.role ? "chat" : "faq"); }} aria-expanded={open} aria-label={open ? "Закрыть помощь" : "Спросить Искорку"}
+      <button type="button" onClick={() => { if (session.role && !window.location.hash.startsWith("#/app/spark")) { setOpen(false); window.location.hash = "#/app/spark"; } else { setOpen(!open); if (!open) setView("faq"); } }} aria-expanded={open} aria-label={open ? "Закрыть помощь" : "Спросить Искорку"}
         className="spark-helper-button flex h-14 items-center gap-1 rounded-full border border-[#b7cdea] bg-[#06469e] pl-1 pr-4 text-sm font-semibold text-white shadow-lift transition hover:bg-[#053477]">
         {open ? <X className="mx-3" size={20} /> : <><Iskorka size={46} still /><span className="hidden sm:inline">Помогу!</span></>}
       </button>

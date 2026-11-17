@@ -1265,8 +1265,10 @@ class Storage:
                          (user_id, role, text, status, int(voice), utcnow()))
         return int(cur.lastrowid)
 
-    def update_spark(self, message_id: int, text: str, status: str) -> None:
-        self._exec("UPDATE spark_messages SET text=?, status=? WHERE id=?", (text, status, message_id))
+    def update_spark(self, message_id: int, text: str, status: str) -> bool:
+        # Never replace an answer that was already completed or expired by another request.
+        return bool(self._exec("UPDATE spark_messages SET text=?, status=? WHERE id=? AND status='pending'",
+                               (text, status, message_id)).rowcount)
 
     def spark_messages(self, user_id: str, limit: int = 60) -> list[dict[str, Any]]:
         rows = self._all("SELECT * FROM spark_messages WHERE user_id=? ORDER BY id DESC LIMIT ?", (user_id, limit))
