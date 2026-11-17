@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { localMessages, parseLocalLesson } from "../src/lib/localSpark.js";
+import { localMessages, parseLocalLesson, streamLocalAnswer } from "../src/lib/localSpark.js";
 
 const form = { topic: "Travel", language: "en", level: "B1" };
 
@@ -22,8 +22,23 @@ test("local lesson rejects incomplete or empty output", () => {
 test("student prompt avoids claiming actions and retains only recent messages", () => {
   const previous = Array.from({ length: 8 }, (_, i) => ({ role: "user", text: String(i) }));
   const messages = localMessages("student", previous, "Hello");
-  assert.equal(messages.length, 8);
+  assert.equal(messages.length, 6);
   assert.match(messages[0].content, /не выполняй/);
   assert.match(messages[0].content, /Не утверждай/);
   assert.equal(messages.at(-1).content, "Hello");
+});
+
+test("local answers appear incrementally instead of waiting for completion", async () => {
+  const updates = [];
+  const engine = { chat: { completions: { create: async (options) => {
+    assert.equal(options.stream, true);
+    return (async function* () { yield { choices: [{ delta: { content: "Hello" } }] }; yield { choices: [{ delta: { content: "!" } }] }; })();
+  } } } };
+  assert.equal(await streamLocalAnswer(engine, [], (text) => updates.push(text)), "Hello!");
+  assert.deepEqual(updates, ["Hello", "Hello!"]);
+});
+
+test("unresponsive local model returns a useful error", async () => {
+  const engine = { chat: { completions: { create: () => new Promise(() => {}) } } };
+  await assert.rejects(streamLocalAnswer(engine, [], () => {}, 20), /слишком долго/);
 });

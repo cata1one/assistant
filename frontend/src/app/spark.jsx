@@ -6,7 +6,7 @@ import { useSession } from "../lib/session.js";
 import { sendVoice } from "../lib/voice.js";
 import { ErrorBox, Loading } from "../ui/kit.jsx";
 import VoiceButton from "./VoiceButton.jsx";
-import { localMessages, startLocalSpark } from "../lib/localSpark.js";
+import { FAST_LOCAL_MODEL, LOCAL_MODEL, localMessages, startLocalSpark, streamLocalAnswer } from "../lib/localSpark.js";
 import { draftFromSpark } from "./units.jsx";
 
 // Подсказки, с чего начать: самые частые просьбы для каждой роли
@@ -36,19 +36,24 @@ export function SparkPage({ compact = false }) {
   const [localLoading, setLocalLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [localChat, setLocalChat] = useState([]);
+  const [localModel, setLocalModel] = useState(LOCAL_MODEL);
   const localEngine = useRef(null);
+  const localRequest = useRef(0);
+  const loadController = useRef(null);
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; localEngine.current?.close(); }; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadController.current?.abort(); localEngine.current?.close(); }; }, []);
   const enableLocal = async () => {
     if (localLoading) return;
     setError(null); setLocalLoading(true); setProgress(0);
+    const controller = new AbortController();
+    loadController.current = controller;
     try {
-      const instance = await startLocalSpark((n) => { if (mounted.current) setProgress(Number.isFinite(n) ? n : 0); });
-      if (!mounted.current) { instance.close(); return; }
+      const instance = await startLocalSpark((n) => { if (mounted.current && !controller.signal.aborted) setProgress(Number.isFinite(n) ? n : 0); }, localModel, controller.signal);
+      if (!mounted.current || controller.signal.aborted) { instance.close(); return; }
       localEngine.current?.close(); localEngine.current = instance; setLocalMode(true);
     } catch (x) {
-      if (mounted.current) setError(new Error(`Не удалось включить ИИ на устройстве. Проверьте свободное место и подключение к интернету. ${x.message || ""}`));
-    } finally { if (mounted.current) setLocalLoading(false); }
+      if (mounted.current && x.name !== "AbortError") setError(new Error(`Не удалось включить ИИ на устройстве. Проверьте свободное место и подключение к интернету. ${x.message || ""}`));
+    } finally { if (loadController.current === controller) loadController.current = null; if (mounted.current) setLocalLoading(false); }
   };
   const box = useRef(null);
   const load = () => request("GET", "/site/v1/spark").then(setData).catch(setError);
@@ -75,15 +80,21 @@ export function SparkPage({ compact = false }) {
     setBusy(true); setError(null);
     if (localMode) {
       const before = localChat;
-      setLocalChat([...before, { id: `u-${Date.now()}`, role: "user", text: value, status: "done" }]);
+      const requestId = ++localRequest.current;
+      const replyId = `a-${requestId}-${Date.now()}`;
+      setLocalChat([...before, { id: `u-${replyId}`, role: "user", text: value, status: "done" }, { id: replyId, role: "spark", text: "", status: "pending" }]);
       setText("");
       try {
-        const result = await localEngine.current.engine.chat.completions.create({ messages: localMessages(role, before, value), temperature: 0.5, max_tokens: 700 });
-        const reply = result.choices?.[0]?.message?.content?.trim();
-        if (!reply) throw new Error("Модель не вернула ответ. Попробуйте переформулировать вопрос.");
-        if (mounted.current) setLocalChat((prev) => [...prev, { id: `a-${Date.now()}`, role: "spark", text: reply, status: "done" }]);
-      } catch (x) { if (mounted.current) setError(x); }
-      if (mounted.current) setBusy(false);
+        const reply = await streamLocalAnswer(localEngine.current.engine, localMessages(role, before, value), (partial) => {
+          if (mounted.current && localRequest.current === requestId) setLocalChat((prev) => prev.map((m) => m.id === replyId ? { ...m, text: partial } : m));
+        });
+        if (mounted.current && localRequest.current === requestId) setLocalChat((prev) => prev.map((m) => m.id === replyId ? { ...m, text: reply, status: "done" } : m));
+      } catch (x) {
+        if (mounted.current && localRequest.current === requestId) {
+          localEngine.current?.close(); localEngine.current = null; setLocalMode(false); setText(value); setError(x);
+        }
+      }
+      if (mounted.current && localRequest.current === requestId) setBusy(false);
       return;
     }
     try { setData(await request("POST", "/site/v1/spark", { text: value })); setText(""); } catch (x) { setError(x); }
@@ -107,7 +118,7 @@ export function SparkPage({ compact = false }) {
       </div>
       <div className="border-b border-line px-4 py-2 text-sm">
         {localMode ? <div className="flex flex-wrap items-center justify-between gap-2"><span>Ответы создаются на устройстве. Проверяйте материалы перед уроком.</span><button type="button" disabled={busy} className="btn-ghost btn-sm" onClick={() => { localEngine.current?.close(); localEngine.current = null; setLocalChat([]); setLocalMode(false); }}>Выключить</button></div>
-          : <div><button type="button" className="btn-light btn-sm" disabled={localLoading || busy || pending} onClick={enableLocal}>{localLoading ? `Этап загрузки ИИ: ${Math.round(progress * 100)}%` : "Включить бесплатный ИИ на устройстве"}</button><p className="mt-1 text-xs text-ink-mute">Около 900 МБ при первой загрузке. Подготовка состоит из нескольких этапов. Нужен совместимый браузер и достаточно памяти. Локальная переписка не сохраняется после закрытия.</p></div>}
+          : <div><div className="flex flex-wrap gap-2"><label className="sr-only" htmlFor="spark-model">Модель ИИ</label><select id="spark-model" className="field !h-9 !w-auto !py-0 text-xs" disabled={localLoading || busy || pending} value={localModel} onChange={(e) => setLocalModel(e.target.value)}><option value={LOCAL_MODEL}>Обычная — точнее</option><option value={FAST_LOCAL_MODEL}>Облегчённая — быстрее</option></select><button type="button" className="btn-light btn-sm" disabled={localLoading || busy || pending} onClick={enableLocal}>{localLoading ? `Этап загрузки ИИ: ${Math.round(progress * 100)}%` : "Включить бесплатный ИИ на устройстве"}</button>{localLoading && <button type="button" className="btn-ghost btn-sm" onClick={() => loadController.current?.abort()}>Отменить загрузку</button>}</div><p className="mt-1 text-xs text-ink-mute">Обычная модель: около 900 МБ; облегчённая меньше и может отвечать проще. При первом запуске нужен интернет. Локальная переписка не сохраняется после закрытия.</p></div>}
       </div>
       <div ref={box} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {!messages.length && (
@@ -124,7 +135,7 @@ export function SparkPage({ compact = false }) {
           <div key={m.id} className={`flex gap-2.5 ${m.role === "user" ? "justify-end" : ""}`}>
             {m.role !== "user" && <Iskorka size={34} still mood={m.status === "pending" ? "think" : m.status === "error" ? "oops" : "happy"} className="mt-0.5" />}
             <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed ${m.role === "user" ? "rounded-br-md bg-ink text-white" : m.status === "error" ? "bg-teach-tint text-teach-deep" : "rounded-tl-md bg-cream"}`}>
-              {m.status === "pending" ? <span className="inline-flex items-center gap-1.5 text-ink-mute"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-mute" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-mute [animation-delay:.15s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-mute [animation-delay:.3s]" /> думаю</span> : m.text}
+              {m.status === "pending" && !m.text ? <span className="text-ink-mute">Готовлю ответ…</span> : m.text}
               {m.voice && <span className="mt-1 block text-[11px] opacity-60">голосовое</span>}
               {localMode && (role === "tutor" || role === "school") && m.role !== "user" && m.status === "done" && <button type="button" className="mt-3 block rounded-lg border border-line bg-white px-3 py-1.5 text-left text-xs font-semibold text-ink" onClick={() => draftFromSpark(m.text)}>Открыть ответ как черновик занятия</button>}
             </div>
@@ -132,6 +143,7 @@ export function SparkPage({ compact = false }) {
         ))}
       </div>
       {error && <div className="px-4 pb-2"><ErrorBox error={error} /></div>}
+      {localMode && busy && <div className="px-4 pb-2"><button type="button" className="btn-light btn-sm" onClick={() => { localRequest.current++; localEngine.current?.close(); localEngine.current = null; setLocalMode(false); setBusy(false); setError(new Error("Ответ остановлен. Вы можете снова включить ИИ или выбрать облегчённую модель.")); }}>Остановить ответ</button></div>}
       <form onSubmit={(e) => { e.preventDefault(); ask(); }} className="relative flex items-center gap-2 border-t border-line p-2.5">
         <input className="field !h-10 !py-0" maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder={pending ? "Искорка отвечает…" : "Спросите Искорку"} aria-label="Вопрос" />
         {text.trim() ? <button type="submit" className="btn-brand !h-10 !w-10 shrink-0 !p-0" disabled={busy} aria-label="Отправить"><Send size={17} /></button>
